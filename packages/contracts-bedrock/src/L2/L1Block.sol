@@ -219,4 +219,32 @@ contract L1Block is ISemver {
             sstore(operatorFeeConstant.slot, shr(160, calldataload(164)))
         }
     }
+
+    /// @notice Updates the L1 block values for an Jovian upgraded chain.
+    /// Params are packed and passed in as raw msg.data instead of ABI to reduce calldata size.
+    /// Params are expected to be in the following order:
+    ///   1. _baseFeeScalar      L1 base fee scalar
+    ///   2. _blobBaseFeeScalar  L1 blob base fee scalar
+    ///   3. _sequenceNumber     Number of L2 blocks since epoch start.
+    ///   4. _timestamp          L1 timestamp.
+    ///   5. _number             L1 blocknumber.
+    ///   6. _basefee            L1 base fee.
+    ///   7. _blobBaseFee        L1 blob base fee.
+    ///   8. _hash               L1 blockhash.
+    ///   9. _batcherHash        Versioned hash to authenticate batcher by.
+    ///   10. _operatorFeeScalar   Operator fee scalar.
+    ///   11. _operatorFeeConstant Operator fee constant.
+    ///   12. _depositNonce       Nonce of the latest TransactionDeposited event processed up to this block.
+    ///   13. _configUpdateNonce  Nonce of the latest ConfigUpdate event processed up to this block.
+    function setL1BlockValuesJovian() external {
+        _setL1BlockValuesJovian();
+    }
+
+    function _setL1BlockValuesJovian() internal {
+        _setL1BlockValuesIsthmus();
+        assembly {
+            // depositNonce (uint64) and configUpdateNonce (uint64)
+            sstore(depositNonce.slot, shr(128, calldataload(164)))
+        }
+    }
 }

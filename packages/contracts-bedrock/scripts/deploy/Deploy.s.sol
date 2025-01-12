@@ -20,7 +20,7 @@ import { DeploySuperchainInput, DeploySuperchain, DeploySuperchainOutput } from 
 import {
     DeployImplementationsInput,
     DeployImplementations,
-    DeployImplementationsIsthmus,
+    DeployImplementationsJovian,
     DeployImplementationsOutput
 } from "scripts/deploy/DeployImplementations.s.sol";
 
@@ -294,8 +294,8 @@ contract Deploy is Deployer {
         // I think this was a bug
         dii.set(dii.upgradeController.selector, superchainProxyAdmin.owner());
 
-        if (cfg.l2GenesisIsthmusTimeOffset() == 0) {
-            di = DeployImplementations(new DeployImplementationsIsthmus());
+        if (cfg.l2GenesisJovianTimeOffset() == 0) {
+            di = DeployImplementations(new DeployImplementationsJovian());
         }
         di.run(dii, dio);
 

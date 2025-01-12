@@ -23,18 +23,21 @@ const (
 	L1InfoFuncIsthmusSignature = "setL1BlockValuesIsthmus()"
 	L1InfoArguments            = 8
 	L1InfoBedrockLen           = 4 + 32*L1InfoArguments
-	L1InfoEcotoneLen           = 4 + 32*5         // after Ecotone upgrade, args are packed into 5 32-byte slots
-	L1InfoIsthmusLen           = 4 + 32*5 + 4 + 8 // after Isthmus upgrade, additionally pack in operator fee scalar and constant
+	L1InfoEcotoneLen           = 4 + 32*5      // after Ecotone upgrade, args are packed into 5 32-byte slots
+	L1InfoIsthmusLen           = 4 + 32*5 + 12 // after Isthmus upgrade, additionally pack in operator fee scalar and constant
+	L1InfoJovianLen            = 4 + 32*5 + 28 // after Jovian upgrade, additionally pack in deposit + config nonces
 )
 
 var (
 	L1InfoFuncBedrockBytes4 = crypto.Keccak256([]byte(L1InfoFuncBedrockSignature))[:4]
 	L1InfoFuncEcotoneBytes4 = crypto.Keccak256([]byte(L1InfoFuncEcotoneSignature))[:4]
 	L1InfoFuncIsthmusBytes4 = crypto.Keccak256([]byte(L1InfoFuncIsthmusSignature))[:4]
+	L1InfoFuncJovianBytes4  = crypto.Keccak256([]byte(L1InfoFuncJovianSignature))[:4]
 	L1InfoDepositerAddress  = common.HexToAddress("0xdeaddeaddeaddeaddeaddeaddeaddeaddead0001")
 	L1BlockAddress          = predeploys.L1BlockAddr
 	ErrInvalidFormat        = errors.New("invalid ecotone l1 block info format")
 	ErrInvalidIsthmusFormat = errors.New("invalid isthmus l1 block info format")
+	ErrInvalidJovianFormat = errors.New("invalid jovian l1 block info format")
 )
 
 const (
@@ -254,7 +257,7 @@ func (info *L1BlockInfo) unmarshalBinaryEcotone(data []byte) error {
 	return nil
 }
 
-// Interop & Isthmus Binary Format
+// Isthmus Binary Format
 // +---------+--------------------------+
 // | Bytes   | Field                    |
 // +---------+--------------------------+
@@ -379,6 +382,28 @@ func unmarshalBinaryWithSignatureAndData(info *L1BlockInfo, signature []byte, da
 func (info *L1BlockInfo) unmarshalBinaryIsthmus(data []byte) error {
 	return unmarshalBinaryWithSignatureAndData(info, L1InfoFuncIsthmusBytes4, data)
 }
+
+// Jovian & Interop Binary Format
+// +---------+--------------------------+
+// | Bytes   | Field                    |
+// +---------+--------------------------+
+// | 4       | Function signature       |
+// | 4       | BaseFeeScalar            |
+// | 4       | BlobBaseFeeScalar        |
+// | 8       | SequenceNumber           |
+// | 8       | Timestamp                |
+// | 8       | L1BlockNumber            |
+// | 32      | BaseFee                  |
+// | 32      | BlobBaseFee              |
+// | 32      | BlockHash                |
+// | 32      | BatcherHash              |
+// | 4       | OperatorFeeScalar        |
+// | 8       | OperatorFeeConstant      |
+// | 8       | DepositNonce             |
+// | 8       | ConfigUpdateNonce        |
+// +---------+--------------------------+
+
+TODO! (removed by rebase)
 
 // isEcotoneButNotFirstBlock returns whether the specified block is subject to the Ecotone upgrade,
 // but is not the activation block itself.
