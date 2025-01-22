@@ -282,6 +282,21 @@ contract L1BlockCustomGasToken_Test is L1BlockTest {
         assertEq(symbol, GasPayingToken.sanitize(LibString.fromSmallString(_symbol)));
     }
 
+    /// @dev Tests that `setConfig` with `STANDARD_BRIDGE_ADDRESS` config type updates the values correctly.
+    function test_setConfig_standardBridge_succeeds(address _bridge) external {
+        Types.ConfigType configType = Types.ConfigType.L1_STANDARD_BRIDGE_ADDRESS;
+        bytes memory data = abi.encode(_bridge);
+
+        vm.prank(Constants.DEPOSITOR_ACCOUNT);
+        l1Block.setConfig(configType, data);
+
+        bytes memory config = l1Block.getConfig(configType);
+        assertEq(keccak256(config), keccak256(data));
+
+        address bridge = abi.decode(config, (address));
+        assertEq(bridge, _bridge);
+    }
+
     /// @dev Tests that `setConfig` with `L1_CROSS_DOMAIN_MESSENGER_ADDRESS` config type updates the values correctly.
     function test_setConfig_l1CrossDomainMessenger_succeeds(address _l1CrossDomainMessengerAddress) external {
         Types.ConfigType configType = Types.ConfigType.L1_CROSS_DOMAIN_MESSENGER_ADDRESS;

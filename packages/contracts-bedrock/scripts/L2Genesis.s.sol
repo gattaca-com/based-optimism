@@ -19,7 +19,6 @@ import { Preinstalls } from "src/libraries/Preinstalls.sol";
 // Interfaces
 import { IOptimismMintableERC721Factory } from "interfaces/L2/IOptimismMintableERC721Factory.sol";
 import { IGovernanceToken } from "interfaces/governance/IGovernanceToken.sol";
-import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
 import { IL2StandardBridge } from "interfaces/L2/IL2StandardBridge.sol";
 import { IL2ERC721Bridge } from "interfaces/L2/IL2ERC721Bridge.sol";
 import { IStandardBridge } from "interfaces/universal/IStandardBridge.sol";
@@ -333,13 +332,7 @@ contract L2Genesis is Deployer {
 
     /// @notice This predeploy is following the safety invariant #1.
     function setOptimismMintableERC20Factory() public {
-        address impl = _setImplementationCode(Predeploys.OPTIMISM_MINTABLE_ERC20_FACTORY);
-
-        IOptimismMintableERC20Factory(impl).initialize({ _bridge: address(0) });
-
-        IOptimismMintableERC20Factory(Predeploys.OPTIMISM_MINTABLE_ERC20_FACTORY).initialize({
-            _bridge: Predeploys.L2_STANDARD_BRIDGE
-        });
+        _setImplementationCode(Predeploys.OPTIMISM_MINTABLE_ERC20_FACTORY);
     }
 
     /// @notice This predeploy is following the safety invariant #2,

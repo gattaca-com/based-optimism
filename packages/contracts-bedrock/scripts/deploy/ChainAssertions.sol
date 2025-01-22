@@ -49,7 +49,7 @@ library ChainAssertions {
         checkSystemConfig({ _contracts: _prox, _cfg: _cfg, _isProxy: true });
         checkL1CrossDomainMessenger({ _contracts: _prox, _vm: _vm, _isProxy: true });
         checkL1StandardBridge({ _contracts: _prox, _isProxy: true });
-        checkOptimismMintableERC20Factory({ _contracts: _prox, _isProxy: true });
+        checkL1OptimismMintableERC20Factory({ _contracts: _prox, _isProxy: true });
         checkL1ERC721Bridge({ _contracts: _prox, _isProxy: true });
         checkOptimismPortal2({ _contracts: _prox, _cfg: _cfg, _isProxy: true });
         checkProtocolVersions({ _contracts: _prox, _cfg: _cfg, _isProxy: true });
@@ -314,7 +314,7 @@ library ChainAssertions {
     }
 
     /// @notice Asserts that the OptimismMintableERC20Factory is setup correctly
-    function checkOptimismMintableERC20Factory(Types.ContractSet memory _contracts, bool _isProxy) internal view {
+    function checkL1OptimismMintableERC20Factory(Types.ContractSet memory _contracts, bool _isProxy) internal view {
         IOptimismMintableERC20Factory factory = IOptimismMintableERC20Factory(_contracts.OptimismMintableERC20Factory);
         console.log(
             "Running chain assertions on the OptimismMintableERC20Factory %s at %s",
@@ -324,7 +324,7 @@ library ChainAssertions {
         require(address(factory) != address(0), "CHECK-MERC20F-10");
 
         // Check that the contract is initialized
-        DeployUtils.assertInitialized({ _contractAddress: address(factory), _isProxy: _isProxy, _slot: 0, _offset: 0 });
+        DeployUtils.assertInitialized({ _contractAddress: address(factory), _isProxy: _isProxy, _slot: 51, _offset: 0 });
 
         if (_isProxy) {
             require(factory.BRIDGE() == _contracts.L1StandardBridge, "CHECK-MERC20F-10");

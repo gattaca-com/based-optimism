@@ -302,18 +302,18 @@ contract Initializer_Test is CommonTest {
                 initCalldata: abi.encodeCall(l2ERC721Bridge.initialize, (payable(address(l1ERC721Bridge))))
             })
         );
-        // OptimismMintableERC20FactoryImpl
+        // L1OptimismMintableERC20FactoryImpl
         contracts.push(
             InitializeableContract({
-                name: "OptimismMintableERC20Factory",
+                name: "L1OptimismMintableERC20Factory",
                 target: deploy.mustGetAddress("OptimismMintableERC20Factory"),
                 initCalldata: abi.encodeCall(l1OptimismMintableERC20Factory.initialize, (address(l1StandardBridge)))
             })
         );
-        // OptimismMintableERC20FactoryProxy
+        // L1OptimismMintableERC20FactoryProxy
         contracts.push(
             InitializeableContract({
-                name: "OptimismMintableERC20FactoryProxy",
+                name: "L1OptimismMintableERC20FactoryProxy",
                 target: address(l1OptimismMintableERC20Factory),
                 initCalldata: abi.encodeCall(l1OptimismMintableERC20Factory.initialize, (address(l1StandardBridge)))
             })

@@ -38,7 +38,6 @@ import { IL2CrossDomainMessenger } from "interfaces/L2/IL2CrossDomainMessenger.s
 import { IL2StandardBridgeInterop } from "interfaces/L2/IL2StandardBridgeInterop.sol";
 import { IL2ToL1MessagePasser } from "interfaces/L2/IL2ToL1MessagePasser.sol";
 import { IL2ERC721Bridge } from "interfaces/L2/IL2ERC721Bridge.sol";
-import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
 import { IAddressManager } from "interfaces/legacy/IAddressManager.sol";
 import { IOptimismSuperchainERC20Factory } from "interfaces/L2/IOptimismSuperchainERC20Factory.sol";
 import { IBaseFeeVault } from "interfaces/L2/IBaseFeeVault.sol";
@@ -52,6 +51,8 @@ import { IWETH98 } from "interfaces/universal/IWETH98.sol";
 import { IGovernanceToken } from "interfaces/governance/IGovernanceToken.sol";
 import { ILegacyMessagePasser } from "interfaces/legacy/ILegacyMessagePasser.sol";
 import { ISuperchainTokenBridge } from "interfaces/L2/ISuperchainTokenBridge.sol";
+import { IL1OptimismMintableERC20Factory } from "interfaces/L1/IL1OptimismMintableERC20Factory.sol";
+import { IL2OptimismMintableERC20Factory } from "interfaces/L2/IL2OptimismMintableERC20Factory.sol";
 
 /// @title Setup
 /// @dev This contact is responsible for setting up the contracts in state. It currently
@@ -87,7 +88,7 @@ contract Setup {
     IL1CrossDomainMessenger l1CrossDomainMessenger;
     IAddressManager addressManager;
     IL1ERC721Bridge l1ERC721Bridge;
-    IOptimismMintableERC20Factory l1OptimismMintableERC20Factory;
+    IL1OptimismMintableERC20Factory l1OptimismMintableERC20Factory;
     IProtocolVersions protocolVersions;
     ISuperchainConfig superchainConfig;
     IDataAvailabilityChallenge dataAvailabilityChallenge;
@@ -97,8 +98,8 @@ contract Setup {
         IL2CrossDomainMessenger(payable(Predeploys.L2_CROSS_DOMAIN_MESSENGER));
     IL2StandardBridgeInterop l2StandardBridge = IL2StandardBridgeInterop(payable(Predeploys.L2_STANDARD_BRIDGE));
     IL2ToL1MessagePasser l2ToL1MessagePasser = IL2ToL1MessagePasser(payable(Predeploys.L2_TO_L1_MESSAGE_PASSER));
-    IOptimismMintableERC20Factory l2OptimismMintableERC20Factory =
-        IOptimismMintableERC20Factory(Predeploys.OPTIMISM_MINTABLE_ERC20_FACTORY);
+    IL2OptimismMintableERC20Factory l2OptimismMintableERC20Factory =
+        IL2OptimismMintableERC20Factory(Predeploys.OPTIMISM_MINTABLE_ERC20_FACTORY);
     IL2ERC721Bridge l2ERC721Bridge = IL2ERC721Bridge(Predeploys.L2_ERC721_BRIDGE);
     IOptimismMintableERC721Factory l2OptimismMintableERC721Factory =
         IOptimismMintableERC721Factory(Predeploys.OPTIMISM_MINTABLE_ERC721_FACTORY);
@@ -209,7 +210,7 @@ contract Setup {
         addressManager = IAddressManager(deploy.mustGetAddress("AddressManager"));
         l1ERC721Bridge = IL1ERC721Bridge(deploy.mustGetAddress("L1ERC721BridgeProxy"));
         l1OptimismMintableERC20Factory =
-            IOptimismMintableERC20Factory(deploy.mustGetAddress("OptimismMintableERC20FactoryProxy"));
+            IL1OptimismMintableERC20Factory(deploy.mustGetAddress("L1OptimismMintableERC20FactoryProxy"));
         protocolVersions = IProtocolVersions(deploy.mustGetAddress("ProtocolVersionsProxy"));
         superchainConfig = ISuperchainConfig(deploy.mustGetAddress("SuperchainConfigProxy"));
         anchorStateRegistry = IAnchorStateRegistry(deploy.mustGetAddress("AnchorStateRegistryProxy"));
@@ -228,8 +229,8 @@ contract Setup {
         vm.label(address(addressManager), "AddressManager");
         vm.label(address(l1ERC721Bridge), "L1ERC721Bridge");
         vm.label(deploy.mustGetAddress("L1ERC721BridgeProxy"), "L1ERC721BridgeProxy");
-        vm.label(address(l1OptimismMintableERC20Factory), "OptimismMintableERC20Factory");
-        vm.label(deploy.mustGetAddress("OptimismMintableERC20FactoryProxy"), "OptimismMintableERC20FactoryProxy");
+        vm.label(address(l1OptimismMintableERC20Factory), "L1OptimismMintableERC20Factory");
+        vm.label(deploy.mustGetAddress("L1OptimismMintableERC20FactoryProxy"), "L1OptimismMintableERC20FactoryProxy");
         vm.label(address(protocolVersions), "ProtocolVersions");
         vm.label(deploy.mustGetAddress("ProtocolVersionsProxy"), "ProtocolVersionsProxy");
         vm.label(address(superchainConfig), "SuperchainConfig");
@@ -311,9 +312,16 @@ contract Setup {
         labelPreinstall(Preinstalls.CreateX);
 
         configureFeeVaults();
+        configureBridges();
         configureCrossDomainMessenger();
 
         console.log("Setup: completed L2 genesis");
+    }
+
+    /// @dev Sets the standard bridge address in the L1Block contract.
+    function configureBridges() internal {
+        vm.prank(Constants.DEPOSITOR_ACCOUNT);
+        l1Block.setConfig(Types.ConfigType.L1_STANDARD_BRIDGE_ADDRESS, abi.encode(address(l2StandardBridge)));
     }
 
     /// @dev Sets the L1CrossDomainMessenger address in the L1Block contract.
