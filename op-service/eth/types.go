@@ -244,6 +244,14 @@ func (env *ExecutionPayloadEnvelope) String() string {
 	return fmt.Sprintf("envelope(%s)", env.ID())
 }
 
+type NewFrag struct {
+	BlockNumber uint64
+	Seq         uint64
+	IsLast      bool
+	Txs         []Data
+	Version     uint64
+}
+
 type ExecutionPayload struct {
 	ParentHash    common.Hash     `json:"parentHash"`
 	FeeRecipient  common.Address  `json:"feeRecipient"`

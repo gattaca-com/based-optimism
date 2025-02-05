@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
@@ -621,4 +622,33 @@ func TestFailsWrongVersionWithWithdrawalRoot(t *testing.T) {
 	var payload ExecutionPayloadEnvelope
 	err = payload.UnmarshalSSZ(BlockV3, uint32(len(data)), bytes.NewReader(data))
 	require.ErrorContains(t, err, ErrBadExtraDataOffset.Error())
+}
+
+func TestMarshalUnmarshalNewFrag(t *testing.T) {
+	f := NewFrag{
+		BlockNumber: 7,
+		Seq:         3,
+		IsLast:      false,
+		Txs: []hexutil.Bytes{
+			{0x01, 0x02, 0x03},
+			{0x04, 0x05, 0x06, 0x07},
+		},
+		Version: 42,
+	}
+
+	var buf bytes.Buffer
+
+	_, err := f.MarshalSSZ(&buf)
+	require.NoError(t, err)
+
+	data := buf.Bytes()
+
+	unmarshalled := &NewFrag{}
+	err = unmarshalled.UnmarshalSSZ(uint32(len(data)), bytes.NewReader(data))
+
+	require.NoError(t, err)
+
+	if diff := cmp.Diff(f, *unmarshalled); diff != "" {
+		t.Fatalf("The data did not round trip correctly:\n%s", diff)
+	}
 }
