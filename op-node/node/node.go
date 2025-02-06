@@ -462,6 +462,10 @@ func (n *OpNode) initRPCServer(cfg *Config) error {
 		})
 		n.log.Info("Admin RPC enabled")
 	}
+	if cfg.RPC.EnableBased {
+		server.EnableBasedAPI(NewBasedAPI(n.p2pNode, n.log, n.metrics))
+		n.log.Info("Based RPC enabled")
+	}
 	n.log.Info("Starting JSON-RPC server")
 	if err := server.Start(); err != nil {
 		return fmt.Errorf("unable to start RPC server: %w", err)

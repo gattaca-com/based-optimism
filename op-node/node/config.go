@@ -88,6 +88,7 @@ type RPCConfig struct {
 	ListenAddr  string
 	ListenPort  int
 	EnableAdmin bool
+	EnableBased bool
 }
 
 func (cfg *RPCConfig) HttpEndpoint() string {

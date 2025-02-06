@@ -146,6 +146,11 @@ var (
 		Usage:    "Read withdrawal_storage_root (aka message passer storage root) from state trie (via execution layer) instead of the block header. Restores pre-Isthmus behavior, requires an archive EL client.",
 		Required: false,
 		EnvVars:  prefixEnvVars("FETCH_WITHDRAWAL_ROOT_FROM_STATE"),
+	}
+	RPCEnableBased = &cli.BoolFlag{
+		Name:     "rpc.enable-based",
+		Usage:    "Enable the based API (experimental)",
+		EnvVars:  prefixEnvVars("RPC_ENABLE_BASED"),
 		Category: OperationsCategory,
 	}
 	L1TrustRPC = &cli.BoolFlag{
@@ -477,6 +482,7 @@ var optionalFlags = []cli.Flag{
 	L1EpochPollIntervalFlag,
 	RuntimeConfigReloadIntervalFlag,
 	RPCEnableAdmin,
+	RPCEnableBased,
 	RPCAdminPersistence,
 	MetricsEnabledFlag,
 	MetricsAddrFlag,
