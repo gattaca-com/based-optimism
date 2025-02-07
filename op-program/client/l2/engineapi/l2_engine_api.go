@@ -639,3 +639,25 @@ func convertRequests(hex []hexutil.Bytes) [][]byte {
 	}
 	return req
 }
+
+// TODO: Define responses for the following methods
+
+func (ea *L2EngineAPI) NewFragV0(ctx context.Context, frag *eth.SignedNewFrag) (*string, error) {
+	log.Info("NewFragV0")
+	return ea.newFragV0(ctx, frag)
+}
+
+func (ea *L2EngineAPI) newFragV0(_ context.Context, _ *eth.SignedNewFrag) (*string, error) {
+	log.Info("newFragV0")
+	return &engine.VALID, nil
+}
+
+func (ea *L2EngineAPI) SealFragV0(ctx context.Context, frag *eth.SignedSeal) (*string, error) {
+	log.Info("SealFragV0")
+	return ea.sealFragV0(ctx, frag)
+}
+
+func (ea *L2EngineAPI) sealFragV0(_ context.Context, _ *eth.SignedSeal) (*string, error) {
+	log.Info("sealFragV0")
+	return &engine.VALID, nil
+}
