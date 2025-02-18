@@ -20,19 +20,6 @@
     "type": "receive"
   },
   {
-    "inputs": [],
-    "name": "balance",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
     "inputs": [
       {
         "internalType": "contract IDisputeGame",
@@ -61,44 +48,6 @@
     "name": "checkWithdrawal",
     "outputs": [],
     "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "_to",
-        "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "_mint",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "_value",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint64",
-        "name": "_gasLimit",
-        "type": "uint64"
-      },
-      {
-        "internalType": "bool",
-        "name": "_isCreation",
-        "type": "bool"
-      },
-      {
-        "internalType": "bytes",
-        "name": "_data",
-        "type": "bytes"
-      }
-    ],
-    "name": "depositERC20Transaction",
-    "outputs": [],
-    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -605,6 +554,7 @@
   {
     "inputs": [
       {
+<<<<<<< HEAD
         "internalType": "enum Types.ConfigType",
         "name": "_type",
         "type": "uint8"
@@ -623,6 +573,8 @@
   {
     "inputs": [
       {
+=======
+>>>>>>> upstream/develop
         "internalType": "GameType",
         "name": "_gameType",
         "type": "uint32"
@@ -901,17 +853,12 @@
   },
   {
     "inputs": [],
-    "name": "NoValue",
+    "name": "LegacyGame",
     "type": "error"
   },
   {
     "inputs": [],
     "name": "NonReentrant",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "OnlyCustomGasToken",
     "type": "error"
   },
   {
@@ -927,11 +874,6 @@
   {
     "inputs": [],
     "name": "SmallGasLimit",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "TransferFailed",
     "type": "error"
   },
   {

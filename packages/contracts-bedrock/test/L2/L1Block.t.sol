@@ -5,7 +5,6 @@ pragma solidity 0.8.15;
 import { CommonTest } from "test/setup/CommonTest.sol";
 
 // Libraries
-import { GasPayingToken } from "src/libraries/GasPayingToken.sol";
 import { StaticConfig } from "src/libraries/StaticConfig.sol";
 import { Types } from "src/libraries/Types.sol";
 import { Encoding } from "src/libraries/Encoding.sol";
@@ -16,12 +15,28 @@ import "src/libraries/L1BlockErrors.sol";
 contract L1BlockTest is CommonTest {
     address depositor;
 
-    event GasPayingTokenSet(address indexed token, uint8 indexed decimals, bytes32 name, bytes32 symbol);
-
     /// @dev Sets up the test suite.
     function setUp() public virtual override {
         super.setUp();
         depositor = l1Block.DEPOSITOR_ACCOUNT();
+    }
+
+    function test_isCustomGasToken_succeeds() external view {
+        assertFalse(l1Block.isCustomGasToken());
+    }
+
+    function test_gasPayingToken_succeeds() external view {
+        (address token, uint8 decimals) = l1Block.gasPayingToken();
+        assertEq(token, Constants.ETHER);
+        assertEq(uint256(decimals), uint256(18));
+    }
+
+    function test_gasPayingTokenName_succeeds() external view {
+        assertEq("Ether", l1Block.gasPayingTokenName());
+    }
+
+    function test_gasPayingTokenSymbol_succeeds() external view {
+        assertEq("ETH", l1Block.gasPayingTokenSymbol());
     }
 }
 
@@ -169,57 +184,7 @@ contract L1BlockEcotone_Test is L1BlockTest {
     }
 }
 
-contract L1BlockCustomGasToken_Test is L1BlockTest {
-    /// @dev Tests that `setGasPayingToken` updates the values correctly.
-    function testFuzz_setGasPayingToken_succeeds(
-        address _token,
-        uint8 _decimals,
-        string calldata _name,
-        string calldata _symbol
-    )
-        external
-    {
-        vm.assume(_token != address(0));
-        vm.assume(_token != Constants.ETHER);
-
-        // Using vm.assume() would cause too many test rejections.
-        string memory name = _name;
-        if (bytes(_name).length > 32) {
-            name = _name[:32];
-        }
-        bytes32 b32name = bytes32(abi.encodePacked(name));
-
-        // Using vm.assume() would cause too many test rejections.
-        string memory symbol = _symbol;
-        if (bytes(_symbol).length > 32) {
-            symbol = _symbol[:32];
-        }
-        bytes32 b32symbol = bytes32(abi.encodePacked(symbol));
-
-        vm.expectEmit(address(l1Block));
-        emit GasPayingTokenSet({ token: _token, decimals: _decimals, name: b32name, symbol: b32symbol });
-
-        vm.prank(depositor);
-        l1Block.setGasPayingToken({ _token: _token, _decimals: _decimals, _name: b32name, _symbol: b32symbol });
-
-        (address token, uint8 decimals) = l1Block.gasPayingToken();
-        assertEq(token, _token);
-        assertEq(decimals, _decimals);
-
-        assertEq(name, l1Block.gasPayingTokenName());
-        assertEq(symbol, l1Block.gasPayingTokenSymbol());
-        assertTrue(l1Block.isCustomGasToken());
-    }
-
-    /// @dev Tests that `setGasPayingToken` reverts if sender address is not the depositor account.
-    function test_setGasPayingToken_isDepositor_reverts(address _nonDepositor) external {
-        vm.assume(_nonDepositor != Constants.DEPOSITOR_ACCOUNT);
-
-        vm.expectRevert(NotDepositor.selector);
-        vm.prank(_nonDepositor);
-        l1Block.setGasPayingToken(address(this), 18, "Test", "TST");
-    }
-
+contract L1BlockSetConfig_Test is L1BlockTest {
     /// @dev Tests that `setConfig` reverts if sender address is not the depositor account.
     function test_setConfig_isDepositor_reverts(
         address _nonDepositor,
@@ -238,48 +203,6 @@ contract L1BlockCustomGasToken_Test is L1BlockTest {
         vm.expectRevert(NotDepositor.selector);
         vm.prank(_nonDepositor);
         l1Block.setConfig(configType, _data);
-    }
-
-    /// @dev Tests that `setConfig` with `GAS_PAYING_TOKEN` config type updates the values correctly.
-    ///         Assumes is not address(0) which means it is not ETH
-    function test_setConfig_gasPayingToken_succeeds(
-        address _token,
-        uint8 _decimals,
-        bytes32 _name,
-        bytes32 _symbol
-    )
-        external
-    {
-        vm.assume(_token != address(0));
-
-        Types.ConfigType configType = Types.ConfigType.GAS_PAYING_TOKEN;
-        bytes memory data = StaticConfig.encodeSetGasPayingToken(_token, _decimals, _name, _symbol);
-
-        vm.expectEmit(address(l1Block));
-        emit GasPayingTokenSet({ token: _token, decimals: _decimals, name: _name, symbol: _symbol });
-
-        vm.prank(Constants.DEPOSITOR_ACCOUNT);
-        l1Block.setConfig(configType, data);
-
-        bytes memory config = l1Block.getConfig(configType);
-        assertEq(
-            keccak256(config),
-            keccak256(
-                abi.encode(
-                    _token,
-                    _decimals,
-                    GasPayingToken.sanitize(LibString.fromSmallString(_name)),
-                    GasPayingToken.sanitize(LibString.fromSmallString(_symbol))
-                )
-            )
-        );
-
-        (address token, uint8 decimals, bytes32 name, bytes32 symbol) =
-            abi.decode(config, (address, uint8, bytes32, bytes32));
-        assertEq(token, _token);
-        assertEq(decimals, _decimals);
-        assertEq(name, GasPayingToken.sanitize(LibString.fromSmallString(_name)));
-        assertEq(symbol, GasPayingToken.sanitize(LibString.fromSmallString(_symbol)));
     }
 
     /// @dev Tests that `setConfig` with `L1_ERC_721_BRIDGE_ADDRESS` config type updates the values correctly.

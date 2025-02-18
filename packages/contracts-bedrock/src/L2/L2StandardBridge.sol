@@ -60,9 +60,9 @@ contract L2StandardBridge is StandardBridge, ISemver {
     );
 
     /// @notice Semantic version.
-    /// @custom:semver 1.11.1-beta.7
+    /// @custom:semver 1.11.1-beta.8
     function version() public pure virtual returns (string memory) {
-        return "1.11.1-beta.7";
+        return "1.11.1-beta.8";
     }
 
     /// @notice Allows EOAs to bridge ETH by sending directly to the bridge.
@@ -70,11 +70,6 @@ contract L2StandardBridge is StandardBridge, ISemver {
         _initiateWithdrawal(
             Predeploys.LEGACY_ERC20_ETH, msg.sender, msg.sender, msg.value, RECEIVE_DEFAULT_GAS_LIMIT, bytes("")
         );
-    }
-
-    /// @inheritdoc StandardBridge
-    function gasPayingToken() internal view override returns (address addr_, uint8 decimals_) {
-        (addr_, decimals_) = IL1Block(Predeploys.L1_BLOCK_ATTRIBUTES).gasPayingToken();
     }
 
     /// @custom:legacy
@@ -97,7 +92,6 @@ contract L2StandardBridge is StandardBridge, ISemver {
         virtual
         onlyEOA
     {
-        require(isCustomGasToken() == false, "L2StandardBridge: not supported with custom gas token");
         _initiateWithdrawal(_l2Token, msg.sender, msg.sender, _amount, _minGasLimit, _extraData);
     }
 
@@ -126,7 +120,6 @@ contract L2StandardBridge is StandardBridge, ISemver {
         payable
         virtual
     {
-        require(isCustomGasToken() == false, "L2StandardBridge: not supported with custom gas token");
         _initiateWithdrawal(_l2Token, msg.sender, _to, _amount, _minGasLimit, _extraData);
     }
 

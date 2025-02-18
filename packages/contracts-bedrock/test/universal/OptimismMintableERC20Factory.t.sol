@@ -232,7 +232,7 @@ contract L1OptimismMintableTokenFactory_Test is OptimismMintableTokenFactory_Tes
 
     /// @notice Tests that the upgrade is successful.
     function test_upgrading_succeeds() external {
-        IProxy proxy = IProxy(deploy.mustGetAddress("OptimismMintableERC20FactoryProxy"));
+        IProxy proxy = IProxy(artifacts.mustGetAddress("L1OptimismMintableERC20FactoryProxy"));
         // Check an unused slot before upgrading.
         bytes32 slot21Before = vm.load(address(l1OptimismMintableERC20Factory), bytes32(uint256(21)));
         assertEq(bytes32(0), slot21Before);
