@@ -25,11 +25,11 @@
     "sourceCodeHash": "0xae496c123e212e36c66c27b6ad3b46aa8cc03559aa4d23474d14a71050593c68"
   },
   "src/L1/OptimismPortal2.sol": {
-    "initCodeHash": "0xe6038647e0d1ca3154c2820f117ec08c9a47dfa743ea7cc410957d71eb181c71",
+    "initCodeHash": "0x4da9d95b88ea4b63b6fe61d66c78416fe0e07d2a9dac7856c5440b4d44476762",
     "sourceCodeHash": "0x6c8e1065dde69ed58a144095cd075fe0ca19c9d02fe4c0e0abfaa3c307e4c619"
   },
   "src/L1/OptimismPortalInterop.sol": {
-    "initCodeHash": "0x185d37e3723c98f642c395f9d143e51fa86cfe37235e285feddcc12846aa7e7c",
+    "initCodeHash": "0x3208eed10ca6ee6f1f2a8cd41449b624f98d37e6edc75fcfe8b4484d91cd9f45",
     "sourceCodeHash": "0x698826b14fd57473b09ded4360d3f88645823e523770bc46efcb1cd282656f62"
 =======
     "initCodeHash": "0x03a3c0eb2418aba9f93bb89723ba2ee7cb9e1988ca00f380503c960149c85b7a",
@@ -111,11 +111,16 @@
   },
   "src/L2/L1Block.sol": {
 <<<<<<< HEAD
+<<<<<<< HEAD
     "initCodeHash": "0xbe766d870faae65d22cb968abc81f3fd80a30ae15051937c83eaffc1c8eddf59",
     "sourceCodeHash": "0x6f2100d34c4bd4c23f58a07514e550ce315f977e683ad6e50b9bdbc97b49c0ff"
+=======
+    "initCodeHash": "0x72cce89d6d9ccf6d4f72300d3a544de2e8696a7db58d135869ff1fad0bfb5094",
+    "sourceCodeHash": "0xafadf007133915a6644a4ee97cce97f3323479e90c9f27ee682880b958395ee4"
+>>>>>>> e00ce5b0db2dd6b1f600e979f038a276117b18c4
   },
   "src/L2/L1BlockInterop.sol": {
-    "initCodeHash": "0x375f075b7afbff9164208fbaea93d0abd04ab7ba8fb7695f12865e0cc1f50ca9",
+    "initCodeHash": "0x78f4bcb59dbc565d050f7149ff7cfdc630967053993e6b2e218d361370133f29",
     "sourceCodeHash": "0xa3e6d473b1b7c5b4ec3a7c212ea7e49f284501b4f9afa5ce8330b494eaaf4140"
 =======
     "initCodeHash": "0xc4c2f3ceaa2738a326f7c3e449c45bc642c0810f4c21332b261bb3a3b3f4397e",

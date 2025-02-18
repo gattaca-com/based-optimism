@@ -168,6 +168,19 @@
   },
   {
     "inputs": [],
+    "name": "isIsthmus",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "l1FeeOverhead",
     "outputs": [
       {
@@ -266,6 +279,20 @@
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "setIsIsthmus",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "setIsthmus",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
 =======
@@ -347,5 +374,54 @@
     ],
     "stateMutability": "pure",
     "type": "function"
+<<<<<<< HEAD
+=======
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint8",
+        "name": "decimals",
+        "type": "uint8"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "name",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "symbol",
+        "type": "bytes32"
+      }
+    ],
+    "name": "GasPayingTokenSet",
+    "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "IsthmusAlreadyActive",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "NotDepositor",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "UnsafeCast",
+    "type": "error"
+>>>>>>> e00ce5b0db2dd6b1f600e979f038a276117b18c4
   }
 ]
