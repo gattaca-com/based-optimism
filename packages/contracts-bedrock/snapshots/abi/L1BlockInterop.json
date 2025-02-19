@@ -302,36 +302,6 @@
     "type": "function"
   },
   {
-    "inputs": [
-      {
-<<<<<<< HEAD
-=======
-        "internalType": "address",
-        "name": "_token",
-        "type": "address"
-      },
-      {
-        "internalType": "uint8",
-        "name": "_decimals",
-        "type": "uint8"
-      },
-      {
-        "internalType": "bytes32",
-        "name": "_name",
-        "type": "bytes32"
-      },
-      {
-        "internalType": "bytes32",
-        "name": "_symbol",
-        "type": "bytes32"
-      }
-    ],
-    "name": "setGasPayingToken",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
     "inputs": [],
     "name": "setIsIsthmus",
     "outputs": [],
@@ -348,7 +318,6 @@
   {
     "inputs": [
       {
->>>>>>> e00ce5b0db2dd6b1f600e979f038a276117b18c4
         "internalType": "uint64",
         "name": "_number",
         "type": "uint64"

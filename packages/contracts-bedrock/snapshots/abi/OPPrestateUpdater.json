@@ -279,6 +279,11 @@
                 "internalType": "address",
                 "name": "challenger",
                 "type": "address"
+              },
+              {
+                "internalType": "address",
+                "name": "feeVaultAdmin",
+                "type": "address"
               }
             ],
             "internalType": "struct OPContractsManager.Roles",
@@ -376,7 +381,7 @@
             "type": "address"
           },
           {
-            "internalType": "contract IOptimismMintableERC20Factory",
+            "internalType": "contract IL1OptimismMintableERC20Factory",
             "name": "optimismMintableERC20FactoryProxy",
             "type": "address"
           },

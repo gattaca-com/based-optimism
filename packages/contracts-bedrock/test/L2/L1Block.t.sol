@@ -5,11 +5,9 @@ pragma solidity 0.8.15;
 import { CommonTest } from "test/setup/CommonTest.sol";
 
 // Libraries
-import { StaticConfig } from "src/libraries/StaticConfig.sol";
 import { Types } from "src/libraries/Types.sol";
 import { Encoding } from "src/libraries/Encoding.sol";
 import { Constants } from "src/libraries/Constants.sol";
-import { LibString } from "@solady/utils/LibString.sol";
 import { FeeVault } from "src/L2/FeeVault.sol";
 import "src/libraries/L1BlockErrors.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";

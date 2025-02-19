@@ -3,7 +3,6 @@ pragma solidity 0.8.15;
 
 // Libraries
 import { Constants } from "src/libraries/Constants.sol";
-import { StaticConfig } from "src/libraries/StaticConfig.sol";
 import { NotDepositor, IsthmusAlreadyActive } from "src/libraries/L1BlockErrors.sol";
 import { Storage } from "src/libraries/Storage.sol";
 import { Types } from "src/libraries/Types.sol";
@@ -308,7 +307,7 @@ contract L1Block is ISemver {
         address recipient = IFeeVault(payable(_addr)).RECIPIENT();
         uint256 amount = IFeeVault(payable(_addr)).MIN_WITHDRAWAL_AMOUNT();
         // Use low level call to check for WITHDRAWAL_NETWORK, default to L2 if it doesn't exist
-        (bool success, bytes memory data) = _addr.staticcall(abi.encodeWithSignature("WITHDRAWAL_NETWORK()"));
+        (bool success, bytes memory data) = _addr.staticcall(abi.encodeCall(IFeeVault.WITHDRAWAL_NETWORK, ()));
         Types.WithdrawalNetwork network =
             success && data.length >= 32 ? abi.decode(data, (Types.WithdrawalNetwork)) : Types.WithdrawalNetwork.L2;
         return Encoding.encodeFeeVaultConfig(recipient, amount, Types.WithdrawalNetwork(uint8(network)));

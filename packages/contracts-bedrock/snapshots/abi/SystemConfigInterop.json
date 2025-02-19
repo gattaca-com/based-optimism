@@ -432,6 +432,11 @@
         "internalType": "struct SystemConfig.Addresses",
         "name": "_addresses",
         "type": "tuple"
+      },
+      {
+        "internalType": "address",
+        "name": "_dependencyManager",
+        "type": "address"
       }
     ],
     "name": "initialize",
@@ -554,11 +559,6 @@
         "internalType": "struct SystemConfig.Addresses",
         "name": "_addresses",
         "type": "tuple"
-      },
-      {
-        "internalType": "address",
-        "name": "_dependencyManager",
-        "type": "address"
       }
     ],
     "name": "initialize",

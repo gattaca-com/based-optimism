@@ -6,10 +6,8 @@ import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/O
 
 // Libraries
 import { Storage } from "src/libraries/Storage.sol";
-import { Constants } from "src/libraries/Constants.sol";
 import { Types } from "src/libraries/Types.sol";
 import { Encoding } from "src/libraries/Encoding.sol";
-import { StaticConfig } from "src/libraries/StaticConfig.sol";
 
 // Interfaces
 import { ISemver } from "interfaces/universal/ISemver.sol";

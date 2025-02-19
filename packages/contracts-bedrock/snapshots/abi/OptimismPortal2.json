@@ -554,7 +554,6 @@
   {
     "inputs": [
       {
-<<<<<<< HEAD
         "internalType": "enum Types.ConfigType",
         "name": "_type",
         "type": "uint8"
@@ -573,8 +572,6 @@
   {
     "inputs": [
       {
-=======
->>>>>>> upstream/develop
         "internalType": "GameType",
         "name": "_gameType",
         "type": "uint32"

@@ -234,7 +234,6 @@
   {
     "inputs": [
       {
-<<<<<<< HEAD
         "internalType": "enum Types.ConfigType",
         "name": "_type",
         "type": "uint8"
@@ -246,34 +245,6 @@
       }
     ],
     "name": "setConfig",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "_token",
-        "type": "address"
-      },
-      {
-        "internalType": "uint8",
-        "name": "_decimals",
-        "type": "uint8"
-      },
-      {
-        "internalType": "bytes32",
-        "name": "_name",
-        "type": "bytes32"
-      },
-      {
-        "internalType": "bytes32",
-        "name": "_symbol",
-        "type": "bytes32"
-      }
-    ],
-    "name": "setGasPayingToken",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -295,8 +266,6 @@
   {
     "inputs": [
       {
-=======
->>>>>>> upstream/develop
         "internalType": "uint64",
         "name": "_number",
         "type": "uint64"
@@ -374,39 +343,6 @@
     ],
     "stateMutability": "pure",
     "type": "function"
-<<<<<<< HEAD
-=======
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "token",
-        "type": "address"
-      },
-      {
-        "indexed": true,
-        "internalType": "uint8",
-        "name": "decimals",
-        "type": "uint8"
-      },
-      {
-        "indexed": false,
-        "internalType": "bytes32",
-        "name": "name",
-        "type": "bytes32"
-      },
-      {
-        "indexed": false,
-        "internalType": "bytes32",
-        "name": "symbol",
-        "type": "bytes32"
-      }
-    ],
-    "name": "GasPayingTokenSet",
-    "type": "event"
   },
   {
     "inputs": [],
@@ -422,6 +358,5 @@
     "inputs": [],
     "name": "UnsafeCast",
     "type": "error"
->>>>>>> e00ce5b0db2dd6b1f600e979f038a276117b18c4
   }
 ]
