@@ -11,7 +11,6 @@ import { Predeploys } from "src/libraries/Predeploys.sol";
 // Interfaces
 import { ISemver } from "interfaces/universal/ISemver.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
-import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { IOptimismPortal2 as IOptimismPortal } from "interfaces/L1/IOptimismPortal2.sol";
 
 /// @custom:proxied true
@@ -30,12 +29,14 @@ contract L1CrossDomainMessenger is CrossDomainMessenger, ISemver, Initializable 
     /// @custom:network-specific
     IOptimismPortal public portal;
 
-    /// @notice Address of the SystemConfig contract.
-    ISystemConfig public systemConfig;
+    /// @custom:legacy
+    /// @custom:spacer systemConfig
+    /// @notice Spacer taking up the legacy `systemConfig` slot.
+    address private spacer_253_0_20;
 
     /// @notice Semantic version.
-    /// @custom:semver 2.4.1-beta.5
-    string public constant version = "2.4.1-beta.5";
+    /// @custom:semver 2.5.0
+    string public constant version = "2.5.0";
 
     /// @notice Constructs the L1CrossDomainMessenger contract.
     constructor() {
@@ -45,23 +46,9 @@ contract L1CrossDomainMessenger is CrossDomainMessenger, ISemver, Initializable 
     /// @notice Initializes the contract.
     /// @param _superchainConfig Contract of the SuperchainConfig contract on this network.
     /// @param _portal Contract of the OptimismPortal contract on this network.
-    /// @param _systemConfig Contract of the SystemConfig contract on this network.
-    function initialize(
-        ISuperchainConfig _superchainConfig,
-        IOptimismPortal _portal,
-        ISystemConfig _systemConfig
-    )
-        external
-        initializer
-    {
+    function initialize(ISuperchainConfig _superchainConfig, IOptimismPortal _portal) external initializer {
         superchainConfig = _superchainConfig;
         portal = _portal;
-        systemConfig = _systemConfig;
-    }
-
-    /// @inheritdoc CrossDomainMessenger
-    function gasPayingToken() internal view override returns (address addr_, uint8 decimals_) {
-        (addr_, decimals_) = systemConfig.gasPayingToken();
     }
 
     /// @notice Getter function for the OptimismPortal contract on this chain.

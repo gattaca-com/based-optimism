@@ -3,8 +3,6 @@ pragma solidity 0.8.15;
 
 // Libraries
 import { Constants } from "src/libraries/Constants.sol";
-import { GasPayingToken, IGasToken } from "src/libraries/GasPayingToken.sol";
-import { StaticConfig } from "src/libraries/StaticConfig.sol";
 import { NotDepositor, IsthmusAlreadyActive } from "src/libraries/L1BlockErrors.sol";
 import { Storage } from "src/libraries/Storage.sol";
 import { Types } from "src/libraries/Types.sol";
@@ -26,10 +24,7 @@ import { IERC721Bridge } from "interfaces/universal/IERC721Bridge.sol";
 ///         Values within this contract are updated once per epoch (every L1 block) and can only be
 ///         set by the "depositor" account, a special system address. Depositor account transactions
 ///         are created by the protocol whenever we move to a new epoch.
-contract L1Block is ISemver, IGasToken {
-    /// @notice Event emitted when the gas paying token is set.
-    event GasPayingTokenSet(address indexed token, uint8 indexed decimals, bytes32 name, bytes32 symbol);
-
+contract L1Block is ISemver {
     /// @notice Storage slot for the base fee vault configuration
     bytes32 internal constant BASE_FEE_VAULT_CONFIG_SLOT = bytes32(uint256(keccak256("opstack.basefeevaultconfig")) - 1);
 
@@ -104,28 +99,29 @@ contract L1Block is ISemver, IGasToken {
     }
 
     /// @notice Returns the gas paying token, its decimals, name and symbol.
-    ///         If nothing is set in state, then it means ether is used.
-    function gasPayingToken() public view returns (address addr_, uint8 decimals_) {
-        (addr_, decimals_) = GasPayingToken.getToken();
+    function gasPayingToken() public pure returns (address addr_, uint8 decimals_) {
+        addr_ = Constants.ETHER;
+        decimals_ = 18;
     }
 
     /// @notice Returns the gas paying token name.
     ///         If nothing is set in state, then it means ether is used.
-    function gasPayingTokenName() public view returns (string memory name_) {
-        name_ = GasPayingToken.getName();
+    ///         This function cannot be removed because WETH depends on it.
+    function gasPayingTokenName() public pure returns (string memory name_) {
+        name_ = "Ether";
     }
 
     /// @notice Returns the gas paying token symbol.
     ///         If nothing is set in state, then it means ether is used.
-    function gasPayingTokenSymbol() public view returns (string memory symbol_) {
-        symbol_ = GasPayingToken.getSymbol();
+    ///         This function cannot be removed because WETH depends on it.
+    function gasPayingTokenSymbol() public pure returns (string memory symbol_) {
+        symbol_ = "ETH";
     }
 
     /// @notice Getter for custom gas token paying networks. Returns true if the
     ///         network uses a custom gas token.
-    function isCustomGasToken() public view returns (bool) {
-        (address token,) = gasPayingToken();
-        return token != Constants.ETHER;
+    function isCustomGasToken() public pure returns (bool is_) {
+        is_ = false;
     }
 
     /// @custom:legacy
@@ -209,15 +205,6 @@ contract L1Block is ISemver, IGasToken {
         }
     }
 
-    /// @notice Sets the gas paying token for the L2 system. Can only be called by the special
-    ///         depositor account. This function is not called on every L2 block but instead
-    ///         only called by specially crafted L1 deposit transactions.
-    function setGasPayingToken(address _token, uint8 _decimals, bytes32 _name, bytes32 _symbol) external {
-        if (msg.sender != DEPOSITOR_ACCOUNT()) revert NotDepositor();
-
-        _setGasPayingToken(_token, _decimals, _name, _symbol);
-    }
-
     /// @notice Sets static configuration options for the L2 system. Can only be called by the special
     ///         depositor account.
     /// @param _type  The type of configuration to set.
@@ -225,9 +212,7 @@ contract L1Block is ISemver, IGasToken {
     function setConfig(Types.ConfigType _type, bytes calldata _value) public virtual {
         if (msg.sender != DEPOSITOR_ACCOUNT()) revert NotDepositor();
 
-        if (_type == Types.ConfigType.GAS_PAYING_TOKEN) {
-            _setGasPayingToken(_value);
-        } else if (_type == Types.ConfigType.BASE_FEE_VAULT_CONFIG) {
+        if (_type == Types.ConfigType.BASE_FEE_VAULT_CONFIG) {
             Storage.setBytes32(BASE_FEE_VAULT_CONFIG_SLOT, abi.decode(_value, (bytes32)));
         } else if (_type == Types.ConfigType.SEQUENCER_FEE_VAULT_CONFIG) {
             Storage.setBytes32(SEQUENCER_FEE_VAULT_CONFIG_SLOT, abi.decode(_value, (bytes32)));
@@ -254,11 +239,6 @@ contract L1Block is ISemver, IGasToken {
             config_ = abi.encode(Storage.getBytes32(SEQUENCER_FEE_VAULT_CONFIG_SLOT));
         } else if (_type == Types.ConfigType.L1_FEE_VAULT_CONFIG) {
             config_ = abi.encode(Storage.getBytes32(L1_FEE_VAULT_CONFIG_SLOT));
-        } else if (_type == Types.ConfigType.GAS_PAYING_TOKEN) {
-            (address token, uint8 decimals) = gasPayingToken();
-            string memory name = gasPayingTokenName();
-            string memory symbol = gasPayingTokenSymbol();
-            config_ = abi.encode(token, decimals, GasPayingToken.sanitize(name), GasPayingToken.sanitize(symbol));
         } else if (_type == Types.ConfigType.REMOTE_CHAIN_ID) {
             config_ = abi.encode(Storage.getUint(REMOTE_CHAIN_ID_SLOT));
         } else if (_type == Types.ConfigType.L1_STANDARD_BRIDGE_ADDRESS) {
@@ -268,25 +248,6 @@ contract L1Block is ISemver, IGasToken {
         } else if (_type == Types.ConfigType.L1_ERC_721_BRIDGE_ADDRESS) {
             config_ = abi.encode(Storage.getAddress(L1_ERC_721_BRIDGE_ADDRESS_SLOT));
         }
-    }
-
-    /// @notice Internal method to set the gas paying token.
-    /// @param _value The ABI-encoded value containing the token address, decimals, name, and symbol.
-    ///               The expected order is: [token address, decimals, name, symbol].
-    function _setGasPayingToken(bytes memory _value) internal {
-        (address token, uint8 decimals, bytes32 name, bytes32 symbol) = StaticConfig.decodeSetGasPayingToken(_value);
-        _setGasPayingToken(token, decimals, name, symbol);
-    }
-
-    /// @notice Internal method to set the gas paying token.
-    /// @param _token    The address of the gas paying token.
-    /// @param _decimals The number of decimals for the gas paying token.
-    /// @param _name     The name of the gas paying token.
-    /// @param _symbol   The symbol of the gas paying token.
-    function _setGasPayingToken(address _token, uint8 _decimals, bytes32 _name, bytes32 _symbol) internal {
-        GasPayingToken.set({ _token: _token, _decimals: _decimals, _name: _name, _symbol: _symbol });
-
-        emit GasPayingTokenSet({ token: _token, decimals: _decimals, name: _name, symbol: _symbol });
     }
 
     /// @notice Sets the L1 block values for an Isthmus upgraded chain.
@@ -346,7 +307,7 @@ contract L1Block is ISemver, IGasToken {
         address recipient = IFeeVault(payable(_addr)).RECIPIENT();
         uint256 amount = IFeeVault(payable(_addr)).MIN_WITHDRAWAL_AMOUNT();
         // Use low level call to check for WITHDRAWAL_NETWORK, default to L2 if it doesn't exist
-        (bool success, bytes memory data) = _addr.staticcall(abi.encodeWithSignature("WITHDRAWAL_NETWORK()"));
+        (bool success, bytes memory data) = _addr.staticcall(abi.encodeCall(IFeeVault.WITHDRAWAL_NETWORK, ()));
         Types.WithdrawalNetwork network =
             success && data.length >= 32 ? abi.decode(data, (Types.WithdrawalNetwork)) : Types.WithdrawalNetwork.L2;
         return Encoding.encodeFeeVaultConfig(recipient, amount, Types.WithdrawalNetwork(uint8(network)));
