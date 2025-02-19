@@ -58,7 +58,7 @@ contract Initializer_Test is CommonTest {
         contracts.push(
             InitializeableContract({
                 name: "SuperchainConfig",
-                target: artifacts.mustGetAddress("SuperchainConfig"),
+                target: EIP1967Helper.getImplementation(address(superchainConfig)),
                 initCalldata: abi.encodeCall(superchainConfig.initialize, (address(0), address(0), false))
             })
         );

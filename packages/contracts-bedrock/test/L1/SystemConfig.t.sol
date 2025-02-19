@@ -43,6 +43,7 @@ contract SystemConfig_Initialize_Test is SystemConfig_Init {
         unsafeBlockSigner = deploy.cfg().p2pSequencerAddress();
         systemConfigImpl = EIP1967Helper.getImplementation(address(systemConfig));
         optimismMintableERC20Factory = artifacts.mustGetAddress("OptimismMintableERC20FactoryProxy");
+        feeVaultAdmin = deploy.cfg().systemConfigFeeVaultAdmin();
     }
 
     /// @notice Tests that the version function returns a valid string. We avoid testing the
