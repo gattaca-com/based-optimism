@@ -553,14 +553,13 @@ contract OPContractsManager_AddGameType_Test is Test {
             Blueprint.create(vm.getCode("FaultDisputeGame"), salt);
 
         IPreimageOracle oracle = IPreimageOracle(DeployUtils.create1("PreimageOracle", abi.encode(126000, 86400)));
-
         IOPContractsManager.Implementations memory impls = IOPContractsManager.Implementations({
             superchainConfigImpl: DeployUtils.create1("SuperchainConfig"),
             protocolVersionsImpl: DeployUtils.create1("ProtocolVersions"),
             l1ERC721BridgeImpl: DeployUtils.create1("L1ERC721Bridge"),
             optimismPortalImpl: DeployUtils.create1("OptimismPortal2", abi.encode(1, 1)),
             systemConfigImpl: DeployUtils.create1("SystemConfig"),
-            optimismMintableERC20FactoryImpl: DeployUtils.create1("OptimismMintableERC20Factory"),
+            optimismMintableERC20FactoryImpl: DeployUtils.create1("L1OptimismMintableERC20Factory"),
             l1CrossDomainMessengerImpl: DeployUtils.create1("L1CrossDomainMessenger"),
             l1StandardBridgeImpl: DeployUtils.create1("L1StandardBridge"),
             disputeGameFactoryImpl: DeployUtils.create1("DisputeGameFactory"),
@@ -568,10 +567,8 @@ contract OPContractsManager_AddGameType_Test is Test {
             delayedWETHImpl: DeployUtils.create1("DelayedWETH", abi.encode(3)),
             mipsImpl: DeployUtils.create1("MIPS64", abi.encode(oracle))
         });
-
         vm.etch(address(superchainConfigProxy), hex"01");
         vm.etch(address(protocolVersionsProxy), hex"01");
-
         opcm = IOPContractsManager(
             DeployUtils.createDeterministic({
                 _name: "OPContractsManager",
@@ -592,7 +589,6 @@ contract OPContractsManager_AddGameType_Test is Test {
                 _salt: DeployUtils.DEFAULT_SALT
             })
         );
-
         chainDeployOutput = opcm.deploy(
             IOPContractsManager.DeployInput({
                 roles: IOPContractsManager.Roles({

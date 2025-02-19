@@ -65,7 +65,7 @@ contract OPPrestateUpdater_Test is Test {
             l1ERC721BridgeImpl: DeployUtils.create1("L1ERC721Bridge"),
             optimismPortalImpl: DeployUtils.create1("OptimismPortal2", abi.encode(1, 1)),
             systemConfigImpl: DeployUtils.create1("SystemConfig"),
-            optimismMintableERC20FactoryImpl: DeployUtils.create1("OptimismMintableERC20Factory"),
+            optimismMintableERC20FactoryImpl: DeployUtils.create1("L1OptimismMintableERC20Factory"),
             l1CrossDomainMessengerImpl: DeployUtils.create1("L1CrossDomainMessenger"),
             l1StandardBridgeImpl: DeployUtils.create1("L1StandardBridge"),
             disputeGameFactoryImpl: DeployUtils.create1("DisputeGameFactory"),
