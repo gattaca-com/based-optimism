@@ -752,7 +752,15 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
 
         // Emit a TransactionDeposited event so that the rollup node can derive a deposit
         // transaction for this deposit.
-        emit TransactionDeposited(from, _to, DEPOSIT_VERSION, opaqueData);
+        _emitTransactionDeposited(from, _to, opaqueData);
+    }
+
+    function _emitTransactionDeposited(address _from, address _to, bytes memory _opaqueData) internal {
+        emit TransactionDeposited(_from, _to, _transactionDepositedNonceAndVersion(), _opaqueData);
+    }
+
+    function _transactionDepositedNonceAndVersion() internal virtual returns (uint256) {
+        return DEPOSIT_VERSION;
     }
 
     /// @notice External getter for the number of proof submitters for a withdrawal hash.
