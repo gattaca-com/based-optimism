@@ -17,7 +17,6 @@ import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.so
 import { IDisputeGame } from "interfaces/dispute/IDisputeGame.sol";
 import { IAddressManager } from "interfaces/legacy/IAddressManager.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
-import { IDelayedWETH } from "interfaces/dispute/IDelayedWETH.sol";
 import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
 import { IFaultDisputeGame } from "interfaces/dispute/IFaultDisputeGame.sol";
 import { IPermissionedDisputeGame } from "interfaces/dispute/IPermissionedDisputeGame.sol";
@@ -1145,6 +1144,7 @@ contract OPContractsManager is ISemver {
         string saltMixer;
         uint64 gasLimit;
         // Configurable dispute game parameters.
+        bool disputeGameUsesSuperRoots;
         GameType disputeGameType;
         Claim disputeAbsolutePrestate;
         uint256 disputeMaxGameDepth;
@@ -1210,6 +1210,7 @@ contract OPContractsManager is ISemver {
         ISystemConfig systemConfigProxy;
         IProxyAdmin proxyAdmin;
         Claim absolutePrestate;
+        bool disputeGameUsesSuperRoots;
     }
 
     struct AddGameInput {
@@ -1291,8 +1292,23 @@ contract OPContractsManager is ISemver {
     /// @notice Thrown when an invalid `l2ChainId` is provided to `deploy`.
     error InvalidChainId();
 
-    /// @notice Thrown when a role's address is not valid.
-    error InvalidRoleAddress(string role);
+    /// @notice Thrown when a role's address is not valid (opChainProxyAdminOwner).
+    error InvalidRoleAddressPAO();
+
+    /// @notice Thrown when a role's address is not valid (systemConfigOwner).
+    error InvalidRoleAddressSCO();
+
+    /// @notice Thrown when a role's address is not valid (batcher).
+    error InvalidRoleAddressBatcher();
+
+    /// @notice Thrown when a role's address is not valid (unsafeBlockSigner).
+    error InvalidRoleAddressUBS();
+
+    /// @notice Thrown when a role's address is not valid (proposer).
+    error InvalidRoleAddressProposer();
+
+    /// @notice Thrown when a role's address is not valid (challenger).
+    error InvalidRoleAddressChallenger();
 
     /// @notice Thrown when the latest release is not set upon initialization.
     error LatestReleaseNotSet();

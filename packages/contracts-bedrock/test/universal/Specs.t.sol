@@ -228,14 +228,25 @@ contract Specification_Test is CommonTest {
         });
         _addSpec({ _name: "OptimismPortalInterop", _sel: _getSel("finalizedWithdrawals(bytes32)") });
         _addSpec({ _name: "OptimismPortalInterop", _sel: _getSel("guardian()") });
-        _addSpec({ _name: "OptimismPortalInterop", _sel: _getSel("initialize(address,address,address)") });
+        _addSpec({ _name: "OptimismPortalInterop", _sel: _getSel("initialize(address,address,address,bool)") });
         _addSpec({ _name: "OptimismPortalInterop", _sel: _getSel("l2Sender()") });
         _addSpec({ _name: "OptimismPortalInterop", _sel: _getSel("minimumGasLimit(uint64)") });
         _addSpec({ _name: "OptimismPortalInterop", _sel: _getSel("params()") });
         _addSpec({ _name: "OptimismPortalInterop", _sel: _getSel("paused()") });
+        _addSpec({ _name: "OptimismPortalInterop", _sel: _getSel("initVersion()") });
+        _addSpec({ _name: "OptimismPortalInterop", _sel: _getSel("superRootsActive()") });
         _addSpec({
             _name: "OptimismPortalInterop",
-            _sel: IOptimismPortal2.proveWithdrawalTransaction.selector,
+            _sel: _getSel(
+                "proveWithdrawalTransaction((uint256,address,address,uint256,uint256,bytes),uint256,(bytes32,bytes32,bytes32,bytes32),bytes[])"
+            ),
+            _pausable: true
+        });
+        _addSpec({
+            _name: "OptimismPortalInterop",
+            _sel: _getSel(
+                "proveWithdrawalTransaction((uint256,address,address,uint256,uint256,bytes),address,uint256,(bytes1,uint64,(uint256,bytes32)[]),(bytes32,bytes32,bytes32,bytes32),bytes[])"
+            ),
             _pausable: true
         });
         _addSpec({ _name: "OptimismPortalInterop", _sel: _getSel("provenWithdrawals(bytes32,address)") });
@@ -249,7 +260,7 @@ contract Specification_Test is CommonTest {
         _addSpec({ _name: "OptimismPortalInterop", _sel: _getSel("respectedGameTypeUpdatedAt()") });
         _addSpec({ _name: "OptimismPortalInterop", _sel: _getSel("proofSubmitters(bytes32,uint256)") });
         _addSpec({ _name: "OptimismPortalInterop", _sel: _getSel("numProofSubmitters(bytes32)") });
-        _addSpec({ _name: "OptimismPortalInterop", _sel: _getSel("upgrade(address)") });
+        _addSpec({ _name: "OptimismPortalInterop", _sel: _getSel("upgrade(address,bool)") });
         _addSpec({
             _name: "OptimismPortalInterop",
             _sel: IOptimismPortalInterop.setConfig.selector,
@@ -273,14 +284,25 @@ contract Specification_Test is CommonTest {
         });
         _addSpec({ _name: "OptimismPortal2", _sel: _getSel("finalizedWithdrawals(bytes32)") });
         _addSpec({ _name: "OptimismPortal2", _sel: _getSel("guardian()") });
-        _addSpec({ _name: "OptimismPortal2", _sel: _getSel("initialize(address,address,address)") });
+        _addSpec({ _name: "OptimismPortal2", _sel: _getSel("initialize(address,address,address,bool)") });
         _addSpec({ _name: "OptimismPortal2", _sel: _getSel("l2Sender()") });
         _addSpec({ _name: "OptimismPortal2", _sel: _getSel("minimumGasLimit(uint64)") });
         _addSpec({ _name: "OptimismPortal2", _sel: _getSel("params()") });
         _addSpec({ _name: "OptimismPortal2", _sel: _getSel("paused()") });
+        _addSpec({ _name: "OptimismPortal2", _sel: _getSel("initVersion()") });
+        _addSpec({ _name: "OptimismPortal2", _sel: _getSel("superRootsActive()") });
         _addSpec({
             _name: "OptimismPortal2",
-            _sel: IOptimismPortal2.proveWithdrawalTransaction.selector,
+            _sel: _getSel(
+                "proveWithdrawalTransaction((uint256,address,address,uint256,uint256,bytes),uint256,(bytes32,bytes32,bytes32,bytes32),bytes[])"
+            ),
+            _pausable: true
+        });
+        _addSpec({
+            _name: "OptimismPortal2",
+            _sel: _getSel(
+                "proveWithdrawalTransaction((uint256,address,address,uint256,uint256,bytes),address,uint256,(bytes1,uint64,(uint256,bytes32)[]),(bytes32,bytes32,bytes32,bytes32),bytes[])"
+            ),
             _pausable: true
         });
         _addSpec({ _name: "OptimismPortal2", _sel: _getSel("provenWithdrawals(bytes32,address)") });
@@ -294,7 +316,7 @@ contract Specification_Test is CommonTest {
         _addSpec({ _name: "OptimismPortal2", _sel: _getSel("respectedGameTypeUpdatedAt()") });
         _addSpec({ _name: "OptimismPortal2", _sel: _getSel("proofSubmitters(bytes32,uint256)") });
         _addSpec({ _name: "OptimismPortal2", _sel: _getSel("numProofSubmitters(bytes32)") });
-        _addSpec({ _name: "OptimismPortal2", _sel: _getSel("upgrade(address)") });
+        _addSpec({ _name: "OptimismPortal2", _sel: _getSel("upgrade(address,bool)") });
 
         // ProtocolVersions
         _addSpec({ _name: "ProtocolVersions", _sel: _getSel("RECOMMENDED_SLOT()") });
@@ -389,6 +411,9 @@ contract Specification_Test is CommonTest {
         _addSpec({ _name: "SystemConfig", _sel: _getSel("blobbasefeeScalar()") });
         _addSpec({ _name: "SystemConfig", _sel: _getSel("maximumGasLimit()") });
         _addSpec({ _name: "SystemConfig", _sel: _getSel("getAddresses()") });
+        _addSpec({ _name: "SystemConfig", _sel: _getSel("l2ChainId()") });
+        _addSpec({ _name: "SystemConfig", _sel: _getSel("upgrade(uint256)") });
+        _addSpec({ _name: "SystemConfig", _sel: _getSel("initVersion()") });
 
         // SystemConfigInterop
         _addSpec({ _name: "SystemConfigInterop", _sel: _getSel("UNSAFE_BLOCK_SIGNER_SLOT()") });
@@ -476,7 +501,9 @@ contract Specification_Test is CommonTest {
         });
         _addSpec({ _name: "SystemConfigInterop", _sel: _getSel("dependencyManager()") });
         _addSpec({ _name: "SystemConfigInterop", _sel: _getSel("getAddresses()") });
-
+        _addSpec({ _name: "SystemConfigInterop", _sel: _getSel("l2ChainId()") });
+        _addSpec({ _name: "SystemConfigInterop", _sel: _getSel("upgrade(uint256)") });
+        _addSpec({ _name: "SystemConfigInterop", _sel: _getSel("initVersion()") });
         // ProxyAdmin
         _addSpec({ _name: "ProxyAdmin", _sel: _getSel("addressManager()") });
         _addSpec({
