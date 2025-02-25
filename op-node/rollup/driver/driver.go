@@ -177,6 +177,7 @@ func NewDriver(
 	sequencerConductor conductor.SequencerConductor,
 	altDA AltDAIface,
 	managedMode bool,
+	preconfChannels engine.PreconfChannels,
 ) *Driver {
 	driverCtx, driverCancel := context.WithCancel(context.Background())
 
@@ -232,7 +233,7 @@ func NewDriver(
 	}
 	sys.Register("sync", syncDeriver, opts)
 
-	sys.Register("engine", engine.NewEngDeriver(log, driverCtx, cfg, metrics, ec), opts)
+	sys.Register("engine", engine.NewEngDeriver(log, driverCtx, cfg, metrics, ec, preconfChannels), opts)
 
 	schedDeriv := NewStepSchedulingDeriver(log)
 	sys.Register("step-scheduler", schedDeriv, opts)
