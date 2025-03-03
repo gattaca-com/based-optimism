@@ -23,10 +23,8 @@ contract OPContractsManager14 is OPContractsManager {
         return string.concat(super.version(), "+upgrade14.1");
     }
 
-    // TODO: Review required arguments
     constructor(
         ISuperchainConfig _superchainConfig,
-        IProtocolVersions _protocolVersions,
         IProxyAdmin _superchainProxyAdmin,
         string memory _l1ContractsRelease,
         Blueprints memory _blueprints,
@@ -35,7 +33,7 @@ contract OPContractsManager14 is OPContractsManager {
     )
     OPContractsManager(
     _superchainConfig,
-    _protocolVersions,
+    0x0, // No longer required for upgrade 14
     _superchainProxyAdmin,
     _l1ContractsRelease,
     _blueprints,
