@@ -64,16 +64,6 @@ contract OPContractsManager14 is OPContractsManager {
             assertValidOpChainConfig(_opChainConfigs[i]);
             ISystemConfig.Addresses memory opChainAddrs = _opChainConfigs[i].systemConfigProxy.getAddresses();
 
-            // Check that all contracts have the correct superchainConfig
-            if (
-                getSuperchainConfig(opChainAddrs.optimismPortal) != superchainConfig
-                    || getSuperchainConfig(opChainAddrs.l1CrossDomainMessenger) != superchainConfig
-                    || getSuperchainConfig(opChainAddrs.l1ERC721Bridge) != superchainConfig
-                    || getSuperchainConfig(opChainAddrs.l1StandardBridge) != superchainConfig
-            ) {
-                revert SuperchainConfigMismatch(_opChainConfigs[i].systemConfigProxy);
-            }
-
             // -------- Discover and Upgrade Proofs Contracts --------
 
             // All chains have the Permissioned Dispute Game.
