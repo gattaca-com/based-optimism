@@ -44,13 +44,6 @@ func BenchmarkMemoryOperations(b *testing.B) {
 				bm.fn(b, m)
 			})
 		})
-		b.Run("Trie", func(b *testing.B) {
-			b.Run((bm.name), func(b *testing.B) {
-				m := NewTrieMemory()
-				b.ResetTimer()
-				bm.fn(b, m)
-			})
-		})
 	}
 }
 
