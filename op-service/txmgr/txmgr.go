@@ -147,6 +147,12 @@ type SimpleTxManager struct {
 	pending atomic.Int64
 
 	closed atomic.Bool
+
+	// shuttingDown is set to true during graceful shutdown, preventing new transactions
+	// while allowing in-flight ones to complete
+	shuttingDown atomic.Bool
+	// waitGroup tracks pending transactions for clean shutdown
+	waitGroup sync.WaitGroup
 }
 
 // NewSimpleTxManager initializes a new SimpleTxManager with the passed Config.
@@ -193,11 +199,34 @@ func (m *SimpleTxManager) API() rpc.API {
 	}
 }
 
-// Close closes the underlying connection, and sets the closed flag.
-// once closed, the tx manager will refuse to send any new transactions, and may abandon pending ones.
+// Close gracefully shuts down the transaction manager.
+// First blocks new transactions, then waits for a short time for in-flight transactions
+// to complete, and finally closes the backend connection.
 func (m *SimpleTxManager) Close() {
+	// First, prevent new transactions from being accepted
+	m.shuttingDown.Store(true)
+
+	const gracePeriod = 10 * time.Second
+	done := make(chan struct{})
+
+	// Wait for pending transactions
+	go func() {
+		m.waitGroup.Wait()
+		close(done)
+	}()
+
+	// Wait for either all transactions to complete or the grace period to expire
+	select {
+	case <-done:
+		m.l.Info("All in-flight transactions completed")
+	case <-time.After(gracePeriod):
+		m.l.Warn("Graceful shutdown timed out, some transactions may be abandoned")
+	}
+
+	// Now fully close the connection and set the closed flag
 	m.backend.Close()
 	m.closed.Store(true)
+	m.l.Info("Transaction manager closed")
 }
 
 func (m *SimpleTxManager) txLogger(tx *types.Transaction, logGas bool) log.Logger {
@@ -238,13 +267,22 @@ type TxCandidate struct {
 //
 // NOTE: Send can be called concurrently, the nonce will be managed internally.
 func (m *SimpleTxManager) Send(ctx context.Context, candidate TxCandidate) (*types.Receipt, error) {
-	// refuse new requests if the tx manager is closed
+	// refuse new requests if the tx manager is closed or shutting down
 	if m.closed.Load() {
 		return nil, ErrClosed
 	}
 
+	if m.shuttingDown.Load() {
+		return nil, errors.New("transaction manager is shutting down")
+	}
+
 	m.metr.RecordPendingTx(m.pending.Add(1))
-	defer m.metr.RecordPendingTx(m.pending.Add(-1))
+	m.waitGroup.Add(1) // Track this transaction for graceful shutdown
+
+	defer func() {
+		m.metr.RecordPendingTx(m.pending.Add(-1))
+		m.waitGroup.Done()
+	}()
 
 	var cancel context.CancelFunc
 	if m.cfg.TxSendTimeout == 0 {
@@ -281,6 +319,14 @@ func (m *SimpleTxManager) SendAsync(ctx context.Context, candidate TxCandidate, 
 		return
 	}
 
+	if m.shuttingDown.Load() {
+		ch <- SendResponse{
+			Receipt: nil,
+			Err:     errors.New("transaction manager is shutting down"),
+		}
+		return
+	}
+
 	var cancel context.CancelFunc
 	if m.cfg.TxSendTimeout == 0 {
 		ctx, cancel = context.WithCancel(ctx)
@@ -300,9 +346,13 @@ func (m *SimpleTxManager) SendAsync(ctx context.Context, candidate TxCandidate, 
 	}
 
 	m.metr.RecordPendingTx(m.pending.Add(1))
+	m.waitGroup.Add(1) // Track this transaction for graceful shutdown
 
 	go func() {
-		defer func() { m.metr.RecordPendingTx(m.pending.Add(-1)) }()
+		defer func() {
+			m.metr.RecordPendingTx(m.pending.Add(-1))
+			m.waitGroup.Done()
+		}()
 		defer cancel()
 		receipt, err := m.sendTx(ctx, tx)
 		if err != nil {
@@ -975,6 +1025,11 @@ func (m *SimpleTxManager) checkBlobFeeLimits(blobBaseFee, bumpedBlobFee *big.Int
 // IsClosed returns true if the tx manager is closed.
 func (m *SimpleTxManager) IsClosed() bool {
 	return m.closed.Load()
+}
+
+// IsShuttingDown returns true if the tx manager is in the process of shutting down.
+func (m *SimpleTxManager) IsShuttingDown() bool {
+	return m.shuttingDown.Load() || m.closed.Load()
 }
 
 // calcThresholdValue returns ceil(x * priceBumpPercent / 100) for non-blob txs, or
