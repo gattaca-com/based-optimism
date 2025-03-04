@@ -349,6 +349,10 @@ func TestIsthmusNetworkUpgradeTransactions(gt *testing.T) {
 	sequencer.ActL2PipelineFull(t)
 	verifier.ActL2PipelineFull(t)
 
+	// Get gas price from oracle
+	gasPriceOracle, err := bindings.NewGasPriceOracleCaller(predeploys.GasPriceOracleAddr, ethCl)
+	require.NoError(t, err)
+
 	// Get current implementations addresses (by slot) for L1Block + GasPriceOracle
 	initialL1BlockAddress, err := ethCl.StorageAt(context.Background(), predeploys.L1BlockAddr, genesis.ImplementationSlot, nil)
 	require.NoError(t, err)
@@ -380,7 +384,7 @@ func TestIsthmusNetworkUpgradeTransactions(gt *testing.T) {
 
 	expectedL1BlockAddress := crypto.CreateAddress(derive.L1BlockIsthmusDeployerAddress, 0)
 
-	// Gas L1 Block Proxy is updated
+	// L1 Block Proxy is updated
 	updatedL1BlockAddress, err := ethCl.StorageAt(context.Background(), predeploys.L1BlockAddr, genesis.ImplementationSlot, latestBlock.Number())
 	require.NoError(t, err)
 	require.Equal(t, expectedL1BlockAddress, common.BytesToAddress(updatedL1BlockAddress))
@@ -395,6 +399,11 @@ func TestIsthmusNetworkUpgradeTransactions(gt *testing.T) {
 	require.Equal(t, expectedGasPriceOracleAddress, common.BytesToAddress(updatedGasPriceOracleAddress))
 	require.NotEqualf(t, initialGasPriceOracleAddress, updatedGasPriceOracleAddress, "Gas Price Oracle Proxy address should have changed")
 	verifyCodeHashMatches(t, ethCl, expectedGasPriceOracleAddress, isthmusGasPriceOracleCodeHash)
+
+	// Check that Isthmus was activated
+	isIsthmus, err := gasPriceOracle.IsIsthmus(nil)
+	require.NoError(t, err)
+	require.True(t, isIsthmus)
 
 	expectedOperatorFeeVaultAddress := crypto.CreateAddress(derive.OperatorFeeVaultDeployerAddress, 0)
 

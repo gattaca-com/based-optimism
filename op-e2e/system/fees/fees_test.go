@@ -101,9 +101,9 @@ func testFees(t *testing.T, cfg e2esys.SystemConfig) {
 	l2Verif := sys.NodeClient("verifier")
 	l1 := sys.NodeClient("l1")
 
-	balanceAt := func(a common.Address) *big.Int {
+	balanceAt := func(a common.Address, blockNumber *big.Int) *big.Int {
 		t.Helper()
-		bal, err := l2Seq.BalanceAt(context.Background(), a, nil)
+		bal, err := l2Seq.BalanceAt(context.Background(), a, blockNumber)
 		require.NoError(t, err)
 		return bal
 	}
@@ -155,10 +155,10 @@ func testFees(t *testing.T, cfg e2esys.SystemConfig) {
 
 	require.Equal(t, decimals.Uint64(), uint64(6), "wrong gpo decimals")
 
-	baseFeeRecipientStartBalance := balanceAt(predeploys.BaseFeeVaultAddr)
-	l1FeeRecipientStartBalance := balanceAt(predeploys.L1FeeVaultAddr)
-	sequencerFeeVaultStartBalance := balanceAt(predeploys.SequencerFeeVaultAddr)
-	operatorFeeVaultStartBalance := balanceAt(predeploys.OperatorFeeVaultAddr)
+	baseFeeRecipientStartBalance := balanceAt(predeploys.BaseFeeVaultAddr, big.NewInt(rpc.EarliestBlockNumber.Int64()))
+	l1FeeRecipientStartBalance := balanceAt(predeploys.L1FeeVaultAddr, big.NewInt(rpc.EarliestBlockNumber.Int64()))
+	sequencerFeeVaultStartBalance := balanceAt(predeploys.SequencerFeeVaultAddr, big.NewInt(rpc.EarliestBlockNumber.Int64()))
+	operatorFeeVaultStartBalance := balanceAt(predeploys.OperatorFeeVaultAddr, big.NewInt(rpc.EarliestBlockNumber.Int64()))
 
 	require.Equal(t, baseFeeRecipientStartBalance.Sign(), 0, "base fee vault should be empty")
 	require.Equal(t, l1FeeRecipientStartBalance.Sign(), 0, "l1 fee vault should be empty")
@@ -168,10 +168,10 @@ func testFees(t *testing.T, cfg e2esys.SystemConfig) {
 	genesisBlock, err := l2Seq.BlockByNumber(context.Background(), big.NewInt(rpc.EarliestBlockNumber.Int64()))
 	require.NoError(t, err)
 
-	coinbaseStartBalance := balanceAt(genesisBlock.Coinbase())
+	coinbaseStartBalance := balanceAt(genesisBlock.Coinbase(), big.NewInt(rpc.EarliestBlockNumber.Int64()))
 
 	// Simple transfer from signer to random account
-	startBalance := balanceAt(fromAddr)
+	startBalance := balanceAt(fromAddr, big.NewInt(rpc.EarliestBlockNumber.Int64()))
 
 	require.Greater(t, startBalance.Uint64(), big.NewInt(params.Ether).Uint64())
 
@@ -191,16 +191,16 @@ func testFees(t *testing.T, cfg e2esys.SystemConfig) {
 	header, err := l2Seq.HeaderByNumber(context.Background(), receipt.BlockNumber)
 	require.Nil(t, err)
 
-	coinbaseEndBalance := balanceAt(header.Coinbase)
-	endBalance := balanceAt(fromAddr)
-	baseFeeRecipientEndBalance := balanceAt(predeploys.BaseFeeVaultAddr)
+	coinbaseEndBalance := balanceAt(header.Coinbase, header.Number)
+	endBalance := balanceAt(fromAddr, header.Number)
+	baseFeeRecipientEndBalance := balanceAt(predeploys.BaseFeeVaultAddr, header.Number)
 
 	l1Header, err := l1.HeaderByNumber(context.Background(), nil)
 	require.Nil(t, err)
 
-	l1FeeRecipientEndBalance := balanceAt(predeploys.L1FeeVaultAddr)
-	sequencerFeeVaultEndBalance := balanceAt(predeploys.SequencerFeeVaultAddr)
-	operatorFeeVaultEndBalance := balanceAt(predeploys.OperatorFeeVaultAddr)
+	l1FeeRecipientEndBalance := balanceAt(predeploys.L1FeeVaultAddr, header.Number)
+	sequencerFeeVaultEndBalance := balanceAt(predeploys.SequencerFeeVaultAddr, header.Number)
+	operatorFeeVaultEndBalance := balanceAt(predeploys.OperatorFeeVaultAddr, header.Number)
 
 	// Diff fee recipient + coinbase balances
 	baseFeeRecipientDiff := new(big.Int).Sub(baseFeeRecipientEndBalance, baseFeeRecipientStartBalance)
