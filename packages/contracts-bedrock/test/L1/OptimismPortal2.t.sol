@@ -93,6 +93,9 @@ contract OptimismPortal2_Test is CommonTest {
     }
 
     function testFuzz_upgrade_succeeds(address _newAnchorStateRegistry, uint256 _balance) external {
+        // Prevent overflow on an upgrade context
+        _balance = bound(_balance, 0, type(uint256).max - address(ethLockbox).balance);
+
         // Set the initialize state of the portal to false.
         vm.store(address(optimismPortal2), bytes32(uint256(0)), bytes32(uint256(0)));
 
@@ -177,6 +180,8 @@ contract OptimismPortal2_Test is CommonTest {
 
     /// @dev Tests that `receive` successdully deposits ETH.
     function testFuzz_receive_succeeds(uint256 _value) external {
+        // Prevent overflow on an upgrade context
+        _value = bound(_value, 0, type(uint256).max - address(ethLockbox).balance);
         uint256 balanceBefore = address(optimismPortal2).balance;
         uint256 lockboxBalanceBefore = address(ethLockbox).balance;
         _value = bound(_value, 0, type(uint256).max - balanceBefore);
@@ -280,6 +285,8 @@ contract OptimismPortal2_Test is CommonTest {
     )
         external
     {
+        // Prevent overflow on an upgrade context
+        _mint = bound(_mint, 0, type(uint256).max - address(ethLockbox).balance);
         _gasLimit = uint64(
             bound(
                 _gasLimit,
@@ -335,6 +342,8 @@ contract OptimismPortal2_Test is CommonTest {
         external
     {
         assumeNotForgeAddress(_7702Target);
+        // Prevent overflow on an upgrade context
+        _mint = bound(_mint, 0, type(uint256).max - address(ethLockbox).balance);
 
         _gasLimit = uint64(
             bound(
@@ -388,6 +397,8 @@ contract OptimismPortal2_Test is CommonTest {
     )
         external
     {
+        // Prevent overflow on an upgrade context
+        _mint = bound(_mint, 0, type(uint256).max - address(ethLockbox).balance);
         _gasLimit = uint64(
             bound(
                 _gasLimit,
@@ -2102,6 +2113,7 @@ contract OptimismPortal2_LiquidityMigration_Test is CommonTest {
 
     /// @notice Tests that the liquidity migration from the portal to the lockbox succeeds.
     function test_migrateLiquidity_succeeds(uint256 _portalBalance) external {
+        _portalBalance = uint256(bound(_portalBalance, 0, type(uint256).max - address(ethLockbox).balance));
         vm.deal(address(optimismPortal2), _portalBalance);
 
         uint256 lockboxBalanceBefore = address(ethLockbox).balance;

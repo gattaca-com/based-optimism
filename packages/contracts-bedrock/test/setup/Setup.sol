@@ -229,7 +229,13 @@ contract Setup {
         console.log("Setup: completed L1 deployment, registering addresses now");
 
         optimismPortal2 = IOptimismPortal(artifacts.mustGetAddress("OptimismPortalProxy"));
-        ethLockbox = IETHLockbox(artifacts.mustGetAddress("ETHLockboxProxy"));
+
+        if (isForkTest() && deploy.cfg().useUpgradedFork()) {
+            // If we are on the last upgrade network, we can use the predeployed ETHLockbox for the fork test
+            ethLockbox = IETHLockbox(artifacts.mustGetAddress("ETHLockboxProxy"));
+        } else if (!isForkTest()) {
+            ethLockbox = IETHLockbox(artifacts.mustGetAddress("ETHLockboxProxy"));
+        }
         systemConfig = ISystemConfig(artifacts.mustGetAddress("SystemConfigProxy"));
         l1StandardBridge = IL1StandardBridge(artifacts.mustGetAddress("L1StandardBridgeProxy"));
         l1CrossDomainMessenger = IL1CrossDomainMessenger(artifacts.mustGetAddress("L1CrossDomainMessengerProxy"));
