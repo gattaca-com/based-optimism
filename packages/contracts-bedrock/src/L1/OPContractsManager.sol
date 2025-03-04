@@ -920,7 +920,7 @@ contract OPContractsManager is ISemver {
         returns (bytes memory)
     {
         return abi.encodeCall(
-            IOptimismPortal2.initialize,
+            IOptimismPortal.initialize,
             (
                 _output.systemConfigProxy,
                 superchainConfig,

@@ -105,7 +105,7 @@ contract OptimismPortal2_Test is CommonTest {
 
         // Call the upgrade function.
         vm.prank(Predeploys.PROXY_ADMIN);
-        optimismPortal2.upgrade(IAnchorStateRegistry(_newAnchorStateRegistry), IETHLockbox(ethLockbox));
+        optimismPortal2.upgrade(IAnchorStateRegistry(_newAnchorStateRegistry), IETHLockbox(ethLockbox), true);
 
         // Assert the portal is properly upgraded.
         assertEq(address(optimismPortal2.ethLockbox()), address(ethLockbox));
@@ -874,7 +874,7 @@ contract OptimismPortal2_FinalizeWithdrawal_Test is CommonTest {
         setSuperRootsActive(true);
 
         // Should revert.
-        vm.expectRevert(IOptimismPortal2.OptimismPortal_WrongProofMethod.selector);
+        vm.expectRevert(IOptimismPortal.OptimismPortal_WrongProofMethod.selector);
         optimismPortal2.proveWithdrawalTransaction({
             _tx: _defaultTx,
             _disputeGameIndex: _proposedGameIndex,
@@ -897,7 +897,7 @@ contract OptimismPortal2_FinalizeWithdrawal_Test is CommonTest {
         });
 
         // Should revert.
-        vm.expectRevert(IOptimismPortal2.OptimismPortal_WrongProofMethod.selector);
+        vm.expectRevert(IOptimismPortal.OptimismPortal_WrongProofMethod.selector);
         optimismPortal2.proveWithdrawalTransaction({
             _tx: _defaultTx,
             _disputeGameProxy: game,
@@ -925,7 +925,7 @@ contract OptimismPortal2_FinalizeWithdrawal_Test is CommonTest {
         });
 
         // Should revert because the proof is wrong.
-        vm.expectRevert(IOptimismPortal2.OptimismPortal_InvalidSuperRootProof.selector);
+        vm.expectRevert(IOptimismPortal.OptimismPortal_InvalidSuperRootProof.selector);
         optimismPortal2.proveWithdrawalTransaction({
             _tx: _defaultTx,
             _disputeGameProxy: game,
@@ -960,7 +960,7 @@ contract OptimismPortal2_FinalizeWithdrawal_Test is CommonTest {
         vm.mockCall(address(game), abi.encodeCall(game.rootClaim, ()), abi.encode(expectedSuperRoot));
 
         // Should revert because the proof is wrong.
-        vm.expectRevert(IOptimismPortal2.OptimismPortal_InvalidOutputRootIndex.selector);
+        vm.expectRevert(IOptimismPortal.OptimismPortal_InvalidOutputRootIndex.selector);
         optimismPortal2.proveWithdrawalTransaction({
             _tx: _defaultTx,
             _disputeGameProxy: game,
@@ -997,7 +997,7 @@ contract OptimismPortal2_FinalizeWithdrawal_Test is CommonTest {
         vm.mockCall(address(game), abi.encodeCall(game.rootClaim, ()), abi.encode(expectedSuperRoot));
 
         // Should revert because the proof is wrong.
-        vm.expectRevert(IOptimismPortal2.OptimismPortal_InvalidOutputRootChainId.selector);
+        vm.expectRevert(IOptimismPortal.OptimismPortal_InvalidOutputRootChainId.selector);
         optimismPortal2.proveWithdrawalTransaction({
             _tx: _defaultTx,
             _disputeGameProxy: game,
@@ -1034,7 +1034,7 @@ contract OptimismPortal2_FinalizeWithdrawal_Test is CommonTest {
         vm.mockCall(address(game), abi.encodeCall(game.rootClaim, ()), abi.encode(expectedSuperRoot));
 
         // Should revert because the proof is wrong.
-        vm.expectRevert(IOptimismPortal2.OptimismPortal_InvalidOutputRootProof.selector);
+        vm.expectRevert(IOptimismPortal.OptimismPortal_InvalidOutputRootProof.selector);
         optimismPortal2.proveWithdrawalTransaction({
             _tx: _defaultTx,
             _disputeGameProxy: game,
@@ -2140,7 +2140,7 @@ contract OptimismPortal2_upgrade_Test is CommonTest {
         vm.store(address(optimismPortal2), bytes32(slot.slot), bytes32(0));
 
         // Trigger upgrade().
-        optimismPortal2.upgrade(IAnchorStateRegistry(address(0xdeadbeef)), true);
+        optimismPortal2.upgrade(IAnchorStateRegistry(address(0xdeadbeef)), IETHLockbox(ethLockbox), true);
 
         // Verify that the initialized slot was updated.
         bytes32 initializedSlotAfter = vm.load(address(optimismPortal2), bytes32(slot.slot));
@@ -2162,11 +2162,11 @@ contract OptimismPortal2_upgrade_Test is CommonTest {
         vm.store(address(optimismPortal2), bytes32(slot.slot), bytes32(0));
 
         // Trigger first upgrade.
-        optimismPortal2.upgrade(IAnchorStateRegistry(address(0xdeadbeef)), true);
+        optimismPortal2.upgrade(IAnchorStateRegistry(address(0xdeadbeef)), IETHLockbox(ethLockbox), true);
 
         // Try to trigger second upgrade.
         vm.expectRevert("Initializable: contract is already initialized");
-        optimismPortal2.upgrade(IAnchorStateRegistry(address(0xdeadbeef)), true);
+        optimismPortal2.upgrade(IAnchorStateRegistry(address(0xdeadbeef)), IETHLockbox(ethLockbox), true);
     }
 
     /// @notice Tests that the upgrade() function reverts if called after initialization.
@@ -2183,7 +2183,7 @@ contract OptimismPortal2_upgrade_Test is CommonTest {
 
         // Try to trigger upgrade().
         vm.expectRevert("Initializable: contract is already initialized");
-        optimismPortal2.upgrade(IAnchorStateRegistry(address(0xdeadbeef)), true);
+        optimismPortal2.upgrade(IAnchorStateRegistry(address(0xdeadbeef)), IETHLockbox(ethLockbox), true);
     }
 }
 

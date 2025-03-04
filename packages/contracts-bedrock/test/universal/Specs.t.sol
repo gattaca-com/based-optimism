@@ -262,7 +262,6 @@ contract Specification_Test is CommonTest {
         _addSpec({ _name: "OptimismPortalInterop", _sel: _getSel("ethLockbox()") });
         _addSpec({ _name: "OptimismPortalInterop", _sel: _getSel("migrateLiquidity()") });
         _addSpec({ _name: "OptimismPortalInterop", _sel: _getSel("proxyAdminOwner()") });
-        _addSpec({ _name: "OptimismPortalInterop", _sel: _getSel("setConfig(uint8,bytes)") });
         _addSpec({ _name: "OptimismPortalInterop", _sel: _getSel("upgrade(address,address,bool)") });
         _addSpec({
             _name: "OptimismPortalInterop",
