@@ -184,6 +184,30 @@ const (
 	Invalid SafetyLevel = "invalid"
 )
 
+type ExecutingDescriptor struct {
+	// Timestamp is the timestamp of the executing message
+	Timestamp uint64
+}
+
+type executingDescriptorMarshaling struct {
+	Timestamp hexutil.Uint64 `json:"timestamp"`
+}
+
+func (ed ExecutingDescriptor) MarshalJSON() ([]byte, error) {
+	var enc executingDescriptorMarshaling
+	enc.Timestamp = hexutil.Uint64(ed.Timestamp)
+	return json.Marshal(&enc)
+}
+
+func (ed *ExecutingDescriptor) UnmarshalJSON(input []byte) error {
+	var dec executingDescriptorMarshaling
+	if err := json.Unmarshal(input, &dec); err != nil {
+		return err
+	}
+	ed.Timestamp = uint64(dec.Timestamp)
+	return nil
+}
+
 type ReferenceView struct {
 	Local eth.BlockID `json:"local"`
 	Cross eth.BlockID `json:"cross"`
@@ -270,43 +294,43 @@ func LogToMessagePayload(l *ethTypes.Log) []byte {
 	return msg
 }
 
-// DerivedBlockRefPair is a pair of block refs, where Derived (L2) is derived from DerivedFrom (L1).
+// DerivedBlockRefPair is a pair of block refs, where Derived (L2) is derived from Source (L1).
 type DerivedBlockRefPair struct {
-	DerivedFrom eth.BlockRef `json:"derivedFrom"`
-	Derived     eth.BlockRef `json:"derived"`
+	Source  eth.BlockRef `json:"source"`
+	Derived eth.BlockRef `json:"derived"`
 }
 
 func (refs *DerivedBlockRefPair) IDs() DerivedIDPair {
 	return DerivedIDPair{
-		DerivedFrom: refs.DerivedFrom.ID(),
-		Derived:     refs.Derived.ID(),
+		Source:  refs.Source.ID(),
+		Derived: refs.Derived.ID(),
 	}
 }
 
 func (refs *DerivedBlockRefPair) Seals() DerivedBlockSealPair {
 	return DerivedBlockSealPair{
-		DerivedFrom: BlockSealFromRef(refs.DerivedFrom),
-		Derived:     BlockSealFromRef(refs.Derived),
+		Source:  BlockSealFromRef(refs.Source),
+		Derived: BlockSealFromRef(refs.Derived),
 	}
 }
 
-// DerivedBlockSealPair is a pair of block seals, where Derived (L2) is derived from DerivedFrom (L1).
+// DerivedBlockSealPair is a pair of block seals, where Derived (L2) is derived from Source (L1).
 type DerivedBlockSealPair struct {
-	DerivedFrom BlockSeal `json:"derivedFrom"`
-	Derived     BlockSeal `json:"derived"`
+	Source  BlockSeal `json:"source"`
+	Derived BlockSeal `json:"derived"`
 }
 
 func (seals *DerivedBlockSealPair) IDs() DerivedIDPair {
 	return DerivedIDPair{
-		DerivedFrom: seals.DerivedFrom.ID(),
-		Derived:     seals.Derived.ID(),
+		Source:  seals.Source.ID(),
+		Derived: seals.Derived.ID(),
 	}
 }
 
-// DerivedIDPair is a pair of block IDs, where Derived (L2) is derived from DerivedFrom (L1).
+// DerivedIDPair is a pair of block IDs, where Derived (L2) is derived from Source (L1).
 type DerivedIDPair struct {
-	DerivedFrom eth.BlockID `json:"derivedFrom"`
-	Derived     eth.BlockID `json:"derived"`
+	Source  eth.BlockID `json:"source"`
+	Derived eth.BlockID `json:"derived"`
 }
 
 type BlockReplacement struct {
@@ -322,5 +346,5 @@ type ManagedEvent struct {
 	DerivationUpdate       *DerivedBlockRefPair `json:"derivationUpdate,omitempty"`
 	ExhaustL1              *DerivedBlockRefPair `json:"exhaustL1,omitempty"`
 	ReplaceBlock           *BlockReplacement    `json:"replaceBlock,omitempty"`
-	DerivationOriginUpdate *DerivedBlockRefPair `json:"derivationOriginUpdate,omitempty"`
+	DerivationOriginUpdate *eth.BlockRef        `json:"derivationOriginUpdate,omitempty"`
 }

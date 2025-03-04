@@ -3,7 +3,7 @@ pragma solidity 0.8.15;
 
 // Testing
 import { console2 as console } from "forge-std/console2.sol";
-import { Vm } from "forge-std/Vm.sol";
+import { Vm, VmSafe } from "forge-std/Vm.sol";
 
 // Scripts
 import { Deploy } from "scripts/deploy/Deploy.s.sol";
@@ -148,6 +148,7 @@ contract Setup {
 
         if (isForkTest()) {
             vm.createSelectFork(vm.envString("FORK_RPC_URL"), vm.envUint("FORK_BLOCK_NUMBER"));
+            console.log("Setup: fork selected!");
             require(
                 block.chainid == Chains.Sepolia || block.chainid == Chains.Mainnet,
                 "Setup: ETH_RPC_URL must be set to a production (Sepolia or Mainnet) RPC URL"
@@ -173,6 +174,13 @@ contract Setup {
         vm.allowCheatcodes(address(l2Genesis));
         l2Genesis.setUp();
         console.log("Setup: L2 setup done!");
+    }
+
+    /// @dev Skips tests when running in coverage mode.
+    function skipIfCoverage() public {
+        if (vm.isContext(VmSafe.ForgeContext.Coverage)) {
+            vm.skip(true);
+        }
     }
 
     /// @dev Skips tests when running against a forked production network.
@@ -306,6 +314,7 @@ contract Setup {
         labelPreinstall(Preinstalls.SenderCreator_v070);
         labelPreinstall(Preinstalls.EntryPoint_v070);
         labelPreinstall(Preinstalls.BeaconBlockRoots);
+        labelPreinstall(Preinstalls.HistoryStorage);
         labelPreinstall(Preinstalls.CreateX);
 
         console.log("Setup: completed L2 genesis");

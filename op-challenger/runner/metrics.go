@@ -19,10 +19,12 @@ type Metrics struct {
 	*contractMetrics.ContractMetrics
 	*metrics.VmMetrics
 
+	up                  prometheus.Gauge
 	vmLastExecutionTime *prometheus.GaugeVec
 	vmLastMemoryUsed    *prometheus.GaugeVec
 	successTotal        *prometheus.CounterVec
 	failuresTotal       *prometheus.CounterVec
+	panicsTotal         *prometheus.CounterVec
 	invalidTotal        *prometheus.CounterVec
 }
 
@@ -43,6 +45,11 @@ func NewMetrics(runConfigs []RunConfig) *Metrics {
 		ContractMetrics: contractMetrics.MakeContractMetrics(Namespace, factory),
 		VmMetrics:       metrics.NewVmMetrics(Namespace, factory),
 
+		up: factory.NewGauge(prometheus.GaugeOpts{
+			Namespace: Namespace,
+			Name:      "up",
+			Help:      "The VM runner has started to run",
+		}),
 		vmLastExecutionTime: factory.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: Namespace,
 			Name:      "vm_last_execution_time",
@@ -63,6 +70,11 @@ func NewMetrics(runConfigs []RunConfig) *Metrics {
 			Name:      "failures_total",
 			Help:      "Number of failures to execute a VM",
 		}, []string{"type"}),
+		panicsTotal: factory.NewCounterVec(prometheus.CounterOpts{
+			Namespace: Namespace,
+			Name:      "panics_total",
+			Help:      "Number of times the VM panicked",
+		}, []string{"type"}),
 		invalidTotal: factory.NewCounterVec(prometheus.CounterOpts{
 			Namespace: Namespace,
 			Name:      "invalid_total",
@@ -73,7 +85,9 @@ func NewMetrics(runConfigs []RunConfig) *Metrics {
 	for _, runConfig := range runConfigs {
 		metrics.successTotal.WithLabelValues(runConfig.Name).Add(0)
 		metrics.failuresTotal.WithLabelValues(runConfig.Name).Add(0)
+		metrics.panicsTotal.WithLabelValues(runConfig.Name).Add(0)
 		metrics.invalidTotal.WithLabelValues(runConfig.Name).Add(0)
+		metrics.RecordUp()
 	}
 
 	return metrics
@@ -81,6 +95,10 @@ func NewMetrics(runConfigs []RunConfig) *Metrics {
 
 func (m *Metrics) Registry() *prometheus.Registry {
 	return m.registry
+}
+
+func (m *Metrics) RecordUp() {
+	m.up.Set(1)
 }
 
 func (m *Metrics) RecordVmExecutionTime(vmType string, dur time.Duration) {
@@ -100,6 +118,10 @@ func (m *Metrics) RecordSuccess(vmType string) {
 
 func (m *Metrics) RecordFailure(vmType string) {
 	m.failuresTotal.WithLabelValues(vmType).Inc()
+}
+
+func (m *Metrics) RecordPanic(vmType string) {
+	m.panicsTotal.WithLabelValues(vmType).Inc()
 }
 
 func (m *Metrics) RecordInvalid(vmType string) {

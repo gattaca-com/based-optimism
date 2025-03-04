@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/standard"
+
 	"github.com/ethereum-optimism/optimism/op-chain-ops/script"
 	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/opcm"
 	"github.com/ethereum/go-ethereum/common"
@@ -19,9 +21,10 @@ type UpgradeOPChainInput struct {
 type OPChainConfig struct {
 	SystemConfigProxy common.Address `json:"systemConfigProxy"`
 	ProxyAdmin        common.Address `json:"proxyAdmin"`
+	AbsolutePrestate  common.Hash    `json:"absolutePrestate"`
 }
 
-var opChainConfigEncoder = w3.MustNewFunc("dummy((address systemConfigProxy,address proxyAdmin)[])", "")
+var opChainConfigEncoder = w3.MustNewFunc("dummy((address systemConfigProxy,address proxyAdmin,bytes32 absolutePrestate)[])", "")
 
 func (u *UpgradeOPChainInput) OpChainConfigs() ([]byte, error) {
 	data, err := opChainConfigEncoder.EncodeArgs(u.EncodedChainConfigs)
@@ -54,7 +57,7 @@ func (u *Upgrader) SupportsVersion(version string) bool {
 }
 
 func (u *Upgrader) ArtifactsURL() string {
-	return ""
+	return "tag://" + standard.ContractsV200Tag
 }
 
 var DefaultUpgrader = new(Upgrader)

@@ -12,7 +12,7 @@ import { Deployer } from "scripts/deploy/Deployer.sol";
 import { Deploy } from "scripts/deploy/Deploy.s.sol";
 
 // Libraries
-import { GameTypes } from "src/dispute/lib/Types.sol";
+import { GameTypes, Claim } from "src/dispute/lib/Types.sol";
 import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 
 // Interfaces
@@ -131,7 +131,6 @@ contract ForkLive is Deployer {
         // Fault proof proxied contracts
         saveProxyAndImpl("AnchorStateRegistry", opToml, ".addresses.AnchorStateRegistryProxy");
         saveProxyAndImpl("DisputeGameFactory", opToml, ".addresses.DisputeGameFactoryProxy");
-        saveProxyAndImpl("DelayedWETH", opToml, ".addresses.DelayedWETHProxy");
 
         // Fault proof non-proxied contracts
         // For chains that don't have a permissionless game, we save the dispute game and WETH
@@ -151,6 +150,10 @@ contract ForkLive is Deployer {
             IFaultDisputeGame(address(disputeGameFactory.gameImpls(GameTypes.PERMISSIONED_CANNON)));
         artifacts.save("PermissionedDisputeGame", address(permissionedDisputeGame));
         artifacts.save("PermissionedDelayedWETHProxy", address(permissionedDisputeGame.weth()));
+
+        // The SR seems out-of-date, so pull the DelayedWETH addresses from the PermissionedDisputeGame.
+        artifacts.save("DelayedWETHProxy", address(permissionedDisputeGame.weth()));
+        artifacts.save("DelayedWETHImpl", EIP1967Helper.getImplementation(address(permissionedDisputeGame.weth())));
     }
 
     /// @notice Calls to the Deploy.s.sol contract etched by Setup.sol to a deterministic address, sets up the
@@ -171,12 +174,19 @@ contract ForkLive is Deployer {
         vm.label(upgrader, "ProxyAdmin Owner");
 
         IOPContractsManager.OpChainConfig[] memory opChains = new IOPContractsManager.OpChainConfig[](1);
-        opChains[0] = IOPContractsManager.OpChainConfig({ systemConfigProxy: systemConfig, proxyAdmin: proxyAdmin });
+        opChains[0] = IOPContractsManager.OpChainConfig({
+            systemConfigProxy: systemConfig,
+            proxyAdmin: proxyAdmin,
+            absolutePrestate: Claim.wrap(bytes32(keccak256("absolutePrestate")))
+        });
 
         // Temporarily replace the upgrader with a DelegateCaller so we can test the upgrade,
         // then reset its code to the original code.
         bytes memory upgraderCode = address(upgrader).code;
         vm.etch(upgrader, vm.getDeployedCode("test/mocks/Callers.sol:DelegateCaller"));
+        DelegateCaller(upgrader).dcForward(
+            address(0x026b2F158255Beac46c1E7c6b8BbF29A4b6A7B76), abi.encodeCall(IOPContractsManager.upgrade, (opChains))
+        );
         DelegateCaller(upgrader).dcForward(address(opcm), abi.encodeCall(IOPContractsManager.upgrade, (opChains)));
         vm.etch(upgrader, upgraderCode);
 

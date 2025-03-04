@@ -24,14 +24,16 @@ func (ev PayloadSuccessEvent) String() string {
 }
 
 func (eq *EngDeriver) onPayloadSuccess(ev PayloadSuccessEvent) {
-	if ev.DerivedFrom == ReplaceBlockDerivedFrom {
+	if ev.DerivedFrom == ReplaceBlockSource {
 		eq.log.Warn("Successfully built replacement block, resetting chain to continue now", "replacement", ev.Ref)
 		// Change the engine state to make the replacement block the cross-safe head of the chain,
 		// And continue syncing from there.
 		eq.emitter.Emit(rollup.ForceResetEvent{
-			Unsafe:    ev.Ref,
-			Safe:      ev.Ref,
-			Finalized: eq.ec.Finalized(),
+			LocalUnsafe: ev.Ref,
+			CrossUnsafe: ev.Ref,
+			LocalSafe:   ev.Ref,
+			CrossSafe:   ev.Ref,
+			Finalized:   eq.ec.Finalized(),
 		})
 		eq.emitter.Emit(InteropReplacedBlockEvent{
 			Envelope: ev.Envelope,
@@ -49,9 +51,9 @@ func (eq *EngDeriver) onPayloadSuccess(ev PayloadSuccessEvent) {
 	// If derived from L1, then it can be considered (pending) safe
 	if ev.DerivedFrom != (eth.L1BlockRef{}) {
 		eq.emitter.Emit(PromotePendingSafeEvent{
-			Ref:         ev.Ref,
-			Concluding:  ev.Concluding,
-			DerivedFrom: ev.DerivedFrom,
+			Ref:        ev.Ref,
+			Concluding: ev.Concluding,
+			Source:     ev.DerivedFrom,
 		})
 	}
 

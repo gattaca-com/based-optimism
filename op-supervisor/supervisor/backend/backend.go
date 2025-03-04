@@ -108,6 +108,7 @@ func NewSupervisorBackend(ctx context.Context, logger log.Logger,
 	}
 
 	eventSys := event.NewSystem(logger, eventExec)
+	eventSys.AddTracer(event.NewMetricsTracer(m))
 
 	sysCtx, sysCancel := context.WithCancel(ctx)
 
@@ -142,7 +143,7 @@ func NewSupervisorBackend(ctx context.Context, logger log.Logger,
 	eventSys.Register("sync-controller", super.syncNodesController, event.DefaultRegisterOpts())
 
 	// create status tracker
-	super.statusTracker = status.NewStatusTracker()
+	super.statusTracker = status.NewStatusTracker(depSet.Chains())
 	eventSys.Register("status", super.statusTracker, event.DefaultRegisterOpts())
 
 	// Initialize the resources of the supervisor backend.
@@ -166,7 +167,15 @@ func (su *SupervisorBackend) OnEvent(ev event.Event) bool {
 		su.emitter.Emit(superevents.UpdateCrossUnsafeRequestEvent{
 			ChainID: x.ChainID,
 		})
+	case superevents.CrossUnsafeUpdateEvent:
+		su.emitter.Emit(superevents.UpdateCrossUnsafeRequestEvent{
+			ChainID: x.ChainID,
+		})
 	case superevents.LocalSafeUpdateEvent:
+		su.emitter.Emit(superevents.UpdateCrossSafeRequestEvent{
+			ChainID: x.ChainID,
+		})
+	case superevents.CrossSafeUpdateEvent:
 		su.emitter.Emit(superevents.UpdateCrossSafeRequestEvent{
 			ChainID: x.ChainID,
 		})
@@ -255,17 +264,17 @@ func (su *SupervisorBackend) openChainDBs(chainID eth.ChainID) error {
 	}
 	su.chainDBs.AddLogDB(chainID, logDB)
 
-	localDB, err := db.OpenLocalDerivedFromDB(su.logger, chainID, su.dataDir, cm)
+	localDB, err := db.OpenLocalDerivationDB(su.logger, chainID, su.dataDir, cm)
 	if err != nil {
 		return fmt.Errorf("failed to open local derived-from DB of chain %s: %w", chainID, err)
 	}
-	su.chainDBs.AddLocalDerivedFromDB(chainID, localDB)
+	su.chainDBs.AddLocalDerivationDB(chainID, localDB)
 
-	crossDB, err := db.OpenCrossDerivedFromDB(su.logger, chainID, su.dataDir, cm)
+	crossDB, err := db.OpenCrossDerivationDB(su.logger, chainID, su.dataDir, cm)
 	if err != nil {
 		return fmt.Errorf("failed to open cross derived-from DB of chain %s: %w", chainID, err)
 	}
-	su.chainDBs.AddCrossDerivedFromDB(chainID, crossDB)
+	su.chainDBs.AddCrossDerivationDB(chainID, crossDB)
 
 	su.chainDBs.AddCrossUnsafeTracker(chainID)
 
@@ -284,6 +293,11 @@ func (su *SupervisorBackend) AttachSyncNode(ctx context.Context, src syncnode.Sy
 	if !su.depSet.HasChain(chainID) {
 		return nil, fmt.Errorf("chain %s is not part of the interop dependency set: %w", chainID, types.ErrUnknownChain)
 	}
+	// before attaching the sync source to the backend at all,
+	// query the anchor point to initialize the database
+	if err := su.QueryAnchorpoint(chainID, src); err != nil {
+		return nil, fmt.Errorf("failed to query anchor point: %w", err)
+	}
 	err = su.AttachProcessorSource(chainID, src)
 	if err != nil {
 		return nil, fmt.Errorf("failed to attach sync source to processor: %w", err)
@@ -295,12 +309,24 @@ func (su *SupervisorBackend) AttachSyncNode(ctx context.Context, src syncnode.Sy
 	return su.syncNodesController.AttachNodeController(chainID, src, noSubscribe)
 }
 
+func (su *SupervisorBackend) QueryAnchorpoint(chainID eth.ChainID, src syncnode.SyncNode) error {
+	anchor, err := src.AnchorPoint(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to get anchor point: %w", err)
+	}
+	su.emitter.Emit(superevents.AnchorEvent{
+		ChainID: chainID,
+		Anchor:  anchor,
+	})
+	return nil
+}
+
 func (su *SupervisorBackend) AttachProcessorSource(chainID eth.ChainID, src processors.Source) error {
 	proc, ok := su.chainProcessors.Get(chainID)
 	if !ok {
 		return fmt.Errorf("unknown chain %s, cannot attach RPC to processor", chainID)
 	}
-	proc.SetSource(src)
+	proc.AddSource(src)
 	return nil
 }
 
@@ -397,7 +423,7 @@ func (su *SupervisorBackend) DependencySet() depset.DependencySet {
 // Query methods
 // ----------------------------
 
-func (su *SupervisorBackend) CheckMessage(identifier types.Identifier, payloadHash common.Hash) (types.SafetyLevel, error) {
+func (su *SupervisorBackend) CheckMessage(identifier types.Identifier, payloadHash common.Hash, executingDescriptor types.ExecutingDescriptor) (types.SafetyLevel, error) {
 	logHash := types.PayloadHashToLogHash(payloadHash, identifier.Origin)
 	chainID := identifier.ChainID
 	blockNum := identifier.BlockNumber
@@ -420,7 +446,43 @@ func (su *SupervisorBackend) CheckMessage(identifier types.Identifier, payloadHa
 	if err != nil {
 		return types.Invalid, fmt.Errorf("failed to check log: %w", err)
 	}
+	if identifier.Timestamp+su.depSet.MessageExpiryWindow() < executingDescriptor.Timestamp {
+		su.logger.Debug("Message expired", "identifier", identifier, "payloadHash", payloadHash, "executingTimestamp", executingDescriptor.Timestamp)
+		return types.Invalid, nil
+	}
+	if identifier.Timestamp > executingDescriptor.Timestamp {
+		su.logger.Debug("Message timestamp is in the future", "identifier", identifier, "payloadHash", payloadHash, "executingTimestamp", executingDescriptor.Timestamp)
+		return types.Invalid, nil
+	}
 	return su.chainDBs.Safest(chainID, blockNum, logIdx)
+}
+
+func (su *SupervisorBackend) CheckMessagesV2(
+	messages []types.Message,
+	minSafety types.SafetyLevel,
+	executingDescriptor types.ExecutingDescriptor) error {
+	su.logger.Debug("Checking messages", "count", len(messages), "minSafety", minSafety, "executingTimestamp", executingDescriptor.Timestamp)
+
+	for _, msg := range messages {
+		su.logger.Debug("Checking message",
+			"identifier", msg.Identifier, "payloadHash", msg.PayloadHash.String(), "executingTimestamp", executingDescriptor.Timestamp)
+		safety, err := su.CheckMessage(msg.Identifier, msg.PayloadHash, executingDescriptor)
+		if err != nil {
+			su.logger.Error("Check message failed", "err", err,
+				"identifier", msg.Identifier, "payloadHash", msg.PayloadHash.String(), "executingTimestamp", executingDescriptor.Timestamp)
+			return fmt.Errorf("failed to check message: %w", err)
+		}
+		if !safety.AtLeastAsSafe(minSafety) {
+			su.logger.Error("Message is not sufficiently safe",
+				"safety", safety, "minSafety", minSafety,
+				"identifier", msg.Identifier, "payloadHash", msg.PayloadHash.String(), "executingTimestamp", executingDescriptor.Timestamp)
+			return fmt.Errorf("message %v (safety level: %v) does not meet the minimum safety %v",
+				msg.Identifier,
+				safety,
+				minSafety)
+		}
+	}
+	return nil
 }
 
 func (su *SupervisorBackend) CheckMessages(
@@ -431,7 +493,9 @@ func (su *SupervisorBackend) CheckMessages(
 	for _, msg := range messages {
 		su.logger.Debug("Checking message",
 			"identifier", msg.Identifier, "payloadHash", msg.PayloadHash.String())
-		safety, err := su.CheckMessage(msg.Identifier, msg.PayloadHash)
+		// Guarantee message expiry checks do not fail by setting the executing timestamp to the message timestamp
+		// This is intentionally done to avoid breaking checkMessagesV1 which doesn't handle message expiry checks
+		safety, err := su.CheckMessage(msg.Identifier, msg.PayloadHash, types.ExecutingDescriptor{Timestamp: msg.Identifier.Timestamp})
 		if err != nil {
 			su.logger.Error("Check message failed", "err", err,
 				"identifier", msg.Identifier, "payloadHash", msg.PayloadHash.String())
@@ -456,8 +520,8 @@ func (su *SupervisorBackend) CrossSafe(ctx context.Context, chainID eth.ChainID)
 		return types.DerivedIDPair{}, err
 	}
 	return types.DerivedIDPair{
-		DerivedFrom: p.DerivedFrom.ID(),
-		Derived:     p.Derived.ID(),
+		Source:  p.Source.ID(),
+		Derived: p.Derived.ID(),
 	}, nil
 }
 
@@ -467,8 +531,8 @@ func (su *SupervisorBackend) LocalSafe(ctx context.Context, chainID eth.ChainID)
 		return types.DerivedIDPair{}, err
 	}
 	return types.DerivedIDPair{
-		DerivedFrom: p.DerivedFrom.ID(),
-		Derived:     p.Derived.ID(),
+		Source:  p.Source.ID(),
+		Derived: p.Derived.ID(),
 	}, nil
 }
 
@@ -488,20 +552,28 @@ func (su *SupervisorBackend) CrossUnsafe(ctx context.Context, chainID eth.ChainI
 	return v.ID(), nil
 }
 
-func (su *SupervisorBackend) SafeDerivedAt(ctx context.Context, chainID eth.ChainID, derivedFrom eth.BlockID) (eth.BlockID, error) {
-	v, err := su.chainDBs.SafeDerivedAt(chainID, derivedFrom)
+func (su *SupervisorBackend) SafeDerivedAt(ctx context.Context, chainID eth.ChainID, source eth.BlockID) (eth.BlockID, error) {
+	v, err := su.chainDBs.SafeDerivedAt(chainID, source)
 	if err != nil {
 		return eth.BlockID{}, err
 	}
 	return v.ID(), nil
 }
 
+func (su *SupervisorBackend) FindSealedBlock(ctx context.Context, chainID eth.ChainID, number uint64) (eth.BlockID, error) {
+	seal, err := su.chainDBs.FindSealedBlock(chainID, number)
+	if err != nil {
+		return eth.BlockID{}, err
+	}
+	return seal.ID(), nil
+}
+
 // AllSafeDerivedAt returns the last derived block for each chain, from the given L1 block
-func (su *SupervisorBackend) AllSafeDerivedAt(ctx context.Context, derivedFrom eth.BlockID) (map[eth.ChainID]eth.BlockID, error) {
+func (su *SupervisorBackend) AllSafeDerivedAt(ctx context.Context, source eth.BlockID) (map[eth.ChainID]eth.BlockID, error) {
 	chains := su.depSet.Chains()
 	ret := map[eth.ChainID]eth.BlockID{}
 	for _, chainID := range chains {
-		derived, err := su.SafeDerivedAt(ctx, chainID, derivedFrom)
+		derived, err := su.SafeDerivedAt(ctx, chainID, source)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get last derived block for chain %v: %w", chainID, err)
 		}
@@ -522,8 +594,20 @@ func (su *SupervisorBackend) FinalizedL1() eth.BlockRef {
 	return su.chainDBs.FinalizedL1()
 }
 
-func (su *SupervisorBackend) CrossDerivedFrom(ctx context.Context, chainID eth.ChainID, derived eth.BlockID) (derivedFrom eth.BlockRef, err error) {
-	v, err := su.chainDBs.CrossDerivedFromBlockRef(chainID, derived)
+func (su *SupervisorBackend) IsLocalUnsafe(ctx context.Context, chainID eth.ChainID, block eth.BlockID) error {
+	return su.chainDBs.IsLocalUnsafe(chainID, block)
+}
+
+func (su *SupervisorBackend) IsCrossSafe(ctx context.Context, chainID eth.ChainID, block eth.BlockID) error {
+	return su.chainDBs.IsCrossSafe(chainID, block)
+}
+
+func (su *SupervisorBackend) IsLocalSafe(ctx context.Context, chainID eth.ChainID, block eth.BlockID) error {
+	return su.chainDBs.IsLocalSafe(chainID, block)
+}
+
+func (su *SupervisorBackend) CrossDerivedToSource(ctx context.Context, chainID eth.ChainID, derived eth.BlockID) (source eth.BlockRef, err error) {
+	v, err := su.chainDBs.CrossDerivedToSourceRef(chainID, derived)
 	if err != nil {
 		return eth.BlockRef{}, err
 	}
@@ -542,7 +626,7 @@ func (su *SupervisorBackend) SuperRootAtTimestamp(ctx context.Context, timestamp
 	chainInfos := make([]eth.ChainRootInfo, len(chains))
 	superRootChains := make([]eth.ChainIDAndOutput, len(chains))
 
-	var crossSafeDerivedFrom eth.BlockID
+	var crossSafeSource eth.BlockID
 
 	for i, chainID := range chains {
 		src, ok := su.syncSources.Get(chainID)
@@ -570,12 +654,12 @@ func (su *SupervisorBackend) SuperRootAtTimestamp(ctx context.Context, timestamp
 		if err != nil {
 			return eth.SuperRootResponse{}, err
 		}
-		derivedFrom, err := su.chainDBs.CrossDerivedFrom(chainID, ref.ID())
+		source, err := su.chainDBs.CrossDerivedToSource(chainID, ref.ID())
 		if err != nil {
 			return eth.SuperRootResponse{}, err
 		}
-		if crossSafeDerivedFrom.Number == 0 || crossSafeDerivedFrom.Number < derivedFrom.Number {
-			crossSafeDerivedFrom = derivedFrom.ID()
+		if crossSafeSource.Number == 0 || crossSafeSource.Number < source.Number {
+			crossSafeSource = source.ID()
 		}
 	}
 	superRoot := eth.SuperRoot(&eth.SuperV1{
@@ -583,7 +667,7 @@ func (su *SupervisorBackend) SuperRootAtTimestamp(ctx context.Context, timestamp
 		Chains:    superRootChains,
 	})
 	return eth.SuperRootResponse{
-		CrossSafeDerivedFrom: crossSafeDerivedFrom,
+		CrossSafeDerivedFrom: crossSafeSource,
 		Timestamp:            uint64(timestamp),
 		SuperRoot:            superRoot,
 		Chains:               chainInfos,
@@ -591,7 +675,7 @@ func (su *SupervisorBackend) SuperRootAtTimestamp(ctx context.Context, timestamp
 }
 
 func (su *SupervisorBackend) SyncStatus() (eth.SupervisorSyncStatus, error) {
-	return su.statusTracker.SyncStatus(), nil
+	return su.statusTracker.SyncStatus()
 }
 
 // PullLatestL1 makes the supervisor aware of the latest L1 block. Exposed for testing purposes.
