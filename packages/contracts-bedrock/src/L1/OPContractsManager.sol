@@ -532,6 +532,11 @@ contract OPContractsManagerUpgrader is OPContractsManagerBase {
             assertValidOpChainConfig(_opChainConfigs[i]);
             ISystemConfig.Addresses memory opChainAddrs = _opChainConfigs[i].systemConfigProxy.getAddresses();
 
+            // -------- Upgrade SystemConfig to Isthmus implementation --------
+            upgradeTo(
+                _opChainConfigs[i].proxyAdmin, address(_opChainConfigs[i].systemConfigProxy), impls.systemConfigImpl
+            );
+
             // -------- Upgrade Contracts Stored in SystemConfig --------
 
             // OptimismPortal and L1CrossDomainMessenger are being upgraded to include the fixes
