@@ -48,8 +48,8 @@
     "sourceCodeHash": "0x6bfbc78b0fef2f65beff11a81f924728a7bd439a56986997621099551805aff9"
   },
   "src/L1/SystemConfigInterop.sol": {
-    "initCodeHash": "0xa23a8b65e67a3d98c264f2015627df81c57a9d36113ccd9c8f53a12df9fb8a55",
-    "sourceCodeHash": "0x609a10f2f85a2b1cc60a5accd795f65c84edc09b0e98124011bd9e7caeb905d9"
+    "initCodeHash": "0xbef4696b2dcb6d43c3b3c438338bfb2224a1ea5002ed0612ec36a7821d7e3da2",
+    "sourceCodeHash": "0x1653aaa4d2b44d34ca1f9f2b4971eeb7594c8c2d27771b1f68b8d38cb79f2368"
   },
   "src/L2/BaseFeeVault.sol": {
     "initCodeHash": "0xc403d4c555d8e69a2699e01d192ae7327136701fa02da10a6d75a584b3c364c9",
@@ -72,8 +72,8 @@
     "sourceCodeHash": "0xd04d64355dcf55247ac937748518e7f9620ae3f9eabe80fae9a82c0115ed77bc"
   },
   "src/L2/L1BlockInterop.sol": {
-    "initCodeHash": "0x705e6f9b979b998fab6c48bc7fb96a458dcced15d14301de7fcb42a33b6387aa",
-    "sourceCodeHash": "0xa219604630152fe37dd4a1a263b87bd5663a6a5822a521e52b68a5892991ab0e"
+    "initCodeHash": "0x55d09f00ad284fd7ca4b55c45fb901ed021b83118012be217aec53876ab34c12",
+    "sourceCodeHash": "0x7dd627c198a583fbe2c7d257f06001e1a2e563c6c7d79ea6ba9ca0d47cd1599b"
   },
   "src/L2/L1FeeVault.sol": {
     "initCodeHash": "0x6745b7be3895a5e8d373df0066d931bae29c47672ac46c2f5829bd0052cc6d9e",
