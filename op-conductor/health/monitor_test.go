@@ -93,8 +93,8 @@ func (s *HealthMonitorTestSuite) TestUnhealthyLowPeerCount() {
 	monitor := s.SetupMonitor(now, 60, 60, rc, pc)
 
 	healthUpdateCh := monitor.Subscribe()
-	healthy := <-healthUpdateCh
-	s.NotNil(healthy)
+	healthFailure := <-healthUpdateCh
+	s.NotNil(healthFailure)
 
 	s.NoError(monitor.Stop())
 }
@@ -105,21 +105,24 @@ func (s *HealthMonitorTestSuite) TestUnhealthyUnsafeHeadNotProgressing() {
 
 	rc := &testutils.MockRollupClient{}
 	ss1 := mockSyncStatus(now, 5, now-8, 1)
-	for i := 0; i < 5; i++ {
+	unsafeBlocksInterval := uint64(10)
+	// every clock tick until the unsafe block interval is hit, expect no errors:
+	for i := uint64(0); i < unsafeBlocksInterval-1; i++ {
 		rc.ExpectSyncStatus(ss1, nil)
 	}
+	rc.ExpectSyncStatus(ss1, ErrSequencerNotHealthy)
 
-	monitor := s.SetupMonitor(now, 60, 60, rc, nil)
+	monitor := s.SetupMonitor(now, unsafeBlocksInterval, 60, rc, nil)
 	healthUpdateCh := monitor.Subscribe()
 
-	for i := 0; i < 5; i++ {
-		healthy := <-healthUpdateCh
-		if i < 4 {
-			s.Nil(healthy)
+	for i := uint64(0); i < unsafeBlocksInterval; i++ {
+		healthFailure := <-healthUpdateCh
+		if i < unsafeBlocksInterval-1 {
+			s.Nil(healthFailure)
 			s.Equal(now, monitor.lastSeenUnsafeTime)
 			s.Equal(uint64(5), monitor.lastSeenUnsafeNum)
 		} else {
-			s.NotNil(healthy)
+			s.NotNil(healthFailure)
 		}
 	}
 
@@ -142,11 +145,11 @@ func (s *HealthMonitorTestSuite) TestUnhealthySafeHeadNotProgressing() {
 	healthUpdateCh := monitor.Subscribe()
 
 	for i := 0; i < 5; i++ {
-		healthy := <-healthUpdateCh
+		healthFailure := <-healthUpdateCh
 		if i < 4 {
-			s.Nil(healthy)
+			s.Nil(healthFailure)
 		} else {
-			s.NotNil(healthy)
+			s.NotNil(healthFailure)
 		}
 	}
 
@@ -181,24 +184,24 @@ func (s *HealthMonitorTestSuite) TestHealthyWithUnsafeLag() {
 	s.Zero(monitor.lastSeenUnsafeTime)
 
 	// confirm state after first check
-	healthy := <-healthUpdateCh
-	s.Nil(healthy)
+	healthFailure := <-healthUpdateCh
+	s.Nil(healthFailure)
 	lastSeenUnsafeTime := monitor.lastSeenUnsafeTime
 	s.NotZero(monitor.lastSeenUnsafeTime)
 	s.Equal(uint64(1), monitor.lastSeenUnsafeNum)
 
-	healthy = <-healthUpdateCh
-	s.Nil(healthy)
+	healthFailure = <-healthUpdateCh
+	s.Nil(healthFailure)
 	s.Equal(lastSeenUnsafeTime, monitor.lastSeenUnsafeTime)
 	s.Equal(uint64(1), monitor.lastSeenUnsafeNum)
 
-	healthy = <-healthUpdateCh
-	s.Nil(healthy)
+	healthFailure = <-healthUpdateCh
+	s.Nil(healthFailure)
 	s.Equal(lastSeenUnsafeTime+2, monitor.lastSeenUnsafeTime)
 	s.Equal(uint64(2), monitor.lastSeenUnsafeNum)
 
-	healthy = <-healthUpdateCh
-	s.Nil(healthy)
+	healthFailure = <-healthUpdateCh
+	s.Nil(healthFailure)
 	s.Equal(lastSeenUnsafeTime+2, monitor.lastSeenUnsafeTime)
 	s.Equal(uint64(2), monitor.lastSeenUnsafeNum)
 
