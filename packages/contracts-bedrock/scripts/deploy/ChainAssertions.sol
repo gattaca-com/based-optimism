@@ -232,7 +232,7 @@ library ChainAssertions {
 
     /// @notice Asserts that the PreimageOracle is setup correctly
     function checkPreimageOracle(IPreimageOracle _oracle, DeployConfig _cfg) internal view {
-        console.log("Running chain assertions on the PreimageOracle %s at %s", address(_oracle));
+        console.log("Running chain assertions on the PreimageOracle at %s", address(_oracle));
         require(address(_oracle) != address(0), "CHECK-PIO-10");
 
         require(_oracle.minProposalSize() == _cfg.preimageOracleMinProposalSize(), "CHECK-PIO-30");
@@ -241,7 +241,7 @@ library ChainAssertions {
 
     /// @notice Asserts that the MIPs contract is setup correctly
     function checkMIPS(IMIPS _mips, IPreimageOracle _oracle) internal view {
-        console.log("Running chain assertions on the MIPS %s at %s", address(_mips));
+        console.log("Running chain assertions on the MIPS at %s", address(_mips));
         require(address(_mips) != address(0), "CHECK-MIPS-10");
 
         require(_mips.oracle() == _oracle, "CHECK-MIPS-20");
@@ -499,7 +499,7 @@ library ChainAssertions {
         require(impls.l1StandardBridgeImpl == _impls.L1StandardBridge, "CHECK-OPCM-100");
         require(impls.disputeGameFactoryImpl == _impls.DisputeGameFactory, "CHECK-OPCM-110");
         require(impls.delayedWETHImpl == _impls.DelayedWETH, "CHECK-OPCM-120");
-        require(impls.mips64Impl == address(_mips), "CHECK-OPCM-130");
+        require(impls.mipsImpl == address(_mips), "CHECK-OPCM-130");
         require(impls.superchainConfigImpl == _impls.SuperchainConfig, "CHECK-OPCM-140");
         require(impls.protocolVersionsImpl == _impls.ProtocolVersions, "CHECK-OPCM-150");
 

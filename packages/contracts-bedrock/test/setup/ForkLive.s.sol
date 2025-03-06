@@ -37,6 +37,8 @@ import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.so
 contract ForkLive is Deployer {
     using stdToml for string;
 
+    bool public useOpsRepo;
+
     /// @notice Returns the base chain name to use for forking
     /// @return The base chain name as a string
     function baseChain() internal view returns (string memory) {
@@ -58,7 +60,7 @@ contract ForkLive is Deployer {
     function run() public {
         string memory superchainOpsAllocsPath = vm.envOr("SUPERCHAIN_OPS_ALLOCS_PATH", string(""));
 
-        bool useOpsRepo = bytes(superchainOpsAllocsPath).length > 0;
+        useOpsRepo = bytes(superchainOpsAllocsPath).length > 0;
         if (useOpsRepo) {
             console.log("ForkLive: loading state from %s", superchainOpsAllocsPath);
             // Set the resultant state from the superchain ops repo upgrades.
@@ -72,7 +74,7 @@ contract ForkLive is Deployer {
         } else {
             // Read the superchain registry and save the addresses to the Artifacts contract.
             _readSuperchainRegistry();
-            // Now deploy the updated OPCM and implementations of the contracts
+            // Now deploy the updated OPCM and implementations of the contracts.
             _deployNewImplementations();
         }
 
@@ -129,7 +131,6 @@ contract ForkLive is Deployer {
         // Fault proof proxied contracts
         saveProxyAndImpl("AnchorStateRegistry", opToml, ".addresses.AnchorStateRegistryProxy");
         saveProxyAndImpl("DisputeGameFactory", opToml, ".addresses.DisputeGameFactoryProxy");
-        saveProxyAndImpl("DelayedWETH", opToml, ".addresses.DelayedWETHProxy");
 
         // Fault proof non-proxied contracts
         // For chains that don't have a permissionless game, we save the dispute game and WETH
@@ -149,6 +150,10 @@ contract ForkLive is Deployer {
             IFaultDisputeGame(address(disputeGameFactory.gameImpls(GameTypes.PERMISSIONED_CANNON)));
         artifacts.save("PermissionedDisputeGame", address(permissionedDisputeGame));
         artifacts.save("PermissionedDelayedWETHProxy", address(permissionedDisputeGame.weth()));
+
+        // The SR seems out-of-date, so pull the DelayedWETH addresses from the PermissionedDisputeGame.
+        artifacts.save("DelayedWETHProxy", address(permissionedDisputeGame.weth()));
+        artifacts.save("DelayedWETHImpl", EIP1967Helper.getImplementation(address(permissionedDisputeGame.weth())));
     }
 
     /// @notice Calls to the Deploy.s.sol contract etched by Setup.sol to a deterministic address, sets up the
@@ -175,10 +180,15 @@ contract ForkLive is Deployer {
             absolutePrestate: Claim.wrap(bytes32(keccak256("absolutePrestate")))
         });
 
-        // TODO Migrate from DelegateCaller to a Safe to reduce risk of mocks not properly
-        // reflecting the production system.
+        // Temporarily replace the upgrader with a DelegateCaller so we can test the upgrade,
+        // then reset its code to the original code.
+        bytes memory upgraderCode = address(upgrader).code;
         vm.etch(upgrader, vm.getDeployedCode("test/mocks/Callers.sol:DelegateCaller"));
+        DelegateCaller(upgrader).dcForward(
+            address(0x026b2F158255Beac46c1E7c6b8BbF29A4b6A7B76), abi.encodeCall(IOPContractsManager.upgrade, (opChains))
+        );
         DelegateCaller(upgrader).dcForward(address(opcm), abi.encodeCall(IOPContractsManager.upgrade, (opChains)));
+        vm.etch(upgrader, upgraderCode);
 
         console.log("ForkLive: Saving newly deployed contracts");
         // A new ASR and new dispute games were deployed, so we need to update them

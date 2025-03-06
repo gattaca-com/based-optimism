@@ -37,8 +37,8 @@ type ApplyConfig struct {
 	PrivateKey       string
 	DeploymentTarget DeploymentTarget
 	Logger           log.Logger
-
-	privateKeyECDSA *ecdsa.PrivateKey
+	CacheDir         string
+	privateKeyECDSA  *ecdsa.PrivateKey
 }
 
 func (a *ApplyConfig) Check() error {
@@ -80,6 +80,7 @@ func ApplyCLI() func(cliCtx *cli.Context) error {
 		l1RPCUrl := cliCtx.String(L1RPCURLFlagName)
 		workdir := cliCtx.String(WorkdirFlagName)
 		privateKey := cliCtx.String(PrivateKeyFlagName)
+		cacheDir := cliCtx.String(CacheDirFlagName)
 		depTarget, err := NewDeploymentTarget(cliCtx.String(DeploymentTargetFlag.Name))
 		if err != nil {
 			return fmt.Errorf("failed to parse deployment target: %w", err)
@@ -93,6 +94,7 @@ func ApplyCLI() func(cliCtx *cli.Context) error {
 			PrivateKey:       privateKey,
 			DeploymentTarget: depTarget,
 			Logger:           l,
+			CacheDir:         cacheDir,
 		})
 	}
 }
@@ -120,6 +122,7 @@ func Apply(ctx context.Context, cfg ApplyConfig) error {
 		State:              st,
 		Logger:             cfg.Logger,
 		StateWriter:        pipeline.WorkdirStateWriter(cfg.Workdir),
+		CacheDir:           cfg.CacheDir,
 	}); err != nil {
 		return err
 	}
@@ -140,6 +143,7 @@ type ApplyPipelineOpts struct {
 	State              *state.State
 	Logger             log.Logger
 	StateWriter        pipeline.StateWriter
+	CacheDir           string
 }
 
 func ApplyPipeline(
@@ -152,33 +156,19 @@ func ApplyPipeline(
 	}
 	st := opts.State
 
-	progressor := func(curr, total int64) {
-		opts.Logger.Info("artifacts download progress", "current", curr, "total", total)
-	}
-
-	l1ArtifactsFS, cleanupL1, err := artifacts.Download(ctx, intent.L1ContractsLocator, progressor)
+	l1ArtifactsFS, err := artifacts.Download(ctx, intent.L1ContractsLocator, artifacts.BarProgressor(), opts.CacheDir)
 	if err != nil {
 		return fmt.Errorf("failed to download L1 artifacts: %w", err)
 	}
-	defer func() {
-		if err := cleanupL1(); err != nil {
-			opts.Logger.Warn("failed to clean up L1 artifacts", "err", err)
-		}
-	}()
 
 	var l2ArtifactsFS foundry.StatDirFs
 	if intent.L1ContractsLocator.Equal(intent.L2ContractsLocator) {
 		l2ArtifactsFS = l1ArtifactsFS
 	} else {
-		l2Afs, cleanupL2, err := artifacts.Download(ctx, intent.L2ContractsLocator, progressor)
+		l2Afs, err := artifacts.Download(ctx, intent.L2ContractsLocator, artifacts.BarProgressor(), opts.CacheDir)
 		if err != nil {
 			return fmt.Errorf("failed to download L2 artifacts: %w", err)
 		}
-		defer func() {
-			if err := cleanupL2(); err != nil {
-				opts.Logger.Warn("failed to clean up L2 artifacts", "err", err)
-			}
-		}()
 		l2ArtifactsFS = l2Afs
 	}
 

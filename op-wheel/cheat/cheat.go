@@ -101,8 +101,9 @@ func (ch *Cheater) RunAndClose(fn HeadFn) error {
 		return ch.Close()
 	}
 
+	isCancun := ch.Blockchain.Config().IsCancun(preHeader.Number, preHeader.Time)
 	// commit the changes, and then update the state-root
-	stateRoot, err := state.Commit(preHeader.Number.Uint64()+1, true)
+	stateRoot, err := state.Commit(preHeader.Number.Uint64()+1, true, isCancun)
 	if err != nil {
 		_ = ch.Close()
 		return fmt.Errorf("failed to commit state change: %w", err)
@@ -132,11 +133,6 @@ func (ch *Cheater) RunAndClose(fn HeadFn) error {
 	// not keyed by blockhash, and we didn't remove any txs, so we just leave this one as-is.
 	// rawdb.WriteTxLookupEntriesByBlock(batch, block)
 	rawdb.WriteHeadBlockHash(batch, blockHash)
-
-	// Geth stores the TD for each block separately from the block itself. We must update this
-	// manually, otherwise Geth thinks we haven't reached TTD yet and tries to build a block
-	// using pre-merge consensus, which causes a panic.
-	rawdb.WriteTd(batch, blockHash, preID.Number, ch.Blockchain.GetTd(preID.Hash, preID.Number))
 
 	// Need to copy over receipts since they are keyed by block hash.
 	receipts := rawdb.ReadReceipts(ch.DB, preID.Hash, preID.Number, preHeader.Time, ch.Blockchain.Config())
@@ -324,7 +320,8 @@ func StoragePatch(patch io.Reader, address common.Address) HeadFn {
 			}
 			i += 1
 			if i%1000 == 0 { // for every 1000 values, commit to disk
-				if _, err := headState.Commit(head.Number.Uint64(), true); err != nil {
+				// warning: if the account is empty, the storage change will not persist.
+				if _, err := headState.Commit(head.Number.Uint64(), true, false); err != nil {
 					return fmt.Errorf("failed to commit state to disk after patching %d entries: %w", i, err)
 				}
 			}
@@ -349,7 +346,7 @@ func SetCode(addr common.Address, code hexutil.Bytes) HeadFn {
 
 func SetNonce(addr common.Address, nonce uint64) HeadFn {
 	return func(_ *types.Header, headState *state.StateDB) error {
-		headState.SetNonce(addr, nonce)
+		headState.SetNonce(addr, nonce, tracing.NonceChangeEoACall)
 		return nil
 	}
 }

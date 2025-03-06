@@ -8,6 +8,8 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/standard"
+
 	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/artifacts"
 	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/broadcaster"
 	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/opcm"
@@ -41,6 +43,7 @@ type ImplementationsConfig struct {
 	ProtocolVersionsProxy           common.Address     `cli:"protocol-versions-proxy"`
 	UpgradeController               common.Address     `cli:"upgrade-controller"`
 	UseInterop                      bool               `cli:"use-interop"`
+	CacheDir                        string             `cli:"cache-dir"`
 
 	Logger log.Logger
 
@@ -94,6 +97,9 @@ func (c *ImplementationsConfig) Check() error {
 	if c.ProtocolVersionsProxy == (common.Address{}) {
 		return errors.New("protocol versions proxy must be specified")
 	}
+	if c.UpgradeController == (common.Address{}) {
+		return errors.New("upgrade controller must be specified")
+	}
 	return nil
 }
 
@@ -106,6 +112,7 @@ func ImplementationsCLI(cliCtx *cli.Context) error {
 	if err := cliutil.PopulateStruct(&cfg, cliCtx); err != nil {
 		return fmt.Errorf("failed to populate config: %w", err)
 	}
+	cfg.Logger = l
 
 	ctx := ctxinterrupt.WithCancelOnInterrupt(cliCtx.Context)
 	outfile := cliCtx.String(OutfileFlagName)
@@ -126,19 +133,15 @@ func Implementations(ctx context.Context, cfg ImplementationsConfig) (opcm.Deplo
 	}
 
 	lgr := cfg.Logger
-	progressor := func(curr, total int64) {
-		lgr.Info("artifacts download progress", "current", curr, "total", total)
+
+	if cfg.ArtifactsLocator.IsTag() && !standard.IsSupportedL1Version(cfg.ArtifactsLocator.Tag) {
+		return dio, fmt.Errorf("unsupported L1 version: %s", cfg.ArtifactsLocator.Tag)
 	}
 
-	artifactsFS, cleanup, err := artifacts.Download(ctx, cfg.ArtifactsLocator, progressor)
+	artifactsFS, err := artifacts.Download(ctx, cfg.ArtifactsLocator, artifacts.BarProgressor(), cfg.CacheDir)
 	if err != nil {
 		return dio, fmt.Errorf("failed to download artifacts: %w", err)
 	}
-	defer func() {
-		if err := cleanup(); err != nil {
-			lgr.Warn("failed to clean up artifacts", "err", err)
-		}
-	}()
 
 	l1Client, err := ethclient.Dial(cfg.L1RPCUrl)
 	if err != nil {
@@ -181,6 +184,11 @@ func Implementations(ctx context.Context, cfg ImplementationsConfig) (opcm.Deplo
 		return dio, fmt.Errorf("failed to create script host: %w", err)
 	}
 
+	superProxyAdmin, err := standard.SuperchainProxyAdminAddrFor(chainID.Uint64())
+	if err != nil {
+		return dio, fmt.Errorf("failed to get superchain proxy admin address: %w", err)
+	}
+
 	if dio, err = opcm.DeployImplementations(
 		l1Host,
 		opcm.DeployImplementationsInput{
@@ -193,6 +201,7 @@ func Implementations(ctx context.Context, cfg ImplementationsConfig) (opcm.Deplo
 			L1ContractsRelease:              cfg.L1ContractsRelease,
 			SuperchainConfigProxy:           cfg.SuperchainConfigProxy,
 			ProtocolVersionsProxy:           cfg.ProtocolVersionsProxy,
+			SuperchainProxyAdmin:            superProxyAdmin,
 			UpgradeController:               cfg.UpgradeController,
 			UseInterop:                      cfg.UseInterop,
 		},

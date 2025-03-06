@@ -78,7 +78,6 @@ func NewKeyedBroadcaster(cfg KeyedBroadcasterOpts) (*KeyedBroadcaster, error) {
 		&metrics.NoopTxMetrics{},
 		mgrCfg,
 	)
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tx manager: %w", err)
 	}
@@ -230,13 +229,24 @@ func asTxCandidate(bcast script.Broadcast, blockGasLimit uint64) txmgr.TxCandida
 // is clamped to the block gas limit since Geth will reject transactions that exceed it before letting them
 // into the mempool.
 func padGasLimit(data []byte, gasUsed uint64, creation bool, blockGasLimit uint64) uint64 {
-	intrinsicGas, err := core.IntrinsicGas(data, nil, creation, true, true, false)
+	intrinsicGas, err := core.IntrinsicGas(data, nil, nil, creation, true, true, false)
 	// This method never errors - we should look into it if it does.
 	if err != nil {
 		panic(err)
 	}
 
-	limit := uint64(float64(intrinsicGas+gasUsed) * GasPadFactor)
+	floorDataGas, err := core.FloorDataGas(data)
+	// We should never cause an overflow here.
+	if err != nil {
+		panic(err)
+	}
+
+	gas := intrinsicGas + gasUsed
+	if floorDataGas > gas {
+		gas = floorDataGas
+	}
+
+	limit := uint64(float64(gas) * GasPadFactor)
 	if limit > blockGasLimit {
 		return blockGasLimit
 	}
