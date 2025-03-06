@@ -656,11 +656,12 @@ func TestSequencerL1TemporaryErrorEvent(t *testing.T) {
 		_, ok := ev.(rollup.L1TemporaryErrorEvent)
 		require.True(t, ok)
 	})
+
+	sealTargetTime1, ok1 := seq.NextAction()
 	seq.OnEvent(SequencerActionEvent{})
 	emitter.AssertExpectations(t)
 
-	sealTargetTime1, ok1 := seq.NextAction()
-	require.True(t, seq.OnEvent(rollup.L1TemporaryErrorEvent{}))
+	// FindL1Origin error will updating d.nextAction
 	sealTargetTime2, ok2 := seq.NextAction()
 
 	require.True(t, ok1 == ok2 && sealTargetTime2.After(sealTargetTime1))
