@@ -38,6 +38,7 @@ contract ReadImplementationAddressesOutput is BaseDeployIO {
     address internal _disputeGameFactory;
     address internal _mipsSingleton;
     address internal _preimageOracleSingleton;
+    address internal _ethLockbox;
 
     function set(bytes4 _sel, address _addr) public {
         require(_addr != address(0), "ReadImplementationAddressesOutput: cannot set zero address");
@@ -51,6 +52,7 @@ contract ReadImplementationAddressesOutput is BaseDeployIO {
         else if (_sel == this.disputeGameFactory.selector) _disputeGameFactory = _addr;
         else if (_sel == this.mipsSingleton.selector) _mipsSingleton = _addr;
         else if (_sel == this.preimageOracleSingleton.selector) _preimageOracleSingleton = _addr;
+        else if (_sel == this.ethLockbox.selector) _ethLockbox = _addr;
         else revert("ReadImplementationAddressesOutput: unknown selector");
     }
 
@@ -110,6 +112,11 @@ contract ReadImplementationAddressesOutput is BaseDeployIO {
         );
         return _preimageOracleSingleton;
     }
+
+    function ethLockbox() public view returns (address) {
+        require(_ethLockbox != address(0), "ReadImplementationAddressesOutput: ethLockbox not set");
+        return _ethLockbox;
+    }
 }
 
 contract ReadImplementationAddresses is Script {
@@ -154,5 +161,8 @@ contract ReadImplementationAddresses is Script {
 
         address preimageOracle = address(IMIPS(mipsLogic).oracle());
         _rio.set(_rio.preimageOracleSingleton.selector, preimageOracle);
+
+        address ethLockbox = _rii.opcm().implementations().ethLockboxImpl;
+        _rio.set(_rio.ethLockbox.selector, ethLockbox);
     }
 }
