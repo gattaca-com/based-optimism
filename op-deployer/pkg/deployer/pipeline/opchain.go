@@ -126,6 +126,7 @@ func makeChainState(chainID common.Hash, dco opcm.DeployOPChainOutput) *state.Ch
 		L1StandardBridgeProxyAddress:              dco.L1StandardBridgeProxy,
 		L1CrossDomainMessengerProxyAddress:        dco.L1CrossDomainMessengerProxy,
 		OptimismPortalProxyAddress:                dco.OptimismPortalProxy,
+		ETHLockboxProxyAddress:                    dco.ETHLockboxProxy,
 		DisputeGameFactoryProxyAddress:            dco.DisputeGameFactoryProxy,
 		AnchorStateRegistryProxyAddress:           dco.AnchorStateRegistryProxy,
 		FaultDisputeGameAddress:                   dco.FaultDisputeGame,

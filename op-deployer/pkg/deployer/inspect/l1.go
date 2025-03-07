@@ -139,6 +139,7 @@ func L1(globalState *state.State, chainID common.Hash) (*L1Contracts, error) {
 			L1StandardBridgeProxyAddress:             chainState.L1StandardBridgeProxyAddress,
 			L1CrossDomainMessengerProxyAddress:       chainState.L1CrossDomainMessengerProxyAddress,
 			OptimismPortalProxyAddress:               chainState.OptimismPortalProxyAddress,
+			ETHLockboxProxyAddress:                   chainState.ETHLockboxProxyAddress,
 			DisputeGameFactoryProxyAddress:           chainState.DisputeGameFactoryProxyAddress,
 			AnchorStateRegistryProxyAddress:          chainState.AnchorStateRegistryProxyAddress,
 			FaultDisputeGameAddress:                  chainState.FaultDisputeGameAddress,
