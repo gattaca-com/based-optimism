@@ -3,6 +3,10 @@
     "initCodeHash": "0xacbae98cc7c0f7ecbf36dc44bbf7cb0a011e6e6b781e28b9dbf947e31482b30d",
     "sourceCodeHash": "0xe772f7db8033e4a738850cb28ac4849d3a454c93732135a8a10d4f7cb498088e"
   },
+  "src/L1/ETHLockbox.sol": {
+    "initCodeHash": "0x599593bf96170081d2fd191bb2f61eaa2d094faafb6a583a34b3eea2dc49e5c6",
+    "sourceCodeHash": "0x34da4a8a0e32cabce97056f10cc1c8231f14a1cd706ae63ee0bef3c1f65f3e13"
+  },
   "src/L1/L1CrossDomainMessenger.sol": {
     "initCodeHash": "0x5a6272f6bd4346da460b7ff2ebc426d158d7ffc65dc0f2c0651a9e6d545bfd03",
     "sourceCodeHash": "0xf11fa72481dbe43dad4e7a48645fcf92d0feeefa0b98b282042bdda568508372"
@@ -16,16 +20,16 @@
     "sourceCodeHash": "0x44797707aea8c63dec049a02d69ea056662a06e5cf320028ab8b388634bf1c67"
   },
   "src/L1/OPContractsManager.sol": {
-    "initCodeHash": "0x5cbd9da550ffc2fdd17434145798cbfd5cf8140c474319671bf339f43cbb994c",
-    "sourceCodeHash": "0x1af10fb0f17db1dfc8b02844f36577bffe54c942f6f8f09a0b75fa9ba38654d9"
+    "initCodeHash": "0x9e7496b9720bae99e5db18dc18c99b5c06cd755c6d4079e0d38c56d625fe7b4e",
+    "sourceCodeHash": "0x8302de0ccd551512f2430d545ea55c938b002701d2292fd7aad2b4d2b975727b"
   },
   "src/L1/OptimismPortal2.sol": {
-    "initCodeHash": "0x22eddc89e6acc58ab5c22927d303a1be8d05a21220e6d314883cba2bca4ffb56",
-    "sourceCodeHash": "0x03da70e6c4b48c9e58722a0ea41c9cb7ca6bf12ce26f8118316a4168b8715b98"
+    "initCodeHash": "0x774dd0c79fb11ea7ecbbffb28d1c005b72790577adbeeeb881c2a180e2feaadf",
+    "sourceCodeHash": "0x2d36fbd2326ceafe89ca1a3b80c223ad7f934e89e996d20b847498f015316bdf"
   },
   "src/L1/OptimismPortalInterop.sol": {
-    "initCodeHash": "0xd77aedf895785318db654a0a7f72f80f0a83a70d32e8b479f3fa3ffa1e50265f",
-    "sourceCodeHash": "0xcd94e7641d43620f4169b083b2e597c2db2eb679b44ccaf5c7eeae6f63d2774a"
+    "initCodeHash": "0x9c35223461ee313b77eafb727c51300596975b5134ff51847d8fab424b4dcd0b",
+    "sourceCodeHash": "0xa1ecf8a19638dd24d80f62e2faef132afa15c6945c14133fe58709015fcb14a6"
   },
   "src/L1/ProtocolVersions.sol": {
     "initCodeHash": "0x5a76c8530cb24cf23d3baacc6eefaac226382af13f1e2a35535d2ec2b0573b29",

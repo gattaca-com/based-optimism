@@ -19,6 +19,7 @@ import { IResourceMetering } from "interfaces/L1/IResourceMetering.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
 import { ProtocolVersion } from "interfaces/L1/IProtocolVersions.sol";
+import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
 
 /// @title Initializer_Test
 /// @dev Ensures that the `initialize()` function on contracts cannot be called more than
@@ -123,7 +124,7 @@ contract Initializer_Test is CommonTest {
                 name: "OptimismPortal2Impl",
                 target: EIP1967Helper.getImplementation(address(optimismPortal2)),
                 initCalldata: abi.encodeCall(
-                    optimismPortal2.initialize, (systemConfig, superchainConfig, anchorStateRegistry, false)
+                    optimismPortal2.initialize, (systemConfig, superchainConfig, anchorStateRegistry, ethLockbox, false)
                 )
             })
         );
@@ -133,10 +134,11 @@ contract Initializer_Test is CommonTest {
                 name: "OptimismPortal2Proxy",
                 target: address(optimismPortal2),
                 initCalldata: abi.encodeCall(
-                    optimismPortal2.initialize, (systemConfig, superchainConfig, anchorStateRegistry, false)
+                    optimismPortal2.initialize, (systemConfig, superchainConfig, anchorStateRegistry, ethLockbox, false)
                 )
             })
         );
+
         // SystemConfigImpl
         contracts.push(
             InitializeableContract({
@@ -322,6 +324,28 @@ contract Initializer_Test is CommonTest {
                         OutputRoot({ root: Hash.wrap(bytes32(0)), l2BlockNumber: 0 }),
                         GameType.wrap(uint32(deploy.cfg().respectedGameType()))
                     )
+                )
+            })
+        );
+
+        // ETHLockboxImpl
+        contracts.push(
+            InitializeableContract({
+                name: "ETHLockboxImpl",
+                target: EIP1967Helper.getImplementation(address(ethLockbox)),
+                initCalldata: abi.encodeCall(
+                    ethLockbox.initialize, (ISuperchainConfig(address(0)), new IOptimismPortal2[](0))
+                )
+            })
+        );
+
+        // ETHLockboxProxy
+        contracts.push(
+            InitializeableContract({
+                name: "ETHLockboxProxy",
+                target: address(ethLockbox),
+                initCalldata: abi.encodeCall(
+                    ethLockbox.initialize, (ISuperchainConfig(address(0)), new IOptimismPortal2[](0))
                 )
             })
         );

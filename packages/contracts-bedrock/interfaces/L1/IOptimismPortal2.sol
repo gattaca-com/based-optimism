@@ -8,8 +8,11 @@ import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol"
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
+import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
+import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 
-interface IOptimismPortal2 {
+interface IOptimismPortal2 is IProxyAdminOwnedBase {
+    error OptimismPortal_Unauthorized();
     error ContentLengthMismatch();
     error EmptyItem();
     error InvalidDataRemainder();
@@ -45,10 +48,13 @@ interface IOptimismPortal2 {
     event WithdrawalFinalized(bytes32 indexed withdrawalHash, bool success);
     event WithdrawalProven(bytes32 indexed withdrawalHash, address indexed from, address indexed to);
     event WithdrawalProvenExtension1(bytes32 indexed withdrawalHash, address indexed proofSubmitter);
+    event ETHMigrated(address indexed lockbox, uint256 ethBalance);
+    event LockboxUpdated(address oldLockbox, address newLockbox);
 
     receive() external payable;
 
     function anchorStateRegistry() external view returns (IAnchorStateRegistry);
+    function ethLockbox() external view returns (IETHLockbox);
     function checkWithdrawal(bytes32 _withdrawalHash, address _proofSubmitter) external view;
     function depositTransaction(
         address _to,
@@ -62,6 +68,7 @@ interface IOptimismPortal2 {
     function disputeGameFactory() external view returns (IDisputeGameFactory);
     function disputeGameFinalityDelaySeconds() external view returns (uint256);
     function donateETH() external payable;
+    function updateLockbox(IETHLockbox _newLockbox) external;
     function finalizeWithdrawalTransaction(Types.WithdrawalTransaction memory _tx) external;
     function finalizeWithdrawalTransactionExternalProof(
         Types.WithdrawalTransaction memory _tx,
@@ -74,6 +81,7 @@ interface IOptimismPortal2 {
         ISystemConfig _systemConfig,
         ISuperchainConfig _superchainConfig,
         IAnchorStateRegistry _anchorStateRegistry,
+        IETHLockbox _ethLockbox,
         bool _superRootsActive
     )
         external;
@@ -113,8 +121,14 @@ interface IOptimismPortal2 {
     function superchainConfig() external view returns (ISuperchainConfig);
     function superRootsActive() external view returns (bool);
     function systemConfig() external view returns (ISystemConfig);
-    function upgrade(IAnchorStateRegistry _anchorStateRegistry, bool _superRootsActive) external;
+    function upgrade(
+        IAnchorStateRegistry _anchorStateRegistry,
+        IETHLockbox _ethLockbox,
+        bool _superRootsActive
+    )
+        external;
     function version() external pure returns (string memory);
+    function migrateLiquidity() external;
 
     function __constructor__(uint256 _proofMaturityDelaySeconds) external;
 }

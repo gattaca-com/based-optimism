@@ -40,6 +40,7 @@ import { IFaultDisputeGame } from "interfaces/dispute/IFaultDisputeGame.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import {
     IOPContractsManager,
+    IOPCMImplementationsWithoutLockbox,
     IOPContractsManagerGameTypeAdder,
     IOPContractsManagerDeployer,
     IOPContractsManagerUpgrader,
@@ -47,6 +48,7 @@ import {
 } from "interfaces/L1/IOPContractsManager.sol";
 import { IOPContractsManagerLegacyUpgrade } from "interfaces/L1/IOPContractsManagerLegacyUpgrade.sol";
 import { ISemver } from "interfaces/universal/ISemver.sol";
+import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 
 // Contracts
 import {
@@ -318,7 +320,8 @@ contract OPContractsManager_Upgrade_Harness is CommonTest {
     function runV200UpgradeAndChecks(address _delegateCaller) public {
         // The address below corresponds with the address of the v2.0.0-rc.1 OPCM on mainnet.
         IOPContractsManager deployedOPCM = IOPContractsManager(address(0x026b2F158255Beac46c1E7c6b8BbF29A4b6A7B76));
-        IOPContractsManager.Implementations memory impls = deployedOPCM.implementations();
+        IOPCMImplementationsWithoutLockbox.Implementations memory impls =
+            IOPCMImplementationsWithoutLockbox(address(deployedOPCM)).implementations();
 
         // Cache the old L1xDM address so we can look for it in the AddressManager's event
         address oldL1CrossDomainMessenger = addressManager.getAddress("OVM_L1CrossDomainMessenger");
@@ -426,7 +429,8 @@ contract OPContractsManager_Upgrade_Harness is CommonTest {
     function runUpgrade14UpgradeAndChecks(address _delegateCaller) public {
         // TODO(#14665): Replace this address with once the final OPCM is deployed for Upgrade 14.
         IOPContractsManager deployedOPCM = IOPContractsManager(address(0x3A1f523a4bc09cd344A2745a108Bb0398288094F));
-        IOPContractsManager.Implementations memory impls = deployedOPCM.implementations();
+        IOPCMImplementationsWithoutLockbox.Implementations memory impls =
+            IOPCMImplementationsWithoutLockbox(address(deployedOPCM)).implementations();
 
         // sanity check
         IPermissionedDisputeGame oldPDG =
@@ -604,7 +608,9 @@ contract OPContractsManager_Upgrade_Harness is CommonTest {
     }
 
     function runUpgradeTestAndChecks(address _delegateCaller) public {
+        // TODO(#14691): Remove this function once Upgrade 15 is deployed on Mainnet.
         runV200UpgradeAndChecks(_delegateCaller);
+        // TODO(#14691): Remove this function once Upgrade 15 is deployed on Mainnet.
         runUpgrade14UpgradeAndChecks(_delegateCaller);
         runUpgrade15UpgradeAndChecks(_delegateCaller);
     }
@@ -793,6 +799,10 @@ contract OPContractsManager_AddGameType_Test is Test {
             optimismPortalImpl: DeployUtils.create1({
                 _name: "OptimismPortal2",
                 _args: DeployUtils.encodeConstructor(abi.encodeCall(IOptimismPortal2.__constructor__, (1)))
+            }),
+            ethLockboxImpl: DeployUtils.create1({
+                _name: "ETHLockbox",
+                _args: DeployUtils.encodeConstructor(abi.encodeCall(IETHLockbox.__constructor__, ()))
             }),
             systemConfigImpl: DeployUtils.create1({
                 _name: "SystemConfig",
@@ -1157,6 +1167,10 @@ contract OPContractsManager_UpdatePrestate_Test is Test {
             optimismPortalImpl: DeployUtils.create1({
                 _name: "OptimismPortal2",
                 _args: DeployUtils.encodeConstructor(abi.encodeCall(IOptimismPortal2.__constructor__, (1)))
+            }),
+            ethLockboxImpl: DeployUtils.create1({
+                _name: "ETHLockbox",
+                _args: DeployUtils.encodeConstructor(abi.encodeCall(IETHLockbox.__constructor__, ()))
             }),
             systemConfigImpl: DeployUtils.create1({
                 _name: "SystemConfig",
