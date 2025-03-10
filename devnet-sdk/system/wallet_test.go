@@ -133,6 +133,7 @@ func TestWallet_Address(t *testing.T) {
 }
 
 func TestWallet_SendETH(t *testing.T) {
+	panic("example")
 	ctx := context.Background()
 	mockChain := newMockChain()
 	mockNode := newMockNode()
