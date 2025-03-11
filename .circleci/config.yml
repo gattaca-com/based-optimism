@@ -1330,6 +1330,7 @@ jobs:
           name: Run Analyzer
           command: |
             make analyze-op-program-client
+          working_directory: op-program
 
   op-program-compat:
     machine: true
