@@ -164,10 +164,8 @@ func Test_ProgramAction_OperatorFeeConstistency(gt *testing.T) {
 			env.Miner.ActL1EndBlock(t)
 
 			// sync sequencer build enough blocks to adopt latest L1 origin
-			for env.Sequencer.SyncStatus().UnsafeL2.L1Origin.Number < env.Miner.L1Chain().CurrentBlock().Number.Uint64() {
-				env.Sequencer.ActL2StartBlock(t)
-				env.Sequencer.ActL2EndBlock(t)
-			}
+			env.Sequencer.ActL1HeadSignal(t)
+			env.Sequencer.ActBuildToL1HeadUnsafe(t)
 
 			receipt, err = env.Alice.GetLatestDepositL2Receipt(t)
 			require.NoError(t, err)
