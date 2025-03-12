@@ -192,6 +192,11 @@
             "type": "uint64"
           },
           {
+            "internalType": "bool",
+            "name": "disputeGameUsesSuperRoots",
+            "type": "bool"
+          },
+          {
             "internalType": "GameType",
             "name": "disputeGameType",
             "type": "uint32"
@@ -277,6 +282,11 @@
             "type": "address"
           },
           {
+            "internalType": "contract IETHLockbox",
+            "name": "ethLockboxProxy",
+            "type": "address"
+          },
+          {
             "internalType": "contract IOptimismPortal2",
             "name": "optimismPortalProxy",
             "type": "address"
@@ -344,6 +354,11 @@
           {
             "internalType": "address",
             "name": "optimismPortalImpl",
+            "type": "address"
+          },
+          {
+            "internalType": "address",
+            "name": "ethLockboxImpl",
             "type": "address"
           },
           {

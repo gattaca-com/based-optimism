@@ -100,9 +100,9 @@ contract L1Block is ISemver {
     /// @notice Whether the L1Block is an X-Fork upgraded chain.
     bool public isXFork;
 
-    /// @custom:semver 1.6.0
+    /// @custom:semver 1.6.0-beta.1
     function version() public pure virtual returns (string memory) {
-        return "1.6.0";
+        return "1.6.0-beta.1";
     }
 
     /// @notice Returns the gas paying token, its decimals, name and symbol.
@@ -336,6 +336,7 @@ contract L1Block is ISemver {
     ///   9. _batcherHash          Versioned hash to authenticate batcher by.
     ///   10. _operatorFeeScalar   Operator fee scalar.
     ///   11. _operatorFeeConstant Operator fee constant.
+
     function setL1BlockValuesIsthmus() public {
         _setL1BlockValuesIsthmus();
     }
