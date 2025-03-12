@@ -41,6 +41,7 @@ type AddGameTypeInput struct {
 	InitialBond             uint64         `json:"initialBond"`
 	VM                      common.Address `json:"vm" evm:"proofVM"`
 	Permissioned            bool           `json:"permissioned"`
+	Prank                   common.Address `json:"prank"`
 }
 
 type AddGameTypeOutput struct {
