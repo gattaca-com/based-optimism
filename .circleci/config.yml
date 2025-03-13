@@ -1317,7 +1317,8 @@ jobs:
       - run:
           name: Install Dependencies
           command: |
-            mise install llvm-objdump
+            sudo apt-get update
+            sudo apt-get install -y llvm curl
 
       - run:
           name: Set up LLVM Path
