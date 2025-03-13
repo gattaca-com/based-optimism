@@ -1,0 +1,163 @@
+package proofs_test
+
+import (
+	"bytes"
+	"testing"
+
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/vm/program"
+	"github.com/holiman/uint256"
+	"github.com/stretchr/testify/require"
+
+	batcherFlags "github.com/ethereum-optimism/optimism/op-batcher/flags"
+	actionsHelpers "github.com/ethereum-optimism/optimism/op-e2e/actions/helpers"
+	"github.com/ethereum-optimism/optimism/op-e2e/actions/proofs/helpers"
+)
+
+func TestSetCodeTxTypeIsthmus(gt *testing.T) {
+	t := actionsHelpers.NewDefaultTesting(gt)
+
+	var (
+		aa = common.HexToAddress("0x000000000000000000000000000000000000aaaa")
+		bb = common.HexToAddress("0x000000000000000000000000000000000000bbbb")
+	)
+
+	// hardcoded because it's not available until after we need it
+	var (
+		bobAddr = common.HexToAddress("0x14dC79964da2C08b23698B3D3cc7Ca32193d9955")
+	)
+
+	// Create 2 contracts, (1) writes 42 to slot 42, (2) calls (1)
+	store42Program := program.New().Sstore(0x42, 0x42)
+	callBobProgram := program.New().Call(nil, bobAddr, 1, 0, 0, 0, 0)
+
+	alloc := *actionsHelpers.DefaultAlloc
+	alloc.L2Alloc = make(map[common.Address]types.Account)
+	alloc.L2Alloc[aa] = types.Account{
+		Code: store42Program.Bytes(),
+	}
+	alloc.L2Alloc[bb] = types.Account{
+		Code: callBobProgram.Bytes(),
+	}
+
+	testCfg := &helpers.TestCfg[interface{}]{
+		Hardfork: helpers.Isthmus,
+		Allocs:   &alloc,
+	}
+
+	tp := helpers.NewTestParams()
+	env := helpers.NewL2FaultProofEnv(t, testCfg, tp, &actionsHelpers.BatcherCfg{
+		MinL1TxSize:          0,
+		MaxL1TxSize:          128_000,
+		DataAvailabilityType: batcherFlags.CalldataType,
+	})
+
+	require.Equal(gt, env.Bob.Address(), bobAddr)
+
+	// go-ethereum test called TestEIP7702 reimplemented here
+	// https://github.com/ethereum/go-ethereum/blob/39638c81c56db2b2dfe6f51999ffd3029ee212cb/core/blockchain_test.go#L4180
+	// p := &e2eutils.TestParams{
+	// 	MaxSequencerDrift:   20,
+	// 	SequencerWindowSize: 24,
+	// 	ChannelTimeout:      20,
+	// 	L1BlockTime:         12,
+	// 	AllocType:           config.AllocTypeStandard,
+	// }
+
+	cl := env.Engine.EthClient()
+	// rollupSeqCl := env.Sequencer.RollupClient()
+
+	env.Sequencer.ActL2PipelineFull(t)
+	env.Miner.ActEmptyBlock(t)
+	env.Sequencer.ActL2StartBlock(t)
+
+	aliceSecret := env.Alice.L2.Secret()
+	bobSecret := env.Bob.L2.Secret()
+
+	chainID := env.Sequencer.RollupCfg.L2ChainID
+
+	// Sign authorization tuples.
+	// The way the auths are combined, it becomes
+	// 1. tx -> addr1 which is delegated to 0xaaaa
+	// 2. addr1:0xaaaa calls into addr2:0xbbbb
+	// 3. addr2:0xbbbb  writes to storage
+	auth1, err := types.SignSetCode(aliceSecret, types.SetCodeAuthorization{
+		ChainID: *uint256.MustFromBig(chainID),
+		Address: bb,
+		Nonce:   1,
+	})
+	require.NoError(gt, err, "failed to sign auth1")
+	auth2, err := types.SignSetCode(bobSecret, types.SetCodeAuthorization{
+		Address: aa,
+		Nonce:   0,
+	})
+	require.NoError(gt, err, "failed to sign auth2")
+
+	txdata := &types.SetCodeTx{
+		ChainID:   uint256.MustFromBig(chainID),
+		Nonce:     0,
+		To:        env.Alice.Address(),
+		Gas:       500000,
+		GasFeeCap: uint256.NewInt(5000000000),
+		GasTipCap: uint256.NewInt(2),
+		AuthList:  []types.SetCodeAuthorization{auth1, auth2},
+	}
+	signer := types.NewIsthmusSigner(chainID)
+	tx := types.MustSignNewTx(aliceSecret, signer, txdata)
+
+	err = cl.SendTransaction(t.Ctx(), tx)
+	require.NoError(gt, err, "failed to send set code tx")
+
+	_, err = env.Engine.EngineApi.IncludeTx(tx, env.Alice.Address())
+	require.NoError(t, err, "failed to include set code tx")
+
+	env.Sequencer.ActL2EndBlock(t)
+
+	// Verify delegation designations were deployed.
+	bobCode, err := cl.PendingCodeAt(t.Ctx(), env.Bob.Address())
+	require.NoError(gt, err, "failed to get bob code")
+	want := types.AddressToDelegation(auth2.Address)
+	if !bytes.Equal(bobCode, want) {
+		t.Fatalf("addr1 code incorrect: got %s, want %s", common.Bytes2Hex(bobCode), common.Bytes2Hex(want))
+	}
+	aliceCode, err := cl.PendingCodeAt(t.Ctx(), env.Alice.Address())
+	require.NoError(gt, err, "failed to get alice code")
+	want = types.AddressToDelegation(auth1.Address)
+	if !bytes.Equal(aliceCode, want) {
+		t.Fatalf("addr2 code incorrect: got %s, want %s", common.Bytes2Hex(aliceCode), common.Bytes2Hex(want))
+	}
+
+	// Verify delegation executed the correct code.
+	fortyTwo := common.BytesToHash([]byte{0x42})
+	actual, err := cl.PendingStorageAt(t.Ctx(), env.Bob.Address(), fortyTwo)
+	require.NoError(gt, err, "failed to get addr1 storage")
+
+	if !bytes.Equal(actual, fortyTwo[:]) {
+		t.Fatalf("addr2 storage wrong: expected %d, got %d", fortyTwo, actual)
+	}
+
+	// batch submit to L1. batcher should submit span batches.
+	env.Batcher.ActSubmitAll(t)
+	env.Miner.ActL1StartBlock(12)(t)
+	env.Miner.ActL1IncludeTx(env.Batcher.BatcherAddr)(t)
+	env.Miner.ActL1EndBlock(t)
+
+	env.Sequencer.ActL1HeadSignal(t)
+	env.Sequencer.ActL2PipelineFull(t)
+
+	latestBlock, err := cl.BlockByNumber(t.Ctx(), nil)
+	require.NoError(t, err, "error fetching latest block")
+
+	env.RunFaultProofProgram(t, latestBlock.NumberU64(), func(t actionsHelpers.Testing, err error) {
+		require.NoError(t, err, "no error expected running FP program")
+	})
+
+	// ensure verifier can verify the batch (needs authorization list or tx will fail)
+	// verifier.ActL1HeadSignal(t)
+	// verifier.ActL2PipelineFull(t)
+
+	// require.Equal(t, sequencer.L2Unsafe(), sequencer.L2Safe())
+	// require.Equal(t, verifier.L2Unsafe(), verifier.L2Safe())
+	// require.Equal(t, sequencer.L2Safe(),  .L2Safe())
+}
