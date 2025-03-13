@@ -6,7 +6,6 @@ import (
 	"github.com/ethereum-optimism/optimism/op-challenger/game/fault/contracts/metrics"
 	"github.com/ethereum-optimism/optimism/op-challenger/game/fault/types"
 	"github.com/ethereum-optimism/optimism/op-service/sources/batching"
-	"github.com/ethereum-optimism/optimism/op-service/txmgr"
 	"github.com/ethereum-optimism/optimism/packages/contracts-bedrock/snapshots"
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -25,8 +24,8 @@ func NewSuperFaultDisputeGameContract(_ context.Context, metrics metrics.Contrac
 	ops.GetL2BlockNumberChallenger = func(contract *batching.BoundContract) GetterContractOp[common.Address] {
 		return NewStaticOp(common.Address{})
 	}
-	ops.ChallengeL2BlockNumberTx = func(_ *batching.BoundContract, _ *types.InvalidL2BlockNumberChallenge) (txmgr.TxCandidate, error) {
-		return txmgr.TxCandidate{}, ErrChallengeL2BlockNotSupported
+	ops.ChallengeL2BlockNumberTx = func(_ *batching.BoundContract, _ *types.InvalidL2BlockNumberChallenge) (*batching.ContractCall, error) {
+		return nil, ErrChallengeL2BlockNotSupported
 	}
 
 	ops.GetL2SequenceNumber = func(contract *batching.BoundContract) GetterContractOp[uint64] {

@@ -39,6 +39,15 @@ func ExecuteOps(ctx context.Context, block rpcblock.Block, caller *batching.Mult
 	}
 }
 
+func ExecuteGetterOp[Result any](ctx context.Context, block rpcblock.Block, caller *batching.MultiCaller, op GetterContractOp[Result]) (Result, error) {
+	err := ExecuteOps(ctx, block, caller, op)
+	if err != nil {
+		var noResult Result
+		return noResult, err
+	}
+	return op.Result(), nil
+}
+
 type GetClaimOp struct {
 	contract *batching.BoundContract
 	idx      uint64
@@ -59,7 +68,7 @@ func (o *GetClaimOp) NextCalls() ([]batching.Call, error) {
 	}
 	return []batching.Call{
 		newCapturingCall(o.contract.Call(methodClaim, big.NewInt(int64(o.idx))), func(result *batching.CallResult) error {
-			o.Claim = o.decodeClaim(result, o.idx)
+			o.Claim = decodeClaim(result, o.idx)
 			return nil
 		}),
 	}, nil
@@ -67,28 +76,6 @@ func (o *GetClaimOp) NextCalls() ([]batching.Call, error) {
 
 func (o *GetClaimOp) Result() types.Claim {
 	return o.Claim
-}
-
-func (o *GetClaimOp) decodeClaim(result *batching.CallResult, contractIndex uint64) types.Claim {
-	parentIndex := result.GetUint32(0)
-	counteredBy := result.GetAddress(1)
-	claimant := result.GetAddress(2)
-	bond := result.GetBigInt(3)
-	claim := result.GetHash(4)
-	position := result.GetBigInt(5)
-	clock := result.GetBigInt(6)
-	return types.Claim{
-		ClaimData: types.ClaimData{
-			Value:    claim,
-			Position: types.NewPositionFromGIndex(position),
-			Bond:     bond,
-		},
-		CounteredBy:         counteredBy,
-		Claimant:            claimant,
-		Clock:               decodeClock(clock),
-		ContractIndex:       int(contractIndex),
-		ParentContractIndex: int(parentIndex),
-	}
 }
 
 var _ ContractOp = (*GetClaimOp)(nil)
@@ -112,6 +99,59 @@ func (o *FixBondOp) NextCalls() ([]batching.Call, error) {
 	}
 	// No further calls required
 	return nil, nil
+}
+
+type ContractArrayGetterOp[Item any] struct {
+	contract     *batching.BoundContract
+	lengthMethod string
+	getMethod    string
+	convert      func(result *batching.CallResult, idx uint64) (Item, error)
+
+	loadedLength bool
+	length       uint64
+	result       []Item
+}
+
+func NewGetArrayOp[Item any](contract *batching.BoundContract, lengthMethod string, getMethod string, convert func(result *batching.CallResult, idx uint64) (Item, error)) *ContractArrayGetterOp[Item] {
+	return &ContractArrayGetterOp[Item]{
+		contract:     contract,
+		lengthMethod: lengthMethod,
+		getMethod:    getMethod,
+		convert:      convert,
+	}
+}
+
+func (o *ContractArrayGetterOp[Item]) NextCalls() ([]batching.Call, error) {
+	if !o.loadedLength {
+		call := newCapturingCall(o.contract.Call(o.lengthMethod), func(result *batching.CallResult) error {
+			o.length = result.GetBigInt(0).Uint64()
+			o.loadedLength = true
+			return nil
+		})
+		return []batching.Call{call}, nil
+	}
+	if uint64(len(o.result)) == o.length {
+		// Already loaded all items
+		return nil, nil
+	}
+	o.result = make([]Item, o.length)
+	calls := make([]batching.Call, len(o.result))
+	for i := uint64(0); i < o.length; i++ {
+		i := i
+		calls[i] = newCapturingCall(o.contract.Call(o.getMethod, new(big.Int).SetUint64(i)), func(result *batching.CallResult) error {
+			item, err := o.convert(result, i)
+			if err != nil {
+				return err
+			}
+			o.result[i] = item
+			return nil
+		})
+	}
+	return calls, nil
+}
+
+func (o *ContractArrayGetterOp[Item]) Result() []Item {
+	return o.result
 }
 
 type SimpleContractGetterOp[Result any] struct {
@@ -199,4 +239,46 @@ func (o *chainedOps[Result]) NextCalls() ([]batching.Call, error) {
 
 func (o *chainedOps[Result]) Result() Result {
 	return o.resultSource()
+}
+
+type MultiGetterOp[Item any] struct {
+	contract *batching.BoundContract
+	method   string
+	args     []interface{}
+	convert  func(result *batching.CallResult, idx int) (Item, error)
+
+	result []Item
+}
+
+func NewMultiGetterOp[Item any](contract *batching.BoundContract, method string, convert func(result *batching.CallResult, idx int) (Item, error), args ...interface{}) GetterContractOp[[]Item] {
+	return &MultiGetterOp[Item]{
+		contract: contract,
+		method:   method,
+		args:     args,
+		convert:  convert,
+	}
+}
+
+func (o *MultiGetterOp[Item]) NextCalls() ([]batching.Call, error) {
+	if len(o.result) == len(o.args) {
+		return nil, nil
+	}
+	o.result = make([]Item, len(o.args))
+	calls := make([]batching.Call, len(o.args))
+	for i, arg := range o.args {
+		i := i
+		calls[i] = newCapturingCall(o.contract.Call(o.method, arg), func(result *batching.CallResult) error {
+			val, err := o.convert(result, i)
+			if err != nil {
+				return err
+			}
+			o.result[i] = val
+			return nil
+		})
+	}
+	return calls, nil
+}
+
+func (o *MultiGetterOp[Item]) Result() []Item {
+	return o.result
 }

@@ -5,6 +5,7 @@ import (
 	_ "embed"
 
 	"github.com/ethereum-optimism/optimism/op-challenger/game/fault/types"
+	"github.com/ethereum-optimism/optimism/op-service/sources/batching"
 	"github.com/ethereum-optimism/optimism/op-service/sources/batching/rpcblock"
 )
 
@@ -17,4 +18,10 @@ type FaultDisputeGameContract131 struct {
 
 func (f *FaultDisputeGameContract131) GetBondDistributionMode(ctx context.Context, block rpcblock.Block) (types.BondDistributionMode, error) {
 	return types.LegacyDistributionMode, nil
+}
+
+func distributionModeUnsupported(ops *faultDisputeGameOps) {
+	ops.GetBondDistributionMode = func(_ *batching.BoundContract) GetterContractOp[types.BondDistributionMode] {
+		return NewStaticOp(types.LegacyDistributionMode)
+	}
 }

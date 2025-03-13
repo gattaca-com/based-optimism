@@ -86,8 +86,13 @@ type faultDisputeGameOps struct {
 	GetMaxClockDuration        func(contract *batching.BoundContract) GetterContractOp[uint64]
 	GetL2BlockNumberChallenged func(contract *batching.BoundContract) GetterContractOp[bool]
 	GetL2BlockNumberChallenger func(contract *batching.BoundContract) GetterContractOp[common.Address]
+	GetBondDistributionMode    func(contract *batching.BoundContract) GetterContractOp[types.BondDistributionMode]
+	IsResolved                 func(contract *batching.BoundContract, claims ...types.Claim) GetterContractOp[[]bool]
 
-	ChallengeL2BlockNumberTx func(contract *batching.BoundContract, challenge *types.InvalidL2BlockNumberChallenge) (txmgr.TxCandidate, error)
+	ChallengeL2BlockNumberTx func(contract *batching.BoundContract, challenge *types.InvalidL2BlockNumberChallenge) (*batching.ContractCall, error)
+	ResolveClaimTx           func(contract *batching.BoundContract, claimIdx uint64) (*batching.ContractCall, error)
+	AttackTx                 func(contract *batching.BoundContract, parent types.Claim, pivot common.Hash) (*batching.ContractCall, error)
+	DefendTx                 func(contract *batching.BoundContract, parent types.Claim, pivot common.Hash) (*batching.ContractCall, error)
 }
 
 func latestFaultDisputeGameOps() *faultDisputeGameOps {
@@ -131,17 +136,41 @@ func latestFaultDisputeGameOps() *faultDisputeGameOps {
 				return result.GetAddress(0), nil
 			})
 		},
-		ChallengeL2BlockNumberTx: func(contract *batching.BoundContract, challenge *types.InvalidL2BlockNumberChallenge) (txmgr.TxCandidate, error) {
+		GetBondDistributionMode: func(contract *batching.BoundContract) GetterContractOp[types.BondDistributionMode] {
+			return NewSimpleGetterOp(contract, methodBondDistributionMode, func(result *batching.CallResult) (types.BondDistributionMode, error) {
+				return types.BondDistributionMode(result.GetUint8(0)), nil
+			})
+		},
+		IsResolved: func(contract *batching.BoundContract, claims ...types.Claim) GetterContractOp[[]bool] {
+			args := make([]interface{}, len(claims))
+			for i, claim := range claims {
+				args[i] = big.NewInt(int64(claim.ContractIndex))
+			}
+			return NewMultiGetterOp(contract, methodResolvedSubgames, func(result *batching.CallResult, _ int) (bool, error) {
+				return result.GetBool(0), nil
+			}, args...)
+		},
+
+		ChallengeL2BlockNumberTx: func(contract *batching.BoundContract, challenge *types.InvalidL2BlockNumberChallenge) (*batching.ContractCall, error) {
 			headerRlp, err := rlp.EncodeToBytes(challenge.Header)
 			if err != nil {
-				return txmgr.TxCandidate{}, fmt.Errorf("failed to serialize header: %w", err)
+				return nil, fmt.Errorf("failed to serialize header: %w", err)
 			}
 			return contract.Call(methodChallengeRootL2Block, outputRootProof{
 				Version:                  challenge.Output.Version,
 				StateRoot:                challenge.Output.StateRoot,
 				MessagePasserStorageRoot: challenge.Output.WithdrawalStorageRoot,
 				LatestBlockhash:          challenge.Output.BlockRef.Hash,
-			}, headerRlp).ToTxCandidate()
+			}, headerRlp), nil
+		},
+		ResolveClaimTx: func(contract *batching.BoundContract, claimIdx uint64) (*batching.ContractCall, error) {
+			return contract.Call(methodResolveClaim, new(big.Int).SetUint64(claimIdx), maxChildChecks), nil
+		},
+		AttackTx: func(contract *batching.BoundContract, parent types.Claim, pivot common.Hash) (*batching.ContractCall, error) {
+			return contract.Call(methodAttack, parent.Value, big.NewInt(int64(parent.ContractIndex)), pivot), nil
+		},
+		DefendTx: func(contract *batching.BoundContract, parent types.Claim, pivot common.Hash) (*batching.ContractCall, error) {
+			return contract.Call(methodDefend, parent.Value, big.NewInt(int64(parent.ContractIndex)), pivot), nil
 		},
 	}
 }
@@ -166,82 +195,61 @@ func NewPreInteropFaultDisputeGameContract(ctx context.Context, metrics metrics.
 	var builder VersionedBuilder[FaultDisputeGameContract]
 	builder.AddVersion(0, 8, func() (FaultDisputeGameContract, error) {
 		legacyAbi := mustParseAbi(faultDisputeGameAbi020)
-		// Replace GetClaim with a version that also restores the original bond amount even for resolved claims.
-		// We could make these overrides reusable as well, since 0.8.0 typically has all the overrides from 0.18.0
-		// plus its unique changes. So we could start by applying the ops changes from 0.18.0 then only need to
-		// apply 0.8.0 specific changes here.
-		ops.GetClaim = func(contract *batching.BoundContract, idx uint64) GetterContractOp[types.Claim] {
-			getClaimOp := NewGetClaimOp(contract, idx)
-			fixBondOp := &FixBondOp{getClaimOp}
-			op := ChainOps(getClaimOp.Result, getClaimOp, fixBondOp)
-			return op
-		}
-		ops.GetMaxClockDuration = func(contract *batching.BoundContract) GetterContractOp[uint64] {
-			return NewSimpleGetterOp(contract, methodGameDuration, func(result *batching.CallResult) (uint64, error) {
-				return result.GetUint64(0) / 2, nil
-			})
-		}
-		ops.GetL2BlockNumberChallenged = func(contract *batching.BoundContract) GetterContractOp[bool] {
-			return NewStaticOp(false)
-		}
-		ops.GetL2BlockNumberChallenger = func(contract *batching.BoundContract) GetterContractOp[common.Address] {
-			return NewStaticOp(common.Address{})
-		}
+		v080Compatibility(ops)
 		// Note: If we made everything that needs to be overridden a ContractOp, we wouldn't need
 		// FaultDisputeGameContract080, we'd just use FaultDisputeGameContractLatest all the time.
 		// And we could potentially then remove the FaultDisputeGame interface as well, since the ops could be
 		// replaced with ones that return static results for mocking.
-		return &FaultDisputeGameContract080{
-			FaultDisputeGameContractLatest: FaultDisputeGameContractLatest{
-				metrics:     metrics,
-				multiCaller: caller,
-				contract:    batching.NewBoundContract(legacyAbi, addr),
-				ops:         ops,
-			},
+		return &FaultDisputeGameContractLatest{
+			metrics:     metrics,
+			multiCaller: caller,
+			contract:    batching.NewBoundContract(legacyAbi, addr),
+			ops:         ops,
 		}, nil
 	})
 	builder.AddVersion(0, 18, func() (FaultDisputeGameContract, error) {
 		legacyAbi := mustParseAbi(faultDisputeGameAbi0180)
-		return &FaultDisputeGameContract0180{
-			FaultDisputeGameContractLatest: FaultDisputeGameContractLatest{
-				metrics:     metrics,
-				multiCaller: caller,
-				contract:    batching.NewBoundContract(legacyAbi, addr),
-				ops:         ops,
-			},
+		distributionModeUnsupported(ops)
+		moveWithoutParentClaim(ops)
+		l2BlockNumberChallengeUnsupported(ops)
+		return &FaultDisputeGameContractLatest{
+			metrics:     metrics,
+			multiCaller: caller,
+			contract:    batching.NewBoundContract(legacyAbi, addr),
+			ops:         ops,
 		}, nil
 	})
 	builder.AddVersion(1, 0, func() (FaultDisputeGameContract, error) {
 		legacyAbi := mustParseAbi(faultDisputeGameAbi0180)
-		return &FaultDisputeGameContract0180{
-			FaultDisputeGameContractLatest: FaultDisputeGameContractLatest{
-				metrics:     metrics,
-				multiCaller: caller,
-				contract:    batching.NewBoundContract(legacyAbi, addr),
-				ops:         ops,
-			},
+		distributionModeUnsupported(ops)
+		moveWithoutParentClaim(ops)
+		l2BlockNumberChallengeUnsupported(ops)
+		return &FaultDisputeGameContractLatest{
+			metrics:     metrics,
+			multiCaller: caller,
+			contract:    batching.NewBoundContract(legacyAbi, addr),
+			ops:         ops,
 		}, nil
 	})
 	builder.AddVersion(1, 1, func() (FaultDisputeGameContract, error) {
 		legacyAbi := mustParseAbi(faultDisputeGameAbi111)
-		return &FaultDisputeGameContract111{
-			FaultDisputeGameContractLatest: FaultDisputeGameContractLatest{
-				metrics:     metrics,
-				multiCaller: caller,
-				contract:    batching.NewBoundContract(legacyAbi, addr),
-				ops:         ops,
-			},
+		distributionModeUnsupported(ops)
+		moveWithoutParentClaim(ops)
+		return &FaultDisputeGameContractLatest{
+			metrics:     metrics,
+			multiCaller: caller,
+			contract:    batching.NewBoundContract(legacyAbi, addr),
+			ops:         ops,
 		}, nil
 	})
 	v131Factory := func() (FaultDisputeGameContract, error) {
 		legacyAbi := mustParseAbi(faultDisputeGameAbi131)
-		return &FaultDisputeGameContract131{
-			FaultDisputeGameContractLatest: FaultDisputeGameContractLatest{
-				metrics:     metrics,
-				multiCaller: caller,
-				contract:    batching.NewBoundContract(legacyAbi, addr),
-				ops:         ops,
-			},
+		distributionModeUnsupported(ops)
+		return &FaultDisputeGameContractLatest{
+			metrics:     metrics,
+			multiCaller: caller,
+			contract:    batching.NewBoundContract(legacyAbi, addr),
+			ops:         ops,
 		}, nil
 	}
 	// The ABI is equivalent between 1.2.x and 1.3.x - there were just changes to the constructor validation.
@@ -263,6 +271,28 @@ func mustParseAbi(json []byte) *abi.ABI {
 		panic(err)
 	}
 	return &loaded
+}
+
+func decodeClaim(result *batching.CallResult, contractIndex uint64) types.Claim {
+	parentIndex := result.GetUint32(0)
+	counteredBy := result.GetAddress(1)
+	claimant := result.GetAddress(2)
+	bond := result.GetBigInt(3)
+	claim := result.GetHash(4)
+	position := result.GetBigInt(5)
+	clock := result.GetBigInt(6)
+	return types.Claim{
+		ClaimData: types.ClaimData{
+			Value:    claim,
+			Position: types.NewPositionFromGIndex(position),
+			Bond:     bond,
+		},
+		CounteredBy:         counteredBy,
+		Claimant:            claimant,
+		Clock:               decodeClock(clock),
+		ContractIndex:       int(contractIndex),
+		ParentContractIndex: int(parentIndex),
+	}
 }
 
 // GetBalanceAndDelay returns the total amount of ETH controlled by this contract.
@@ -490,11 +520,11 @@ func (f *FaultDisputeGameContractLatest) GetOracle(ctx context.Context) (Preimag
 
 func (f *FaultDisputeGameContractLatest) GetMaxClockDuration(ctx context.Context) (time.Duration, error) {
 	defer f.metrics.StartContractRequest("GetMaxClockDuration")()
-	result, err := f.multiCaller.SingleCall(ctx, rpcblock.Latest, f.contract.Call(methodMaxClockDuration))
+	duration, err := ExecuteGetterOp(ctx, rpcblock.Latest, f.multiCaller, f.ops.GetMaxClockDuration(f.contract))
 	if err != nil {
 		return 0, fmt.Errorf("failed to fetch max clock duration: %w", err)
 	}
-	return time.Duration(result.GetUint64(0)) * time.Second, nil
+	return time.Duration(duration) * time.Second, nil
 }
 
 func (f *FaultDisputeGameContractLatest) GetMaxGameDepth(ctx context.Context) (types.Depth, error) {
@@ -554,41 +584,25 @@ func (f *FaultDisputeGameContractLatest) GetClaim(ctx context.Context, idx uint6
 
 func (f *FaultDisputeGameContractLatest) GetAllClaims(ctx context.Context, block rpcblock.Block) ([]types.Claim, error) {
 	defer f.metrics.StartContractRequest("GetAllClaims")()
-	results, err := batching.ReadArray(ctx, f.multiCaller, block, f.contract.Call(methodClaimCount), func(i *big.Int) *batching.ContractCall {
-		return f.contract.Call(methodClaim, i)
-	})
+	claims, err := ExecuteGetterOp(ctx, block, f.multiCaller,
+		NewGetArrayOp[types.Claim](f.contract, methodClaimCount, methodClaim, func(result *batching.CallResult, idx uint64) (types.Claim, error) {
+			return f.decodeClaim(result, int(idx)), nil
+		}))
 	if err != nil {
 		return nil, fmt.Errorf("failed to load claims: %w", err)
-	}
-
-	var claims []types.Claim
-	for idx, result := range results {
-		claims = append(claims, f.decodeClaim(result, idx))
 	}
 	return claims, nil
 }
 
 func (f *FaultDisputeGameContractLatest) GetBondDistributionMode(ctx context.Context, block rpcblock.Block) (types.BondDistributionMode, error) {
-	result, err := f.multiCaller.SingleCall(ctx, block, f.contract.Call(methodBondDistributionMode))
-	if err != nil {
-		return 0, fmt.Errorf("failed to fetch bond mode: %w", err)
-	}
-	return types.BondDistributionMode(result.GetUint8(0)), nil
+	return ExecuteGetterOp(ctx, block, f.multiCaller, f.ops.GetBondDistributionMode(f.contract))
 }
 
 func (f *FaultDisputeGameContractLatest) IsResolved(ctx context.Context, block rpcblock.Block, claims ...types.Claim) ([]bool, error) {
 	defer f.metrics.StartContractRequest("IsResolved")()
-	calls := make([]batching.Call, 0, len(claims))
-	for _, claim := range claims {
-		calls = append(calls, f.contract.Call(methodResolvedSubgames, big.NewInt(int64(claim.ContractIndex))))
-	}
-	results, err := f.multiCaller.Call(ctx, block, calls...)
+	resolved, err := ExecuteGetterOp(ctx, block, f.multiCaller, f.ops.IsResolved(f.contract, claims...))
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve resolved subgames: %w", err)
-	}
-	resolved := make([]bool, 0, len(claims))
-	for _, result := range results {
-		resolved = append(resolved, result.GetBool(0))
 	}
 	return resolved, nil
 }
@@ -612,16 +626,26 @@ func (f *FaultDisputeGameContractLatest) IsL2BlockNumberChallenged(ctx context.C
 }
 
 func (f *FaultDisputeGameContractLatest) ChallengeL2BlockNumberTx(challenge *types.InvalidL2BlockNumberChallenge) (txmgr.TxCandidate, error) {
-	return f.ops.ChallengeL2BlockNumberTx(f.contract, challenge)
+	call, err := f.ops.ChallengeL2BlockNumberTx(f.contract, challenge)
+	if err != nil {
+		return txmgr.TxCandidate{}, err
+	}
+	return call.ToTxCandidate()
 }
 
 func (f *FaultDisputeGameContractLatest) AttackTx(ctx context.Context, parent types.Claim, pivot common.Hash) (txmgr.TxCandidate, error) {
-	call := f.contract.Call(methodAttack, parent.Value, big.NewInt(int64(parent.ContractIndex)), pivot)
+	call, err := f.ops.AttackTx(f.contract, parent, pivot)
+	if err != nil {
+		return txmgr.TxCandidate{}, err
+	}
 	return f.txWithBond(ctx, parent.Position.Attack(), call)
 }
 
 func (f *FaultDisputeGameContractLatest) DefendTx(ctx context.Context, parent types.Claim, pivot common.Hash) (txmgr.TxCandidate, error) {
-	call := f.contract.Call(methodDefend, parent.Value, big.NewInt(int64(parent.ContractIndex)), pivot)
+	call, err := f.ops.DefendTx(f.contract, parent, pivot)
+	if err != nil {
+		return txmgr.TxCandidate{}, err
+	}
 	return f.txWithBond(ctx, parent.Position.Defend(), call)
 }
 
@@ -644,8 +668,11 @@ func (f *FaultDisputeGameContractLatest) StepTx(claimIdx uint64, isAttack bool, 
 
 func (f *FaultDisputeGameContractLatest) CallResolveClaim(ctx context.Context, claimIdx uint64) error {
 	defer f.metrics.StartContractRequest("CallResolveClaim")()
-	call := f.resolveClaimCall(claimIdx)
-	_, err := f.multiCaller.SingleCall(ctx, rpcblock.Latest, call)
+	call, err := f.ops.ResolveClaimTx(f.contract, claimIdx)
+	if err != nil {
+		return err
+	}
+	_, err = f.multiCaller.SingleCall(ctx, rpcblock.Latest, call)
 	if err != nil {
 		return fmt.Errorf("failed to call resolve claim: %w", err)
 	}
@@ -653,12 +680,11 @@ func (f *FaultDisputeGameContractLatest) CallResolveClaim(ctx context.Context, c
 }
 
 func (f *FaultDisputeGameContractLatest) ResolveClaimTx(claimIdx uint64) (txmgr.TxCandidate, error) {
-	call := f.resolveClaimCall(claimIdx)
+	call, err := f.ops.ResolveClaimTx(f.contract, claimIdx)
+	if err != nil {
+		return txmgr.TxCandidate{}, err
+	}
 	return call.ToTxCandidate()
-}
-
-func (f *FaultDisputeGameContractLatest) resolveClaimCall(claimIdx uint64) *batching.ContractCall {
-	return f.contract.Call(methodResolveClaim, new(big.Int).SetUint64(claimIdx), maxChildChecks)
 }
 
 func (f *FaultDisputeGameContractLatest) CallResolve(ctx context.Context) (gameTypes.GameStatus, error) {
