@@ -5,7 +5,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ethereum-optimism/optimism/op-e2e/actions/interop/dsl"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -13,6 +12,8 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ethereum-optimism/optimism/op-e2e/actions/interop/dsl"
 
 	"github.com/ethereum-optimism/optimism/op-chain-ops/devkeys"
 	"github.com/ethereum-optimism/optimism/op-e2e/actions/helpers"
@@ -209,10 +210,10 @@ func includeTxOnChain(t helpers.Testing, actors *dsl.InteropActors, chain *dsl.C
 	actors.ChainB.Sequencer.ActL2PipelineFull(t)
 }
 
-func assertHeads(t helpers.Testing, chain *dsl.Chain, unsafe, localSafe, crossUnsafe, safe uint64) {
+func assertHeads(t helpers.Testing, chain *dsl.Chain, unsafe, crossUnsafe, safe, crossSafe uint64) {
 	status := chain.Sequencer.SyncStatus()
-	require.Equal(t, unsafe, status.UnsafeL2.ID().Number, "Unsafe")
+	require.Equal(t, unsafe, status.UnsafeL2.ID().Number, "Local Unsafe")
 	require.Equal(t, crossUnsafe, status.CrossUnsafeL2.ID().Number, "Cross Unsafe")
-	require.Equal(t, localSafe, status.LocalSafeL2.ID().Number, "Local safe")
-	require.Equal(t, safe, status.SafeL2.ID().Number, "Safe")
+	require.Equal(t, safe, status.LocalSafeL2.ID().Number, "Local Safe")
+	require.Equal(t, crossSafe, status.SafeL2.ID().Number, "Cross Safe")
 }

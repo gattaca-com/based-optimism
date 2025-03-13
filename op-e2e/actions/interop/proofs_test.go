@@ -548,7 +548,7 @@ func TestInteropFaultProofsInvalidBlock(gt *testing.T) {
 
 	// safe head is still behind until we verify cross-safe
 	assertHeads(t, actors.ChainA, 3, 3, 3, 2) // Chain A's block is cross unsafe
-	assertHeads(t, actors.ChainB, 3, 3, 2, 2) // Chain B's block is not
+	assertHeads(t, actors.ChainB, 3, 2, 3, 2) // Chain B's block is not
 	endTimestamp := actors.ChainB.Sequencer.L2Unsafe().Time
 
 	startTimestamp := endTimestamp - 1
