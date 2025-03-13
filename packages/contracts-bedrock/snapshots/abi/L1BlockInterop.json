@@ -280,7 +280,6 @@
   {
     "inputs": [
       {
-<<<<<<< HEAD
         "internalType": "enum Types.ConfigType",
         "name": "_type",
         "type": "uint8"
@@ -306,8 +305,6 @@
   {
     "inputs": [
       {
-=======
->>>>>>> 7e561276c8edee224d65f281b51ee20b3d42fec3
         "internalType": "uint64",
         "name": "_number",
         "type": "uint64"

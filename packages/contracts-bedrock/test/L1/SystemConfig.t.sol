@@ -144,7 +144,6 @@ contract SystemConfig_Initialize_Test is SystemConfig_Init {
                 l1CrossDomainMessenger: address(0),
                 l1ERC721Bridge: address(0),
                 l1StandardBridge: address(0),
-                disputeGameFactory: address(0),
                 optimismPortal: address(optimismPortal2),
                 optimismMintableERC20Factory: address(0)
             }),

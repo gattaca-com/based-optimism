@@ -30,9 +30,8 @@ import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { IL1CrossDomainMessenger } from "interfaces/L1/IL1CrossDomainMessenger.sol";
 import { IL1ERC721Bridge } from "interfaces/L1/IL1ERC721Bridge.sol";
 import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
-import {
-    IL1OptimismMintableERC20Factory as IOptimismMintableERC20Factory
-} from "interfaces/L1/IL1OptimismMintableERC20Factory.sol";
+import { IL1OptimismMintableERC20Factory as IOptimismMintableERC20Factory } from
+    "interfaces/L1/IL1OptimismMintableERC20Factory.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 import { Solarray } from "scripts/libraries/Solarray.sol";
