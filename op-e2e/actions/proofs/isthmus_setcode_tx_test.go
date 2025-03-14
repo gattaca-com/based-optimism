@@ -42,6 +42,7 @@ func runSetCodeTxTypeTest(gt *testing.T, testCfg *helpers.TestCfg[any]) {
 
 	tp := helpers.NewTestParams()
 	env := helpers.NewL2FaultProofEnv(t, testCfg, tp, helpers.NewBatcherCfg())
+	require.Equal(gt, env.Bob.Address(), bobAddr)
 
 	cl := env.Engine.EthClient()
 
