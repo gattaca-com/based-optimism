@@ -1296,7 +1296,8 @@ jobs:
 
   analyze-op-program-client:
     docker:
-      - image: cimg/go:1.21
+      - image: <<pipeline.parameters.default_docker_image>>
+    resource_class: xlarge
     steps:
       - utils/checkout-with-mise
 
