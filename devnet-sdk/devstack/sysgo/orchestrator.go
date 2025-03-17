@@ -34,8 +34,8 @@ type Orchestrator struct {
 	l2CLs       locks.RWMap[stack.L2CLNodeID, *L2CLNode]
 	supervisors locks.RWMap[stack.SupervisorID, *Supervisor]
 	batchers    locks.RWMap[stack.L2BatcherID, *L2Batcher]
-	//challengers locks.RWMap[stack.L2ChallengerID, *L2Challenger] // TODO(#15057): op-challenger support
-	proposers locks.RWMap[stack.L2ProposerID, *L2Proposer]
+	challengers locks.RWMap[stack.L2ChallengerID, *L2Challenger]
+	proposers   locks.RWMap[stack.L2ProposerID, *L2Proposer]
 
 	controlPlane *ControlPlane
 
@@ -82,6 +82,7 @@ func (o *Orchestrator) Hydrate(sys stack.ExtensibleSystem) {
 	o.l2CLs.Range(rangeHydrateFn[stack.L2CLNodeID, *L2CLNode](sys))
 	o.supervisors.Range(rangeHydrateFn[stack.SupervisorID, *Supervisor](sys))
 	o.batchers.Range(rangeHydrateFn[stack.L2BatcherID, *L2Batcher](sys))
+	o.challengers.Range(rangeHydrateFn[stack.L2ChallengerID, *L2Challenger](sys))
 	o.proposers.Range(rangeHydrateFn[stack.L2ProposerID, *L2Proposer](sys))
 }
 
