@@ -27,7 +27,7 @@ fi
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 ARCH=$(uname -m)
 BIN_DIR="bin"
-ANALYZER_BIN="${BIN_DIR}/analyzer"
+ANALYZER_BIN="analyzer"
 
 # Normalize architecture naming
 case "$ARCH" in
@@ -36,7 +36,7 @@ case "$ARCH" in
 esac
 
 if ! command -v llvm-objdump &>/dev/null; then
-    echo "❌ Error: llvm-objdump is required but not found."
+    echo "❌ Error: llvm-objdump is required but not found in \$PATH"
     echo "Please install it using one of the following commands, based on your OS:"
     echo "  Ubuntu/Debian: sudo apt-get install -y llvm"
     echo "  Fedora: sudo dnf install -y llvm"
@@ -47,19 +47,19 @@ fi
 
 echo "✅ llvm-objdump found at $(which llvm-objdump)"
 
-# Define the binary based on OS and ARCH
-ANALYZER_VERSION="v1.1.0"
-ANALYZER_URL="https://github.com/ChainSafe/vm-compat/releases/download/${ANALYZER_VERSION}/analyzer-${OS}-${ARCH}"
-
-# Fetch Analyzer if not present
-if [[ -f "$ANALYZER_BIN" ]]; then
-    echo "Analyzer binary already exists, skipping download."
-else
-    echo "Fetching Analyzer Binary for ${OS}-${ARCH}..."
-    mkdir -p "$BIN_DIR"
-    curl -L -o "$ANALYZER_BIN" "$ANALYZER_URL"
-    chmod +x "$ANALYZER_BIN"
+# Check if 'analyzer' is installed
+if ! command -v analyzer &>/dev/null; then
+    echo "❌ Error: 'analyzer' is required but not found in \$PATH"
+    echo "Please install it using:"
+    echo "  mise plugins add vm-compat https://github.com/ChainSafe/mise-vm-compat.git"
+    echo "  mise install vm-compat@1.1.0"
+    echo "  mise use -g vm-compat@1.1.0"
+    echo "Or manually download from:"
+    echo "  https://github.com/ChainSafe/vm-compat/releases"
+    exit 1
 fi
+
+echo "✅ analyzer found at $(which analyzer)"
 
 # Run the analyzer
 echo "Running analysis with VM profile: $VM_PROFILE using baseline report: $BASELINE_REPORT..."

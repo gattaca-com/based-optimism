@@ -1314,6 +1314,13 @@ jobs:
              mise use -g llvm-objdump@20.1.0
 
       - run:
+          name: Install vm-compat via Mise
+          command: |
+            mise plugins add https://github.com/ChainSafe/mise-vm-compat.git
+            mise install vm-compat@1.1.0
+            mise use -g vm-compat@1.1.0
+
+      - run:
           name: Run Analyzer
           command: |
             make analyze-op-program-client
