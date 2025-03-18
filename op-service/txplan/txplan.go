@@ -169,7 +169,7 @@ func WithAssumedInclusion(cl ReceiptGetter) Option {
 	}
 }
 
-func WithRetryInclusion(cl ReceiptGetter, maxAttempts int, strat retry.Strategy) Option {
+func WithRetryInclusion(cl ReceiptGetter, maxAttempts int, strategy retry.Strategy) Option {
 	return func(tx *PlannedTx) {
 		tx.Included.DependOn(&tx.Signed, &tx.Submitted)
 		tx.Included.Fn(func(ctx context.Context) (*types.Receipt, error) {
@@ -177,7 +177,7 @@ func WithRetryInclusion(cl ReceiptGetter, maxAttempts int, strat retry.Strategy)
 		})
 		tx.Included.Wrap(func(fn plan.Fn[*types.Receipt]) plan.Fn[*types.Receipt] {
 			return func(ctx context.Context) (*types.Receipt, error) {
-				return retry.Do(ctx, maxAttempts, strat, func() (*types.Receipt, error) {
+				return retry.Do(ctx, maxAttempts, strategy, func() (*types.Receipt, error) {
 					return fn(ctx)
 				})
 			}
