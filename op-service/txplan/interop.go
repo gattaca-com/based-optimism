@@ -29,8 +29,8 @@ func (v *InitTrigger) To() (*common.Address, error) {
 
 func (v *InitTrigger) Data() ([]byte, error) {
 	// TODO format call
-	// return nil, nil
-	// temp fix
+	// This OpaqueData was for using the EventLogger contract to test
+	// This is a temp bypass for setting calldata for basic testing
 	return v.OpaqueData, nil
 }
 
