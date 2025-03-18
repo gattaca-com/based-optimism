@@ -48,9 +48,7 @@ func (v *ExecTrigger) To() (*common.Address, error) {
 }
 
 func (v *ExecTrigger) Data() ([]byte, error) {
-	// TODO format call to CrossL2Inbox
-	// Need to do better. very ugly
-	// construct call input, ugly but no bindings...
+	// TODO: Need to do better construct call input than this
 	validateMessage := w3.MustNewFunc("validateMessage((address Origin, uint256 BlockNumber, uint256 LogIndex, uint256 Timestamp, uint256 ChainId), bytes32)", "")
 	type Identifier struct {
 		Origin      common.Address
