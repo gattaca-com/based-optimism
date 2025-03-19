@@ -1761,9 +1761,6 @@ workflows:
             branches:
               ignore: /.*/
       - publish-cannon-prestates:
-          when:
-            condition:
-              equal: ["optimism", <<pipeline.parameters.repo_name>>]
           context:
             - slack
             - oplabs-network-optimism-io-bucket
