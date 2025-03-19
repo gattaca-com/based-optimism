@@ -1834,6 +1834,9 @@ workflows:
             - contracts-bedrock-build
             - cannon-prestate
       - publish-cannon-prestates:
+          when:
+            condition:
+              equal: ["optimism", <<parameters.repo>>]
           context:
             - slack
             - oplabs-network-optimism-io-bucket
