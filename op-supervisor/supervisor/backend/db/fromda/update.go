@@ -33,7 +33,7 @@ func (db *DB) ReplaceInvalidatedBlock(replacementDerived eth.BlockRef, invalidat
 	if err != nil {
 		return types.DerivedBlockSealPair{}, fmt.Errorf("failed to read last derivation data: %w", err)
 	}
-	if !last.invalidated {
+	if !last.Invalidated() {
 		return types.DerivedBlockSealPair{}, fmt.Errorf("cannot replace block %d, that was not invalidated, with block %s: %w", last.derived, replacementDerived, types.ErrConflict)
 	}
 	if last.derived.Hash != invalidated {
@@ -162,8 +162,12 @@ func (db *DB) rewindLocked(t types.DerivedBlockSealPair, including bool) error {
 
 // addLink adds a L1/L2 derivation link, with strong consistency checks.
 // if the link invalidates a prior L2 block, that was valid in a prior L1,
-// the invalidated hash needs to match it, even if a new derived block replaces it.
-func (db *DB) addLink(source eth.BlockRef, derived eth.BlockRef, invalidated common.Hash) error {
+// the invalidRef hash needs to match it, even if a new derived block replaces it.
+func (db *DB) addLink(source eth.BlockRef, derived eth.BlockRef, invalidRef common.Hash) error {
+	linkType := SourceV0
+	if (invalidRef != common.Hash{}) && derived.Hash == invalidRef {
+		linkType = InvalidatedFromV0
+	}
 	link := LinkEntry{
 		source: types.BlockSeal{
 			Hash:      source.Hash,
@@ -175,11 +179,11 @@ func (db *DB) addLink(source eth.BlockRef, derived eth.BlockRef, invalidated com
 			Number:    derived.Number,
 			Timestamp: derived.Time,
 		},
-		invalidated: (invalidated != common.Hash{}) && derived.Hash == invalidated,
+		entryType: linkType,
 	}
 	// If we don't have any entries yet, allow any block to start things off
 	if db.store.Size() == 0 {
-		if link.invalidated {
+		if link.Invalidated() {
 			return fmt.Errorf("first DB entry %s cannot be an invalidated entry: %w", link, types.ErrConflict)
 		}
 		e := link.encode()
@@ -195,7 +199,7 @@ func (db *DB) addLink(source eth.BlockRef, derived eth.BlockRef, invalidated com
 	if err != nil {
 		return err
 	}
-	if last.invalidated {
+	if last.Invalidated() {
 		return fmt.Errorf("cannot build %s on top of invalidated entry %s: %w", link, last, types.ErrConflict)
 	}
 	lastSource := last.source
@@ -226,15 +230,17 @@ func (db *DB) addLink(source eth.BlockRef, derived eth.BlockRef, invalidated com
 	if lastDerived.Number == derived.Number {
 		// Same block height? Then it must be the same block.
 		// I.e. we encountered an empty L1 block, and the same L2 block continues to be the last block that was derived from it.
-		if invalidated != (common.Hash{}) {
-			if lastDerived.Hash != invalidated {
-				return fmt.Errorf("inserting block %s that invalidates %s at height %d, but expected %s: %w", derived.Hash, invalidated, lastDerived.Number, lastDerived.Hash, types.ErrConflict)
+		if invalidRef != (common.Hash{}) {
+			if lastDerived.Hash != invalidRef {
+				return fmt.Errorf("inserting block %s that invalidates %s at height %d, but expected %s: %w", derived.Hash, invalidRef, lastDerived.Number, lastDerived.Hash, types.ErrConflict)
 			}
 		} else {
 			if lastDerived.Hash != derived.Hash {
 				return fmt.Errorf("derived block %s conflicts with known derived block %s at same height: %w",
 					derived, lastDerived, types.ErrConflict)
 			}
+			// invalidRef is used and references pass, so this is actually a replacement block
+			link.entryType = ReplacementV0
 		}
 	} else if lastDerived.Number+1 == derived.Number {
 		if lastDerived.Hash != derived.ParentHash {

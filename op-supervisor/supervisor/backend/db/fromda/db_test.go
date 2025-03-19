@@ -1140,9 +1140,9 @@ func TestLookupDetectIfCorruptDB(t *testing.T) {
 		func(t *testing.T, db *DB, m *stubMetrics) {
 			// Skip L1 block 1 and L2 block 1, force it into the DB
 			e := LinkEntry{
-				source:      l1Block2,
-				derived:     l2Block2,
-				invalidated: false,
+				source:    l1Block2,
+				derived:   l2Block2,
+				entryType: InvalidatedFromV0,
 			}
 			require.NoError(t, db.store.Append(e.encode()))
 			db.m.RecordDBDerivedEntryCount(db.store.Size())

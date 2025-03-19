@@ -128,7 +128,7 @@ func (db *DB) Invalidated() (pair types.DerivedBlockSealPair, err error) {
 	if err != nil {
 		return types.DerivedBlockSealPair{}, err
 	}
-	if !link.invalidated {
+	if !link.Invalidated() {
 		return types.DerivedBlockSealPair{}, fmt.Errorf("last entry %s is not invalidated: %w", link, types.ErrConflict)
 	}
 	return types.DerivedBlockSealPair{
@@ -150,7 +150,7 @@ func (db *DB) SourceToLastDerived(source eth.BlockID) (derived types.BlockSeal, 
 		return types.BlockSeal{}, fmt.Errorf("searched for last derived-from %s but found %s: %w",
 			source, link.source, types.ErrConflict)
 	}
-	if link.invalidated {
+	if link.Invalidated() {
 		return types.BlockSeal{}, types.ErrAwaitReplacementBlock
 	}
 	return link.derived, nil
@@ -193,7 +193,7 @@ func (db *DB) ContainsDerived(derived eth.BlockID) error {
 		return fmt.Errorf("searched if derived %s but found %s: %w",
 			derived, link.derived, types.ErrConflict)
 	}
-	if link.invalidated {
+	if link.Invalidated() {
 		return fmt.Errorf("derived %s, but invalidated it: %w", derived, types.ErrAwaitReplacementBlock)
 	}
 	return nil
