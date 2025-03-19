@@ -1847,10 +1847,10 @@ workflows:
           requires:
             - cannon-prestate
             - op-e2e-cannon-tests
-          filters:
-            branches:
-              only:
-                - develop
+        #filters:
+        #branches:
+              #only:
+                #- develop
 
   develop-kontrol-tests:
     when:
