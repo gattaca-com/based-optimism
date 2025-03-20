@@ -162,11 +162,11 @@ func (v *MultiTrigger) Data() ([]byte, error) {
 	for _, call := range v.Calls {
 		target, err := call.To()
 		if err != nil {
-			return nil, fmt.Errorf("failed to aggregate to: %v", err)
+			return nil, fmt.Errorf("failed to aggregate to: %w", err)
 		}
 		calldata, err := call.Data()
 		if err != nil {
-			return nil, fmt.Errorf("failed to aggregate calldata: %v", err)
+			return nil, fmt.Errorf("failed to aggregate calldata: %w", err)
 		}
 		multicall = append(multicall, Call3Value{
 			Target:       *target,
@@ -178,7 +178,7 @@ func (v *MultiTrigger) Data() ([]byte, error) {
 	aggregate3 := w3.MustNewFunc("aggregate3((address target, bool allowFailure, bytes callData)[])", "(bool, bytes)[]")
 	aggregate3calldata, err := aggregate3.EncodeArgs(multicall)
 	if err != nil {
-		return nil, fmt.Errorf("failed to construct calldata: %v", err)
+		return nil, fmt.Errorf("failed to construct calldata: %w", err)
 	}
 	return aggregate3calldata, nil
 }

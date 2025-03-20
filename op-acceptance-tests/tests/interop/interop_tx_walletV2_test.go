@@ -61,18 +61,20 @@ func eventloggerdeployandEmitandValidate(lowLevelSystemGetter validators.LowLeve
 
 		rng := rand.New(rand.NewSource(1234))
 
-		cnt := 3
-		topics := [][32]byte{}
-
-		for idx := range cnt {
-			var topic [32]byte
-			copy(topic[:], testutils.RandomData(rng, 32))
-			topics = append(topics, topic)
-			log.Info("input", "idx", idx, "topic", hex.EncodeToString(topics[idx][:]))
+		randTopicAndData := func(cnt, len int) ([][32]byte, []byte) {
+			topics := [][32]byte{}
+			for _ = range cnt {
+				var topic [32]byte
+				copy(topic[:], testutils.RandomData(rng, 32))
+				topics = append(topics, topic)
+				// log.Info("input", "idx", idx, "topic", hex.EncodeToString(topics[idx][:]))
+			}
+			data := testutils.RandomData(rng, len)
+			// log.Info("input", "data", hex.EncodeToString(data))
+			return topics, data
 		}
-		data := []byte{0x12, 0x34}
-		log.Info("input", "data", hex.EncodeToString(data))
 
+		topics, data := randTopicAndData(3, 10)
 		optsA = txplan.CombineOptions(optsA, txplan.WithTo(&eventLoggerAddress))
 		txA := system.NewIntent[*system.InitTrigger, *system.InteropOutput](optsA)
 		txA.Content.Set(&system.InitTrigger{
@@ -112,6 +114,21 @@ func eventloggerdeployandEmitandValidate(lowLevelSystemGetter validators.LowLeve
 		recC, err := txC.PlannedTx.Included.Eval(ctx)
 		require.NoError(t, err)
 		logger.Info("included validating message twice", "block", recC.BlockHash)
+
+		// can we multicall inittrigger? do this in chain B
+		topicsE, dataE := randTopicAndData(1, 15)
+		topicsF, dataF := randTopicAndData(2, 13)
+
+		calls2 := make([]system.Call, 0)
+		calls2 = append(calls2, &system.InitTrigger{Emitter: eventLoggerAddress, Topics: topicsE, OpaqueData: dataE})
+		calls2 = append(calls2, &system.InitTrigger{Emitter: eventLoggerAddress, Topics: topicsF, OpaqueData: dataF})
+		txD := system.NewIntent[*system.MultiTrigger, *system.InteropOutput](optsB)
+		txD.Content.Set(&system.MultiTrigger{Calls: calls2})
+
+		recD, err := txD.PlannedTx.Included.Eval(ctx)
+		require.NoError(t, err)
+		logger.Info("included initiating message twice", "block", recD.BlockHash)
+
 	}
 }
 
