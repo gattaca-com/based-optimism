@@ -38,8 +38,10 @@ func (v *InitTrigger) AccessList() (types.AccessList, error) {
 }
 
 type SendTrigger struct {
-	Emitter    common.Address
-	OpaqueData []byte
+	Emitter         common.Address
+	DestChainID     eth.ChainID
+	Target          common.Address
+	RelayedCalldata []byte
 }
 
 func (v *SendTrigger) To() (*common.Address, error) {
@@ -47,7 +49,8 @@ func (v *SendTrigger) To() (*common.Address, error) {
 }
 
 func (v *SendTrigger) Data() ([]byte, error) {
-	return v.OpaqueData, nil
+	sendMessage := w3.MustNewFunc("sendMessage(uint256,address,bytes calldata)", "bytes32")
+	return sendMessage.EncodeArgs(v.DestChainID.ToBig(), v.Target, v.RelayedCalldata)
 }
 
 func (v *SendTrigger) AccessList() (types.AccessList, error) {

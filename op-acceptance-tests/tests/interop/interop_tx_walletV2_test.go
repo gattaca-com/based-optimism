@@ -13,7 +13,6 @@ import (
 	"github.com/ethereum-optimism/optimism/devnet-sdk/testing/testlib/validators"
 	sdktypes "github.com/ethereum-optimism/optimism/devnet-sdk/types"
 	"github.com/ethereum-optimism/optimism/op-e2e/e2eutils/wait"
-	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-service/predeploys"
 	"github.com/ethereum-optimism/optimism/op-service/testlog"
 	"github.com/ethereum-optimism/optimism/op-service/testutils"
@@ -22,7 +21,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/lmittmann/w3"
 	"github.com/stretchr/testify/require"
 )
 
@@ -167,12 +165,6 @@ func TestSimpleTxWalletV2(t *testing.T) {
 	)
 }
 
-func BuildSendMessageCalldata(chainID eth.ChainID, addr common.Address, msg []byte) ([]byte, error) {
-	// TODO: Need to do better construct call input than this
-	sendMessage := w3.MustNewFunc("sendMessage(uint256,address,bytes calldata)", "bytes32")
-	return sendMessage.EncodeArgs(chainID.ToBig(), addr, msg)
-}
-
 func interopTxUsingL2toL2CDMWalletV2(lowLevelSystemGetter validators.LowLevelSystemGetter, sourceChainIdx, destChainIdx uint64, sourceWalletGetter, destWalletGetter validators.WalletGetter) systest.InteropSystemTestFunc {
 	return func(t systest.T, sys system.InteropSystem) {
 		ctx := t.Context()
@@ -213,7 +205,6 @@ func interopTxUsingL2toL2CDMWalletV2(lowLevelSystemGetter validators.LowLevelSys
 
 		destChainID, err := txB.PlannedTx.ChainID.Eval(ctx)
 		require.NoError(t, err)
-		opaqueData, err := BuildSendMessageCalldata(destChainID, randomAddr, randomData)
 		require.NoError(t, err)
 
 		txA := system.NewIntent[*system.SendTrigger, *system.InteropOutput](optsA)
@@ -221,8 +212,10 @@ func interopTxUsingL2toL2CDMWalletV2(lowLevelSystemGetter validators.LowLevelSys
 		// Topics field is only needed when we call EventLogger contract
 		// We are using L2toL2CDM so make it empty
 		txA.Content.Set(&system.SendTrigger{
-			Emitter:    eventLogger,
-			OpaqueData: opaqueData,
+			Emitter:         eventLogger,
+			DestChainID:     destChainID,
+			Target:          randomAddr,
+			RelayedCalldata: randomData,
 		})
 
 		txB.Content.DependOn(&txA.Result)
@@ -295,13 +288,13 @@ func messagePassingScenarioWalletV2(lowLevelSystemGetter validators.LowLevelSyst
 		txB := system.NewIntent[*system.RelayTrigger, *system.InteropOutput](optsB)
 		destChainID, err := txB.PlannedTx.ChainID.Eval(ctx)
 		require.NoError(t, err)
-		opaqueData, err := BuildSendMessageCalldata(destChainID, sha256PrecompileAddr, dummyMessage)
-		require.NoError(t, err)
 
 		txA := system.NewIntent[*system.SendTrigger, *system.InteropOutput](optsA)
 		txA.Content.Set(&system.SendTrigger{
-			Emitter:    eventLogger,
-			OpaqueData: opaqueData,
+			Emitter:         eventLogger,
+			DestChainID:     destChainID,
+			Target:          sha256PrecompileAddr,
+			RelayedCalldata: dummyMessage,
 		})
 
 		recA, err := txA.PlannedTx.Included.Eval(ctx)
