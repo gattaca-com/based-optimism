@@ -600,8 +600,8 @@ func (su *SupervisorBackend) IsLocalSafe(ctx context.Context, chainID eth.ChainI
 	return su.chainDBs.IsLocalSafe(chainID, block)
 }
 
-func (su *SupervisorBackend) IsReplacement(ctx context.Context, chainID eth.ChainID, block eth.BlockID) error {
-	return su.chainDBs.IsReplacement(chainID, block)
+func (su *SupervisorBackend) IsReplacementAt(ctx context.Context, chainID eth.ChainID, blockNum uint64) error {
+	return su.chainDBs.IsReplacementAt(chainID, blockNum)
 }
 
 func (su *SupervisorBackend) CrossDerivedToSource(ctx context.Context, chainID eth.ChainID, derived eth.BlockID) (source eth.BlockRef, err error) {

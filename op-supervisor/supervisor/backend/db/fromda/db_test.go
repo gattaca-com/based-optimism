@@ -883,6 +883,7 @@ func TestInvalidateAndReplace(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, replacement.ID(), result.Derived.ID())
 		require.Equal(t, l1Block1.ID(), result.Source.ID())
+		require.NoError(t, db.Replacement(replacement.Number), "replacement is marked as a replacement block type")
 
 		pair, err = db.Last()
 		require.NoError(t, err)
@@ -947,6 +948,14 @@ func TestInvalidateAndReplaceNonFirst(t *testing.T) {
 		require.Equal(t, invalidated.Source.ID(), pair.Source.ID())
 		require.Equal(t, invalidated.Derived.ID(), pair.Derived.ID())
 
+		fmt.Println("--invalid--")
+		srcIndex, srcLink, err := db.sourceNumToFirstDerived(invalidated.Source.Number)
+		derIndex, derLink, err := db.derivedNumToFirstSource(invalidated.Derived.Number)
+		fmt.Println("srcLink", srcLink)
+		fmt.Println("srcIndex", srcIndex)
+		fmt.Println("derLink", derLink)
+		fmt.Println("derIndex", derIndex)
+
 		replacement := l2Ref3
 		replacement.Hash = common.Hash{0xff, 0xff, 0xff}
 		require.NotEqual(t, l2Ref3.Hash, replacement.Hash) // different L2 block as replacement
@@ -954,6 +963,15 @@ func TestInvalidateAndReplaceNonFirst(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, replacement.ID(), result.Derived.ID())
 		require.Equal(t, l1Block2.ID(), result.Source.ID())
+
+		fmt.Println("--replace--")
+		srcIndex, srcLink, err = db.sourceNumToFirstDerived(result.Source.Number)
+		derIndex, derLink, err = db.derivedNumToFirstSource(result.Derived.Number)
+		fmt.Println("srcLink", srcLink)
+		fmt.Println("srcIndex", srcIndex)
+		fmt.Println("derLink", derLink)
+		fmt.Println("derIndex", derIndex)
+		require.NoError(t, db.Replacement(replacement.Number), "replacement is marked as a replacement block type")
 
 		pair, err = db.Last()
 		require.NoError(t, err)
@@ -1142,7 +1160,7 @@ func TestLookupDetectIfCorruptDB(t *testing.T) {
 			e := LinkEntry{
 				source:    l1Block2,
 				derived:   l2Block2,
-				entryType: InvalidatedFromV0,
+				entryType: SourceV0,
 			}
 			require.NoError(t, db.store.Append(e.encode()))
 			db.m.RecordDBDerivedEntryCount(db.store.Size())

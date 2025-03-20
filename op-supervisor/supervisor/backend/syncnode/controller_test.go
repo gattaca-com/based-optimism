@@ -175,7 +175,7 @@ func (m *mockBackend) CrossUnsafe(ctx context.Context, chainID eth.ChainID) (eth
 	return eth.BlockID{}, nil
 }
 
-func (m *mockBackend) IsReplacement(ctx context.Context, chainID eth.ChainID, blockID eth.BlockID) error {
+func (m *mockBackend) IsReplacementAt(ctx context.Context, chainID eth.ChainID, blockNum uint64) error {
 	return nil
 }
 

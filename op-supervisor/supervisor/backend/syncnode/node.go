@@ -31,7 +31,7 @@ type backend interface {
 	FindSealedBlock(ctx context.Context, chainID eth.ChainID, number uint64) (eth.BlockID, error)
 	IsLocalSafe(ctx context.Context, chainID eth.ChainID, block eth.BlockID) error
 	IsCrossSafe(ctx context.Context, chainID eth.ChainID, block eth.BlockID) error
-	IsReplacement(ctx context.Context, chainID eth.ChainID, block eth.BlockID) error
+	IsReplacementAt(ctx context.Context, chainID eth.ChainID, blockNum uint64) error
 	IsLocalUnsafe(ctx context.Context, chainID eth.ChainID, block eth.BlockID) error
 	SafeDerivedAt(ctx context.Context, chainID eth.ChainID, source eth.BlockID) (derived eth.BlockID, err error)
 	L1BlockRefByNumber(ctx context.Context, number uint64) (eth.L1BlockRef, error)
@@ -282,8 +282,8 @@ func (m *ManagedNode) onUpdateLocalSafeFailed(ev superevents.UpdateLocalSafeFail
 	}
 }
 
-// OnResetReady handles a reset-ready event from the supervisor
-// once the supervisor has determined the reset target by bisecting the search range
+// OnResetReady handles a fully qualified reset command to the node
+// it is called by the resetTracker when the reset is ready to be executed
 func (m *ManagedNode) OnResetReady(lUnsafe, xUnsafe, lSafe, xSafe, finalized eth.BlockID) {
 	m.log.Info("Reset ready event received",
 		"localUnsafe", lUnsafe,
@@ -443,8 +443,8 @@ func (m *ManagedNode) Close() error {
 func (m *ManagedNode) replaceIfNeeded() bool {
 	ctx, cancel := context.WithTimeout(m.ctx, internalTimeout)
 	defer cancel()
-	err := m.backend.IsReplacement(ctx, m.chainID, m.lastNodeLocalSafe)
-	if err != nil {
+	err := m.backend.IsReplacementAt(ctx, m.chainID, m.lastNodeLocalSafe.Number)
+	if err == nil {
 		m.log.Info("Replacement block detected, initiating replacement",
 			"lastNodeLocalSafe", m.lastNodeLocalSafe,
 			"err", err)

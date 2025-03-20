@@ -161,12 +161,21 @@ func (db *DB) rewindLocked(t types.DerivedBlockSealPair, including bool) error {
 }
 
 // addLink adds a L1/L2 derivation link, with strong consistency checks.
-// if the link invalidates a prior L2 block, that was valid in a prior L1,
-// the invalidRef hash needs to match it, even if a new derived block replaces it.
+// - source is the L1 block that the L2 block is derived from
+// - derived is the L2 block that is derived from the source
+// - one of the two must be sequential, but not both
+// - invalidRef is the hash of the L2 block that is being invalidated, if any
+// if invalidRef is provided and matches derived, then the link is marked as invalid
+// if invalidRef is provided but does not match derived, the link is a replacement of the invalidated block
+// if invalidRef is empty, then the link is a normal derivation link
 func (db *DB) addLink(source eth.BlockRef, derived eth.BlockRef, invalidRef common.Hash) error {
 	linkType := SourceV0
-	if (invalidRef != common.Hash{}) && derived.Hash == invalidRef {
-		linkType = InvalidatedFromV0
+	if (invalidRef != common.Hash{}) {
+		if derived.Hash == invalidRef {
+			linkType = InvalidatedFromV0
+		} else {
+			linkType = ReplacementV0
+		}
 	}
 	link := LinkEntry{
 		source: types.BlockSeal{
@@ -239,8 +248,6 @@ func (db *DB) addLink(source eth.BlockRef, derived eth.BlockRef, invalidRef comm
 				return fmt.Errorf("derived block %s conflicts with known derived block %s at same height: %w",
 					derived, lastDerived, types.ErrConflict)
 			}
-			// invalidRef is used and references pass, so this is actually a replacement block
-			link.entryType = ReplacementV0
 		}
 	} else if lastDerived.Number+1 == derived.Number {
 		if lastDerived.Hash != derived.ParentHash {

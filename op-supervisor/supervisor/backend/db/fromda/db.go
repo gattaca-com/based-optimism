@@ -137,15 +137,17 @@ func (db *DB) Invalidated() (pair types.DerivedBlockSealPair, err error) {
 	}, nil
 }
 
-func (db *DB) Replacement(derived eth.BlockID) error {
+// Replacement checks if the block at the given number is a replacement for an invalidated entry.
+// It uses block number because the caller may have only derived the invalid block at this point.
+func (db *DB) Replacement(blockNum uint64) error {
 	db.rwLock.RLock()
 	defer db.rwLock.RUnlock()
-	_, link, err := db.derivedNumToFirstSource(derived.Number)
+	_, link, err := db.derivedNumToFirstSource(blockNum)
 	if err != nil {
-		return fmt.Errorf("failed to check if block %d is a replacement: %w", derived.Number, err)
+		return fmt.Errorf("failed to check if block %d is a replacement: %w", blockNum, err)
 	}
 	if !link.Replacement() {
-		return fmt.Errorf("last entry %s is not a replacement: %w", link, types.ErrConflict)
+		return fmt.Errorf("entry %s is not a replacement: %w", link, types.ErrConflict)
 	}
 	return nil
 }
