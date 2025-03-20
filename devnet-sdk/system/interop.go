@@ -178,7 +178,7 @@ func (v *MultiTrigger) Data() ([]byte, error) {
 	aggregate3 := w3.MustNewFunc("aggregate3((address target, bool allowFailure, bytes callData)[])", "(bool, bytes)[]")
 	aggregate3calldata, err := aggregate3.EncodeArgs(multicall)
 	if err != nil {
-		return nil, fmt.Errorf("failed to construct aggregate3 calldata: %v", err)
+		return nil, fmt.Errorf("failed to construct calldata: %v", err)
 	}
 	return aggregate3calldata, nil
 }
