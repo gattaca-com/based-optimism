@@ -162,6 +162,7 @@ func Test_ProgramAction_OperatorFeeConstistency(gt *testing.T) {
 			// regular Deposit, in new L1 block
 			env.Alice.L1.ActResetTxOpts(t)
 			env.Alice.L2.ActSetTxToAddr(&env.Dp.Addresses.Bob)(t)
+			env.Alice.L2.ActSetGasLimit(22000)(t)
 			env.Alice.ActDeposit(t)
 			env.Miner.ActL1StartBlock(12)(t)
 			env.Miner.ActL1IncludeTx(env.Alice.Address())(t)
