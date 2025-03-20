@@ -204,7 +204,7 @@ func (s *BasicUser[B]) ActSetTxValue(value *big.Int) Action {
 	}
 }
 
-func (s *BasicUser[B]) ActSetGasLimit(limit uint64) Action {
+func (s *BasicUser[B]) ActSetTxGasLimit(limit uint64) Action {
 	return func(t Testing) {
 		s.txOpts.GasLimit = limit
 	}

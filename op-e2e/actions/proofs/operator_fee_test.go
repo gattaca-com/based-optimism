@@ -27,7 +27,7 @@ func Test_ProgramAction_OperatorFeeConstistency(gt *testing.T) {
 		IsthmusTransitionBlock
 	)
 
-	const testOperatorFeeScalar = uint32(20000)
+	const testOperatorFeeScalar = uint32(100e6)
 	const testOperatorFeeConstant = uint64(500)
 	testStorageUpdateContractAddress := common.HexToAddress("0xffffffff")
 	// contract TestSetter {
@@ -158,7 +158,7 @@ func Test_ProgramAction_OperatorFeeConstistency(gt *testing.T) {
 			// regular Deposit, in new L1 block
 			env.Alice.L1.ActResetTxOpts(t)
 			env.Alice.L2.ActSetTxToAddr(&env.Dp.Addresses.Bob)(t)
-			env.Alice.L2.ActSetGasLimit(22000)(t)
+			env.Alice.L2.ActSetTxGasLimit(2e6)(t)
 			env.Alice.ActDeposit(t)
 			env.Miner.ActL1StartBlock(12)(t)
 			env.Miner.ActL1IncludeTx(env.Alice.Address())(t)
@@ -208,7 +208,7 @@ func Test_ProgramAction_OperatorFeeConstistency(gt *testing.T) {
 		}
 
 		if testCfg.Custom == DepositTx {
-			require.True(t, aliceFinalBalance.Cmp(aliceInitialBalance) == 0, "Alice's balance shouldn't have changed")
+			require.Equal(t, aliceInitialBalance, aliceFinalBalance, "Alice's balance shouldn't have changed")
 		} else {
 			require.True(t, aliceFinalBalance.Cmp(aliceInitialBalance) < 0, "Alice's balance should decrease")
 		}
