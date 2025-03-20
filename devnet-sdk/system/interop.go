@@ -144,22 +144,70 @@ type Call interface {
 var _ Call = (*MultiTrigger)(nil)
 
 type MultiTrigger struct {
-	Calls []Call
+	Executor common.Address // address of the MultiCall3 contract
+	Calls    []Call
 }
 
 func (v *MultiTrigger) To() (*common.Address, error) {
-	// TODO format multi-call
-	return nil, nil
+	return &v.Executor, nil
 }
 
 func (v *MultiTrigger) Data() ([]byte, error) {
-	// TODO format multi-call
-	return nil, nil
+	type Call3Value struct {
+		Target       common.Address
+		AllowFailure bool
+		CallData     []byte
+	}
+	var multicall []Call3Value
+	for _, call := range v.Calls {
+		target, err := call.To()
+		if err != nil {
+			return nil, fmt.Errorf("failed to aggregate to: %v", err)
+		}
+		calldata, err := call.Data()
+		if err != nil {
+			return nil, fmt.Errorf("failed to aggregate calldata: %v", err)
+		}
+		multicall = append(multicall, Call3Value{
+			Target:       *target,
+			AllowFailure: false,
+			CallData:     calldata,
+		})
+	}
+	// TODO: Need to do better construct call input than this
+	aggregate3 := w3.MustNewFunc("aggregate3((address target, bool allowFailure, bytes callData)[])", "(bool, bytes)[]")
+	aggregate3calldata, err := aggregate3.EncodeArgs(multicall)
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct aggregate3 calldata: %v", err)
+	}
+	return aggregate3calldata, nil
 }
 
 func (v *MultiTrigger) AccessList() (types.AccessList, error) {
-	// TODO format multi-call
-	return nil, nil
+	var aggAccessList types.AccessList
+	for _, call := range v.Calls {
+		accessList, err := call.AccessList()
+		if err != nil {
+			return nil, fmt.Errorf("failed to aggregate access list: %v", err)
+		}
+		aggAccessList = append(aggAccessList, accessList...)
+	}
+	return aggAccessList, nil
+}
+
+var _ Result = (*MulticallOutput)(nil)
+
+type MulticallOutput struct {
+	receipt *types.Receipt
+}
+
+func (m *MulticallOutput) Init() Result {
+	return &MulticallOutput{}
+}
+
+func (m *MulticallOutput) FromReceipt(ctx context.Context, rec *types.Receipt, includedIn eth.BlockRef, chainID eth.ChainID) error {
+	m.receipt = rec
+	return nil
 }
 
 type Result interface {
@@ -238,6 +286,22 @@ func ExecuteIndexed(executor common.Address, events *plan.Lazy[*InteropOutput], 
 		}, nil
 	}
 }
+
+// func MultiIndexed(executor common.Address, events *plan.Lazy[*InteropOutput], indexes []int) func(ctx context.Context) (*MultiTrigger, error) {
+// 	return func(ctx context.Context) (*MultiTrigger, error) {
+// 		var messages []suptypes.Message
+// 		for _, index := range indexes {
+// 			if x := len(events.Value().Entries); x <= index {
+// 				return nil, fmt.Errorf("invalid index: %d, only have %d events", index, x)
+// 			}
+// 			messages = append(messages, events.Value().Entries[index])
+// 		}
+// 		return &MultiTrigger{
+// 			Executor: executor,
+// 			Msgs:     messages,
+// 		}, nil
+// 	}
+// }
 
 func RelayIndexed(executor common.Address, events *plan.Lazy[*InteropOutput], receipt *plan.Lazy[*types.Receipt], index int) func(ctx context.Context) (*RelayTrigger, error) {
 	return func(ctx context.Context) (*RelayTrigger, error) {

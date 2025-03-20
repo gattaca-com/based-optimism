@@ -100,6 +100,18 @@ func eventloggerdeployandEmitandValidate(lowLevelSystemGetter validators.LowLeve
 		recB, err := txB.PlannedTx.Included.Eval(ctx)
 		require.NoError(t, err)
 		logger.Info("included validating message", "block", recB.BlockHash)
+
+		// lets execute the message twice
+		txC := system.NewIntent[*system.MultiTrigger, *system.MulticallOutput](optsB)
+
+		calls := make([]system.Call, 0)
+		calls = append(calls, &system.ExecTrigger{Executor: CrossL2InboxAddr, Msg: txB.Content.Value().Msg})
+		calls = append(calls, &system.ExecTrigger{Executor: CrossL2InboxAddr, Msg: txB.Content.Value().Msg})
+		txC.Content.Set(&system.MultiTrigger{Calls: calls})
+
+		recC, err := txC.PlannedTx.Included.Eval(ctx)
+		require.NoError(t, err)
+		logger.Info("included validating message twice", "block", recC.BlockHash)
 	}
 }
 
