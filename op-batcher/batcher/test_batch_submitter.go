@@ -64,3 +64,8 @@ func (l *TestBatchSubmitter) WaitOnJammingTx(ctx context.Context) error {
 	l.Log.Info("done waiting on jamming tx", "err", err)
 	return nil
 }
+
+// PublishNow manually triggers the batch publishing process. Only works in test mode.
+func (l *TestBatchSubmitter) PublishNow(ctx context.Context) error {
+	return l.BatchSubmitter.PublishNow(ctx)
+}
