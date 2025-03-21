@@ -1,13 +1,11 @@
 package interop
 
 import (
-	"context"
 	"encoding/hex"
 	"math/big"
 	"math/rand"
 	"testing"
 
-	"github.com/ethereum-optimism/optimism/devnet-sdk/contracts/bindings"
 	"github.com/ethereum-optimism/optimism/devnet-sdk/contracts/constants"
 	"github.com/ethereum-optimism/optimism/devnet-sdk/system"
 	"github.com/ethereum-optimism/optimism/devnet-sdk/testing/systest"
@@ -23,55 +21,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/stretchr/testify/require"
 )
-
-func DeployEventLogger(ctx context.Context, wallet system.WalletV2, logger log.Logger) (common.Address, error) {
-	optsFunc := func(w system.WalletV2) txplan.Option {
-		opts := txplan.CombineOptions(
-			system.DefaultTxSubmitOptions(w),
-			system.DefaultTxInclusionOptions(w),
-		)
-		return opts
-	}
-	opts := optsFunc(wallet)
-	logger.Info("Deploying EventLogger")
-	deployCalldata := common.FromHex(bindings.EventloggerBin)
-	deployTx := txplan.NewPlannedTx(opts, txplan.WithData(deployCalldata))
-
-	res, err := deployTx.Included.Eval(ctx)
-	if err != nil {
-		return common.Address{}, err
-	}
-	eventLoggerAddress := res.ContractAddress
-	logger.Info("Deployed EventLogger", "address", eventLoggerAddress)
-	return eventLoggerAddress, err
-}
-
-func RandomTopicAndData(rng *rand.Rand, cnt, len int) ([][32]byte, []byte) {
-	topics := [][32]byte{}
-	for range cnt {
-		var topic [32]byte
-		copy(topic[:], testutils.RandomData(rng, 32))
-		topics = append(topics, topic)
-	}
-	data := testutils.RandomData(rng, len)
-	return topics, data
-}
-
-func RandomInitTrigger(rng *rand.Rand, eventLoggerAddress common.Address, cnt, len int) *system.InitTrigger {
-	topics, data := RandomTopicAndData(rng, cnt, len)
-	return &system.InitTrigger{
-		Emitter:    eventLoggerAddress,
-		Topics:     topics,
-		OpaqueData: data,
-	}
-}
-
-func DefaultOpts(w system.WalletV2) txplan.Option {
-	return txplan.CombineOptions(
-		system.DefaultTxSubmitOptions(w),
-		system.DefaultTxInclusionOptions(w),
-	)
-}
 
 func eventloggerdeployandEmitandValidate(lowLevelSystemGetter validators.LowLevelSystemGetter, sourceChainIdx, destChainIdx uint64, sourceWalletGetter, destWalletGetter validators.WalletGetter) systest.InteropSystemTestFunc {
 	return func(t systest.T, sys system.InteropSystem) {
