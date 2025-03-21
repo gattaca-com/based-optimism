@@ -171,10 +171,17 @@ func (l *BatchSubmitter) StartBatchSubmitting() error {
 		l.Log.Warn("Throttling loop is DISABLED due to 0 throttle-interval. This should not be disabled in prod.")
 	}
 
-	l.wg.Add(3)
-	go l.receiptsLoop(l.wg, receiptsCh)                                            // ranges over receiptsCh channel
-	go l.publishingLoop(l.killCtx, l.wg, receiptsCh, publishSignal)                // ranges over publishSignal, spawns routines which send on receiptsCh. Closes receiptsCh when done.
-	go l.blockLoadingLoop(l.shutdownCtx, l.wg, pendingBytesUpdated, publishSignal) // sends on pendingBytesUpdated (if throttling enabled), and publishSignal. Closes them both when done
+	l.wg.Add(2)
+	go l.receiptsLoop(l.wg, receiptsCh)                             // ranges over receiptsCh channel
+	go l.publishingLoop(l.killCtx, l.wg, receiptsCh, publishSignal) // ranges over publishSignal, spawns routines which send on receiptsCh. Closes receiptsCh when done.
+
+	// In test mode, we don't want to automatically load blocks, as we want full control over the process
+	if !l.Config.TestMode {
+		l.wg.Add(1)
+		go l.blockLoadingLoop(l.shutdownCtx, l.wg, pendingBytesUpdated, publishSignal) // sends on pendingBytesUpdated (if throttling enabled), and publishSignal. Closes them both when done
+	} else {
+		l.Log.Info("Block loading loop is DISABLED in test mode. Blocks will only be loaded via the test API.")
+	}
 
 	l.Log.Info("Batch Submitter started")
 	return nil
@@ -300,11 +307,17 @@ func (l *BatchSubmitter) loadBlockIntoState(ctx context.Context, blockNumber uin
 
 	l.channelMgrMutex.Lock()
 	defer l.channelMgrMutex.Unlock()
-	if err := l.channelMgr.AddL2Block(block); err != nil {
-		return nil, fmt.Errorf("adding L2 block to state: %w", err)
+
+	if l.channelMgr == nil {
+		return nil, errors.New("channel manager not initialized")
 	}
 
-	l.Log.Info("Added L2 block to local state", "block", eth.ToBlockID(block), "tx_count", len(block.Transactions()), "time", block.Time())
+	l.Log.Debug("loaded block", "number", block.Number(), "hash", block.Hash())
+	err = l.channelMgr.AddL2Block(block)
+	if err != nil {
+		return nil, fmt.Errorf("adding L2 block to channel: %w", err)
+	}
+
 	return block, nil
 }
 
@@ -481,11 +494,21 @@ func (l *BatchSubmitter) publishingLoop(ctx context.Context, wg *sync.WaitGroup,
 // -  prunes the channel manager state (i.e. safe blocks)
 // -  loads unsafe blocks from the sequencer
 func (l *BatchSubmitter) blockLoadingLoop(ctx context.Context, wg *sync.WaitGroup, pendingBytesUpdated chan int64, publishSignal chan struct{}) {
+	// Early return if in test mode as block loading should be controlled via the test API
+	if l.Config.TestMode {
+		l.Log.Info("blockLoadingLoop not started in test mode")
+		defer close(pendingBytesUpdated)
+		defer close(publishSignal)
+		defer wg.Done()
+		return
+	}
+
 	ticker := time.NewTicker(l.Config.PollInterval)
 	defer ticker.Stop()
 	defer close(pendingBytesUpdated)
 	defer close(publishSignal)
 	defer wg.Done()
+
 	for {
 		select {
 		case <-ticker.C:
