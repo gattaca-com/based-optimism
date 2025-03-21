@@ -69,3 +69,8 @@ func (l *TestBatchSubmitter) WaitOnJammingTx(ctx context.Context) error {
 func (l *TestBatchSubmitter) PublishNow(ctx context.Context) error {
 	return l.BatchSubmitter.PublishNow(ctx)
 }
+
+// BlockProgress returns information about the current batch processing progress
+func (l *TestBatchSubmitter) BlockProgress(ctx context.Context) (map[string]uint64, error) {
+	return l.BatchSubmitter.BlockProgress(ctx)
+}
