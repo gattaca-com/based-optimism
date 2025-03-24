@@ -1075,9 +1075,9 @@ func (l *BatchSubmitter) SubmitNow(ctx context.Context) error {
 	return ErrBatcherNotRunning
 }
 
-// BlockProgress returns information about the current batch processing progress,
+// Buffer returns information about the current batcher buffer state,
 // including the latest processed L2 blocks and pending blocks
-func (l *BatchSubmitter) BlockProgress(ctx context.Context) (map[string]uint64, error) {
+func (l *BatchSubmitter) Buffer(ctx context.Context) (map[string]uint64, error) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 
@@ -1095,24 +1095,24 @@ func (l *BatchSubmitter) BlockProgress(ctx context.Context) (map[string]uint64, 
 	// Get the last stored block
 	lastBlock := l.channelMgr.LastStoredBlock()
 
-	// Create a map with progress information
-	progress := make(map[string]uint64)
-	progress["lastStoredL2Block"] = lastBlock.Number
+	// Create a map with buffer information
+	buffer := make(map[string]uint64)
+	buffer["lastStoredL2Block"] = lastBlock.Number
 
 	// If we have a current channel, add information about it
 	if l.channelMgr.currentChannel != nil {
 		if oldestL2 := l.channelMgr.currentChannel.OldestL2(); oldestL2.Number > 0 {
-			progress["currentChannelOldestL2Block"] = oldestL2.Number
+			buffer["currentChannelOldestL2Block"] = oldestL2.Number
 		}
 		if latestL2 := l.channelMgr.currentChannel.LatestL2(); latestL2.Number > 0 {
-			progress["currentChannelLatestL2Block"] = latestL2.Number
+			buffer["currentChannelLatestL2Block"] = latestL2.Number
 		}
 	}
 
 	// Add information about pending blocks
-	progress["pendingBlocks"] = uint64(l.channelMgr.pendingBlocks())
+	buffer["pendingBlocks"] = uint64(l.channelMgr.pendingBlocks())
 
-	return progress, nil
+	return buffer, nil
 }
 
 // PublishNow manually triggers the batch publishing process. Only works in test mode.
