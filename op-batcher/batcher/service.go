@@ -254,10 +254,8 @@ func (bs *BatcherService) initChannelConfig(cfg *CLIConfig) error {
 
 	switch cfg.DataAvailabilityType {
 	case flags.BlobsType, flags.AutoType:
-		if !cfg.TestUseMaxTxSizeForBlobs {
-			// account for version byte prefix
-			cc.MaxFrameSize = eth.MaxBlobDataSize - 1
-		}
+		// account for version byte prefix
+		cc.MaxFrameSize = eth.MaxBlobDataSize - 1
 		cc.UseBlobs = true
 	case flags.CalldataType: // do nothing
 	default:
