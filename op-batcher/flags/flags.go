@@ -192,12 +192,6 @@ var (
 		Value:   false,
 		EnvVars: prefixEnvVars("TEST_MODE"),
 	}
-	TestUseMaxTxSizeForBlobsFlag = &cli.BoolFlag{
-		Name:    "test-use-max-tx-size-for-blobs",
-		Usage:   "Use MaxL1TxSize for blob size (testing only)",
-		Value:   false,
-		EnvVars: prefixEnvVars("TEST_USE_MAX_TX_SIZE_FOR_BLOBS"),
-	}
 	// Legacy Flags
 	SequencerHDPathFlag = txmgr.SequencerHDPathFlag
 )
@@ -232,7 +226,6 @@ var optionalFlags = []cli.Flag{
 	ThrottleAlwaysBlockSizeFlag,
 	PreferLocalSafeL2Flag,
 	TestModeFlag,
-	TestUseMaxTxSizeForBlobsFlag,
 }
 
 func init() {
