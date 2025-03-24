@@ -22,8 +22,8 @@ type BatcherTestDriver interface {
 	SubmitNow(ctx context.Context) error
 	// PublishNow manually triggers the batch publishing process
 	PublishNow(ctx context.Context) error
-	// BlockProgress returns information about the current batch processing progress
-	BlockProgress(ctx context.Context) (map[string]uint64, error)
+	// Buffer returns information about the batcher buffer state
+	Buffer(ctx context.Context) (map[string]uint64, error)
 }
 
 // testAPI provides testing methods for the batcher
@@ -86,12 +86,12 @@ func (a *testAPI) PublishNow(ctx context.Context) error {
 	return err
 }
 
-// BlockProgress returns information about the current batch processing progress
-func (a *testAPI) BlockProgress(ctx context.Context) (map[string]uint64, error) {
-	a.m.RecordRPCServerRequest("batcher_blockProgress")
-	progress, err := a.b.BlockProgress(ctx)
+// Buffer returns information about the batcher buffer state
+func (a *testAPI) Buffer(ctx context.Context) (map[string]uint64, error) {
+	a.m.RecordRPCServerRequest("batcher_buffer")
+	buffer, err := a.b.Buffer(ctx)
 	if err != nil {
-		a.log.Error("Failed to get block progress", "err", err)
+		a.log.Error("Failed to get buffer state", "err", err)
 	}
-	return progress, err
+	return buffer, err
 }
