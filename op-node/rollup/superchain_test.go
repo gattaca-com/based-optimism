@@ -78,7 +78,7 @@ func TestSuperchainGasLimit(t *testing.T) {
 		t.Log("Chain:", chainID, "GasLimit", fmt.Sprintf("%.1fM", float64(*chainResults["gasLimit()"][0].(*uint64))/1000000))
 		assert.GreaterOrEqual(t, *chainResults["gasLimit()"][0].(*uint64), uint64(30_000_000))
 		t.Log("Chain:", chainID, "ResourceConfig", *chainResults["resourceConfig()"][0].(*uint32))
-		assert.GreaterOrEqual(t, *chainResults["resourceConfig()"][0].(*uint32), uint32(1000))
+		assert.GreaterOrEqual(t, *chainResults["resourceConfig()"][0].(*uint32), uint32(20_000_000))
 	}
 }
 
