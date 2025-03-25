@@ -68,6 +68,16 @@ type CachedPage struct {
 	OkLow, OkHigh uint64 // size is PageSize / 32 == 64 + 64 == 128
 }
 
+func (p *CachedPage) getLowHighMask(k uint64) (
+	lowMask, highMask uint64,
+) {
+	mask := uint64(1) << (k & 63) // Bitmask
+	isHigh := k >> 6              // 1 if k >= 64, 0 if k < 64
+
+	return mask * (1 - isHigh),
+		mask * isHigh
+}
+
 func (p *CachedPage) invalidate(pageAddr Word) {
 	if pageAddr >= PageSize {
 		panic("invalid page addr")
@@ -77,26 +87,22 @@ func (p *CachedPage) invalidate(pageAddr Word) {
 	k >>= 5 + 1
 
 	for k > 0 {
-		mask := uint64(1) << (k & 63)   // Bitmask
-		isHigh := k >> 6                // 1 if k >= 64, 0 if k < 64
-		p.OkLow &^= mask * (1 - isHigh) // Zero bit in OkLow if isHigh == 0
-		p.OkHigh &^= mask * isHigh      // Zero bit in OkHigh if isHigh == 1
+		lowMask, highMask := p.getLowHighMask(k)
+		p.OkLow &^= lowMask
+		p.OkHigh &^= highMask
 		k >>= 1
 	}
 }
 
 func (p *CachedPage) getBit(k uint64) bool {
-	if k < 64 {
-		return (p.OkLow & (1 << k)) != 0
-	}
-	return (p.OkHigh & (1 << (k - 64))) != 0
+	lowMask, highMask := p.getLowHighMask(k)
+	return (p.OkLow&lowMask | p.OkHigh&highMask) != 0
 }
 
 func (p *CachedPage) setBit(k uint64) {
-	mask := uint64(1) << (k & 63)  // Bitmask
-	isHigh := k >> 6               // 1 if k >= 64, 0 if k < 64
-	p.OkLow |= mask * (1 - isHigh) // Set in OkLow if isHigh == 0
-	p.OkHigh |= mask * isHigh      // Set in OkHigh if isHigh == 1
+	lowMask, highMask := p.getLowHighMask(k)
+	p.OkLow |= lowMask
+	p.OkHigh |= highMask
 }
 
 func (p *CachedPage) InvalidateFull() {
