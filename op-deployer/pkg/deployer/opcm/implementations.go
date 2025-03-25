@@ -35,8 +35,10 @@ type DeployImplementationsOutput struct {
 	OpcmGameTypeAdder                common.Address `json:"opcmGameTypeAdderAddress"`
 	OpcmDeployer                     common.Address `json:"opcmDeployerAddress"`
 	OpcmUpgrader                     common.Address `json:"opcmUpgraderAddress"`
+	OpcmInteropMigrator              common.Address `json:"opcmInteropMigratorAddress"`
 	DelayedWETHImpl                  common.Address `json:"delayedWETHImplAddress"`
 	OptimismPortalImpl               common.Address `json:"optimismPortalImplAddress"`
+	ETHLockboxImpl                   common.Address `json:"ethLockboxImplAddress" evm:"ethLockboxImpl"`
 	PreimageOracleSingleton          common.Address `json:"preimageOracleSingletonAddress"`
 	MipsSingleton                    common.Address `json:"mipsSingletonAddress"`
 	SystemConfigImpl                 common.Address `json:"systemConfigImplAddress"`
@@ -80,9 +82,6 @@ func DeployImplementations(
 	defer cleanupOutput()
 
 	implContract := "DeployImplementations"
-	if input.UseInterop {
-		implContract = "DeployImplementationsInterop"
-	}
 	deployScript, cleanupDeploy, err := script.WithScript[DeployImplementationsScript](host, "DeployImplementations.s.sol", implContract)
 	if err != nil {
 		return output, fmt.Errorf("failed to load %s script: %w", implContract, err)
@@ -90,15 +89,12 @@ func DeployImplementations(
 	defer cleanupDeploy()
 
 	opcmContract := "OPContractsManager"
-	if err := host.RememberOnLabel("OPContractsManager", "OPContractsManager.sol", opcmContract); err != nil {
+	if err := host.RememberOnLabel("OPContractsManager", opcmContract+".sol", opcmContract); err != nil {
 		return output, fmt.Errorf("failed to link OPContractsManager label: %w", err)
 	}
 
 	// So we can see in detail where the SystemConfig interop initializer fails
 	sysConfig := "SystemConfig"
-	if input.UseInterop {
-		sysConfig = "SystemConfigInterop"
-	}
 	if err := host.RememberOnLabel("SystemConfigImpl", sysConfig+".sol", sysConfig); err != nil {
 		return output, fmt.Errorf("failed to link SystemConfig label: %w", err)
 	}

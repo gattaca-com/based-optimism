@@ -38,6 +38,7 @@ var (
 type Metricer interface {
 	contractMetrics.ContractMetricer
 	metrics.VmMetricer
+	opmetrics.RPCClientMetricer
 
 	RecordFailure(vmType string)
 	RecordPanic(vmType string)
@@ -101,7 +102,7 @@ func (r *Runner) Start(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to dial rollup client: %w", err)
 		}
-		supervisorClient = sources.NewSupervisorClient(client.NewBaseRPCClient(rpcCl))
+		supervisorClient = sources.NewSupervisorClient(client.NewBaseRPCClient(rpcCl), r.m)
 	}
 
 	l1Client, err := dial.DialRPCClientWithTimeout(ctx, 1*time.Minute, r.log, r.cfg.L1EthRpc)
@@ -177,7 +178,7 @@ func (r *Runner) runAndRecordOnce(ctx context.Context, runConfig RunConfig, roll
 		return
 	}
 
-	inputsLogger := r.log.New("l1", localInputs.L1Head, "l2", localInputs.L2Head, "l2Block", localInputs.L2BlockNumber, "claim", localInputs.L2Claim)
+	inputsLogger := r.log.New("l1", localInputs.L1Head, "l2", localInputs.L2Head, "l2Block", localInputs.L2SequenceNumber, "claim", localInputs.L2Claim)
 	// Sanitize the directory name.
 	safeName := regexp.MustCompile("[^a-zA-Z0-9_-]").ReplaceAllString(runConfig.Name, "")
 	dir, err := r.prepDatadir(safeName)
