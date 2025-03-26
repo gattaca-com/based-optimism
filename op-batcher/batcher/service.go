@@ -51,7 +51,8 @@ type BatcherConfig struct {
 
 	PreferLocalSafeL2 bool
 
-	DAUpdateEndpoints []string
+	DAUpdateEndpoints   []string
+	ThrottlingEndpoints []string
 }
 
 // BatcherService represents a full batch-submitter instance and its resources,
@@ -82,7 +83,7 @@ type BatcherService struct {
 
 	NotSubmittingOnStart bool
 
-	DAUpdateEndpoints []string
+	ThrottlingEndpoints []string
 }
 
 type DriverSetupOption func(setup *DriverSetup)
@@ -119,7 +120,7 @@ func (bs *BatcherService) initFromCLIConfig(ctx context.Context, version string,
 
 	bs.PreferLocalSafeL2 = cfg.PreferLocalSafeL2
 
-	bs.DAUpdateEndpoints = cfg.DAUpdateEndpoints
+	bs.ThrottlingEndpoints = cfg.ThrottlingEndpoints
 
 	optsFromRPC, err := bs.initRPCClients(ctx, cfg)
 	if err != nil {
