@@ -13,11 +13,13 @@ import { IOptimismPortal2 as IOptimismPortal } from "interfaces/L1/IOptimismPort
 import { console2 as console } from "forge-std/console2.sol";
 
 contract InteropAlphanetMigration is Script {
-    function run() public {
-        IOPContractsManager opcm = IOPContractsManager(0xEB32e20EbDE266A769a5683CC80976f05D9e6e7B);
+    function getInputs() internal pure returns (IOPContractsManagerInteropMigrator.MigrateInput memory) {
         bytes32 absolutePrestate = hex"0387beeb10e2139751e069ad40f0d1f0fa91b6076fa6f2d5dd488d453a46eec6";
         bool usePermissionlessGame = true;
-        Proposal memory startingAnchorRoot = Proposal({ root: Hash.wrap(hex"dd69e5f8f65f27ed413cb31f80070ec961b3dd5ca8898269cade08699d9303f6"), l2SequenceNumber: 1743027458 });
+        Proposal memory startingAnchorRoot = Proposal({
+            root: Hash.wrap(hex"dd69e5f8f65f27ed413cb31f80070ec961b3dd5ca8898269cade08699d9303f6"),
+            l2SequenceNumber: 1743027458
+        });
         address proposer = 0x4d522194aa103df731F2e6eB74cF2005FD6C48F5;
         address challenger = 0x544078E6C0A7dFC220E096026E99ee87773d1624;
         uint64 maxGameDepth = 73;
@@ -38,7 +40,7 @@ contract InteropAlphanetMigration is Script {
             absolutePrestate: Claim.wrap(absolutePrestate)
         });
 
-        IOPContractsManagerInteropMigrator.MigrateInput memory inputs = IOPContractsManagerInteropMigrator.MigrateInput({
+        return IOPContractsManagerInteropMigrator.MigrateInput({
             usePermissionlessGame: usePermissionlessGame,
             startingAnchorRoot: startingAnchorRoot,
             gameParameters: IOPContractsManagerInteropMigrator.GameParameters({
@@ -52,12 +54,39 @@ contract InteropAlphanetMigration is Script {
             }),
             opChainConfigs: opChainConfigs
         });
+    }
 
+    function run() public {
+        IOPContractsManagerInteropMigrator.MigrateInput memory inputs = getInputs();
+        IOPContractsManager opcm = IOPContractsManager(0xEB32e20EbDE266A769a5683CC80976f05D9e6e7B);
         bytes memory cd = abi.encodeWithSelector(IOPContractsManager.migrate.selector, inputs);
         console.log("calldata: ");
         console.logBytes(cd);
 
-        //vm.broadcast(msg.sender);
-        //opcm.migrate(inputs);
+        // Etch DummyCaller contract. This contract is used to mimic the contract that is used
+        // as the source of the delegatecall to the OPCM. In practice this will be the governance
+        // 2/2 or similar.
+        address prank = 0xe934Dc97E347C6aCef74364B50125bb8689c40ff; // TODO: confirm this is L1PAO
+        bytes memory code = vm.getDeployedCode("InteropAlphanetMigration.s.sol:DummyCaller");
+        vm.etch(prank, code);
+        vm.store(prank, bytes32(0), bytes32(uint256(uint160(address(opcm)))));
+        vm.label(prank, "DummyCaller");
+
+        vm.broadcast(msg.sender);
+        (bool success,) = DummyCaller(prank).migrate(inputs);
+        require(success, "InteropAlphanetMigration: migrate failed");
+    }
+}
+
+contract DummyCaller {
+    address internal _opcmAddr;
+
+    function migrate(IOPContractsManagerInteropMigrator.MigrateInput memory _migrateInput)
+        external
+        returns (bool, bytes memory)
+    {
+        bytes memory data = abi.encodeCall(DummyCaller.migrate, _migrateInput);
+        (bool success, bytes memory result) = _opcmAddr.delegatecall(data);
+        return (success, result);
     }
 }
