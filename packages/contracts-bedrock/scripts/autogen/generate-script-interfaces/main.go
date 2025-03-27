@@ -82,14 +82,7 @@ func processFile(file string) (*processedFile, []error) {
 
 	// var run = w3.MustNewFunc("run((address,address,address,bool,uint256,uint256) _input)", "(address,address,address,address,address) _output")
 
-	runArgs := RunArgs{
-		SuperchainProxyAdminOwner:  _common.BigToAddress(big.NewInt(1)),
-		ProtocolVersionsOwner:      _common.BigToAddress(big.NewInt(1)),
-		Guardian:                   _common.BigToAddress(big.NewInt(1)),
-		Paused:                     false,
-		RequiredProtocolVersion:    big.NewInt(1),
-		RecommendedProtocolVersion: big.NewInt(1),
-	}
+	runArgs := new(RunArgs)
 	packed, err := artifact.Abi.Parsed.Pack("run", runArgs)
 	if err != nil {
 		return nil, []error{fmt.Errorf("failed to pack %s: %w", file, err)}

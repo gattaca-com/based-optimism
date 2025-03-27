@@ -61,6 +61,45 @@ func WithScript[B any](h *Host, name string, contract string) (b *B, cleanup fun
 	}, nil
 }
 
+func validateScriptRunAbi[I any, O any](
+	scriptAbi abi.ABI,
+	zeroInput I,
+	zeroOutput O,
+) (*abi.Method, error) {
+	// make sure:
+	//
+	// - the constructor can be packed using no arguments
+	// - the run() can be packed using the provided input
+	// - the run() return value can be packed using the provided output
+
+	// First we make sure that we can pack the constructor without any args
+	_, err := scriptAbi.Pack("")
+	if err != nil {
+		return nil, fmt.Errorf("script can't be instantiated without arguments (has signature %s): %w", scriptAbi.Constructor.Sig, err)
+	}
+
+	// Now we make sure the run method exists
+	runAbi, ok := scriptAbi.Methods["run"]
+	if !ok {
+		return nil, fmt.Errorf("contract is missing a run method")
+	}
+
+	// Now we make sure that the run method can be packed using the provided input
+	_, err = runAbi.Inputs.Pack(zeroInput)
+	if err != nil {
+		return nil, fmt.Errorf("contract has an incompatible run method (has signature %s): %w", runAbi.Sig, err)
+	}
+
+	// Now we make sure that the run output can be packed using the provided output
+	_, err = runAbi.Outputs.Pack(zeroOutput)
+	if err != nil {
+		return nil, fmt.Errorf("contract has an incompatible run method return value: %w", err)
+	}
+
+	// At this point we know that the script has the ABI we'd like it to have
+	return &runAbi, nil
+}
+
 // WithPrecompileAtAddress turns a struct into a precompile,
 // and inserts it as override at the given address in the host.
 // A cleanup function is returned, to remove the precompile override again.
