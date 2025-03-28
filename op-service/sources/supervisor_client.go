@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/client"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	opmetrics "github.com/ethereum-optimism/optimism/op-service/metrics"
+	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/backend/depset"
 	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/types"
 )
 
@@ -89,6 +90,14 @@ func (cl *SupervisorClient) CrossDerivedToSource(ctx context.Context, chainID et
 
 	err = cl.client.CallContext(ctx, &derivedFrom, "supervisor_crossDerivedToSource", chainID, derived)
 	return derivedFrom, err
+}
+
+func (cl *SupervisorClient) DependencySet(ctx context.Context) (depset depset.DependencySet, err error) {
+	done := cl.metrics.RecordRPCClientRequest("supervisor_dependencySet")
+	defer func() { done(err) }()
+
+	err = cl.client.CallContext(ctx, &depset, "supervisor_dependencySet")
+	return depset, err
 }
 
 func (cl *SupervisorClient) LocalUnsafe(ctx context.Context, chainID eth.ChainID) (result eth.BlockID, err error) {

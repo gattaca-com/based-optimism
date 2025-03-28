@@ -415,9 +415,9 @@ func (su *SupervisorBackend) AddL2RPC(ctx context.Context, rpc string, jwtSecret
 
 // Internal methods, for processors
 // ----------------------------
-
-func (su *SupervisorBackend) DependencySet() depset.DependencySet {
-	return su.depSet
+func (su *SupervisorBackend) DependencySet(ctx context.Context) (depset depset.DependencySet, err error) {
+	su.logger.Debug("Checking dependencySet")
+	return su.depSet, nil
 }
 
 // Query methods

@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/apis"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	opmetrics "github.com/ethereum-optimism/optimism/op-service/metrics"
+	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/backend/depset"
 	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/types"
 )
 
@@ -33,6 +34,11 @@ func (q *QueryFrontend) CheckAccessList(ctx context.Context, inboxEntries []comm
 	minSafety types.SafetyLevel, executingDescriptor types.ExecutingDescriptor) error {
 	defer q.maybeRecordMetric("checkAccessList")
 	return q.Supervisor.CheckAccessList(ctx, inboxEntries, minSafety, executingDescriptor)
+}
+
+func (q *QueryFrontend) DependencySet(ctx context.Context) (depset depset.DependencySet, err error) {
+	defer q.maybeRecordMetric("dependencySet")
+	return q.Supervisor.DependencySet(ctx)
 }
 
 func (q *QueryFrontend) LocalUnsafe(ctx context.Context, chainID eth.ChainID) (eth.BlockID, error) {

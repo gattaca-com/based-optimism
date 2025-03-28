@@ -6,7 +6,9 @@ import (
 	"io"
 	"sync/atomic"
 
+	// ktdepset "github.com/ethereum-optimism/optimism/kurtosis-devnet/pkg/kurtosis/sources/depset"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
+	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/backend/depset"
 	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/frontend"
 	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/types"
 	"github.com/ethereum/go-ethereum/common"
@@ -45,6 +47,10 @@ func (m *MockBackend) AllSafeDerivedAt(ctx context.Context, source eth.BlockID) 
 
 func (m *MockBackend) AddL2RPC(ctx context.Context, rpc string, jwtSecret eth.Bytes32) error {
 	return nil
+}
+
+func (m *MockBackend) DependencySet(ctx context.Context) (depset.DependencySet, error) {
+	return nil, nil
 }
 
 func (m *MockBackend) CheckAccessList(ctx context.Context, inboxEntries []common.Hash,
