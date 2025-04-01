@@ -2,12 +2,16 @@ package interop
 
 import (
 	"context"
+	"math/rand"
 	"testing"
 
 	"github.com/ethereum-optimism/optimism/devnet-sdk/contracts/bindings"
+	"github.com/ethereum-optimism/optimism/devnet-sdk/contracts/constants"
+	"github.com/ethereum-optimism/optimism/op-acceptance-tests/tests/interop"
 	"github.com/ethereum-optimism/optimism/op-e2e/actions/helpers"
 	"github.com/ethereum-optimism/optimism/op-e2e/actions/interop/dsl"
 	"github.com/ethereum-optimism/optimism/op-service/sources"
+	"github.com/ethereum-optimism/optimism/op-service/txintent"
 	"github.com/ethereum-optimism/optimism/op-service/txplan"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -118,4 +122,223 @@ func TestTxPlanDeployEventLogger(gt *testing.T) {
 
 	// single block advanced
 	require.Equal(t, latestBlock.NumberU64()+1, includedBlock.Number)
+}
+
+func DefaultTxOpts(t helpers.Testing, user *userWithKeys, chain *dsl.Chain) txplan.Option {
+	sc := chain.SequencerEngine.SourceClient(t, 10)
+	getter := &receiptGetter{t: t, chain: chain, sc: sc}
+	submitter := &txSubmitter{t: t, chain: chain, from: user.address}
+	// txplan options for tx submission and ensuring block inclusion
+	return txplan.Combine(
+		txplan.WithPrivateKey(user.secret),
+		txplan.WithChainID(sc),
+		txplan.WithAgainstLatestBlock(sc),
+		txplan.WithPendingNonce(sc),
+		txplan.WithEstimator(sc, false),
+		txplan.WithTransactionSubmitter(submitter),
+		txplan.WithAssumedInclusion(getter),
+		txplan.WithBlockInclusionInfo(sc),
+	)
+}
+
+func DeployEventLogger(t helpers.Testing, opts txplan.Option) common.Address {
+	deployCalldata := common.FromHex(bindings.EventloggerBin)
+	deployTx := txplan.NewPlannedTx(opts, txplan.WithData(deployCalldata))
+	receipt, err := deployTx.Included.Eval(t.Ctx())
+	require.NoError(t, err)
+	require.NotNil(t, receipt.ContractAddress)
+	eventLoggerAddress := receipt.ContractAddress
+	return eventLoggerAddress
+}
+func TestTxPlanInitAndExecMsg(gt *testing.T) {
+	t := helpers.NewDefaultTesting(gt)
+	rng := rand.New(rand.NewSource(1234))
+	is := dsl.SetupInterop(t)
+	actors := is.CreateActors()
+	actors.PrepareChainState(t)
+	alice := setupUser(t, is, actors.ChainA, 0)
+	bob := setupUser(t, is, actors.ChainB, 0)
+
+	optsA := DefaultTxOpts(t, alice, actors.ChainA)
+	optsB := DefaultTxOpts(t, bob, actors.ChainB)
+	actors.ChainA.Sequencer.ActL2StartBlock(t)
+	// chain A progressed single unsafe block
+	eventLoggerAddress := DeployEventLogger(t, optsA)
+	// Also match chain B
+	// comment this block to simulate case to break the timestamp invariant:
+	// https://github.com/ethereum-optimism/specs/blob/main/specs/interop/messaging.md#timestamp-invariant
+	actors.ChainB.Sequencer.ActL2EmptyBlock(t)
+
+	// Intent to initiate message(or emit event) on chain A
+	txA := txintent.NewIntent[*txintent.InitTrigger, *txintent.InteropOutput](optsA)
+	randomInitTrigger := interop.RandomInitTrigger(rng, eventLoggerAddress, 3, 10)
+	txA.Content.Set(randomInitTrigger)
+
+	// Trigger single event
+	actors.ChainA.Sequencer.ActL2StartBlock(t)
+	_, err := txA.PlannedTx.Included.Eval(t.Ctx())
+	require.NoError(t, err)
+
+	status := actors.ChainA.Sequencer.SyncStatus()
+	require.Equal(t, uint64(2), status.UnsafeL2.Number)
+	require.Equal(t, uint64(0), status.CrossUnsafeL2.Number)
+	require.Equal(t, uint64(0), status.LocalSafeL2.Number)
+	require.Equal(t, uint64(0), status.SafeL2.Number)
+	require.Equal(t, uint64(0), status.FinalizedL2.Number)
+	// Ingest the new unsafe-block event
+	actors.ChainA.Sequencer.SyncSupervisor(t)
+	// Verify as cross-unsafe with supervisor
+	actors.Supervisor.ProcessFull(t)
+	actors.ChainA.Sequencer.ActL2PipelineFull(t)
+	status = actors.ChainA.Sequencer.SyncStatus()
+	require.Equal(t, uint64(2), status.UnsafeL2.Number)
+	require.Equal(t, uint64(2), status.CrossUnsafeL2.Number)
+	require.Equal(t, uint64(0), status.LocalSafeL2.Number)
+	require.Equal(t, uint64(0), status.SafeL2.Number)
+	require.Equal(t, uint64(0), status.FinalizedL2.Number)
+
+	status = actors.ChainB.Sequencer.SyncStatus()
+	require.Equal(t, uint64(1), status.UnsafeL2.Number)
+	require.Equal(t, uint64(0), status.CrossUnsafeL2.Number)
+	require.Equal(t, uint64(0), status.LocalSafeL2.Number)
+	require.Equal(t, uint64(0), status.SafeL2.Number)
+	require.Equal(t, uint64(0), status.FinalizedL2.Number)
+	// Ingest the new unsafe-block event
+	actors.ChainB.Sequencer.SyncSupervisor(t)
+	// Verify as cross-unsafe with supervisor
+	actors.Supervisor.ProcessFull(t)
+	actors.ChainB.Sequencer.ActL2PipelineFull(t)
+	status = actors.ChainB.Sequencer.SyncStatus()
+	require.Equal(t, uint64(1), status.UnsafeL2.Number)
+	require.Equal(t, uint64(1), status.CrossUnsafeL2.Number)
+	require.Equal(t, uint64(0), status.LocalSafeL2.Number)
+	require.Equal(t, uint64(0), status.SafeL2.Number)
+	require.Equal(t, uint64(0), status.FinalizedL2.Number)
+
+	// Intent to validate message on chain B
+	txB := txintent.NewIntent[*txintent.ExecTrigger, *txintent.InteropOutput](optsB)
+	txB.Content.DependOn(&txA.Result)
+
+	// Single event in tx so index is 0
+	txB.Content.Fn(txintent.ExecuteIndexed(constants.CrossL2Inbox, &txA.Result, 0))
+
+	actors.ChainB.Sequencer.ActL2StartBlock(t)
+	_, err = txB.PlannedTx.Included.Eval(t.Ctx())
+	require.NoError(t, err)
+
+	includedA, err := txA.PlannedTx.IncludedBlock.Eval(t.Ctx())
+	require.NoError(t, err)
+	includedB, err := txB.PlannedTx.IncludedBlock.Eval(t.Ctx())
+	require.NoError(t, err)
+
+	// initating messages time <= executing message time
+	require.LessOrEqual(t, includedA.Time, includedB.Time)
+
+	status = actors.ChainB.Sequencer.SyncStatus()
+	require.Equal(t, uint64(2), status.UnsafeL2.Number)
+	require.Equal(t, uint64(1), status.CrossUnsafeL2.Number)
+	require.Equal(t, uint64(0), status.LocalSafeL2.Number)
+	require.Equal(t, uint64(0), status.SafeL2.Number)
+	require.Equal(t, uint64(0), status.FinalizedL2.Number)
+	// Ingest the new unsafe-block event
+	actors.ChainB.Sequencer.SyncSupervisor(t)
+	// Verify as cross-unsafe with supervisor
+	actors.Supervisor.ProcessFull(t)
+	actors.ChainB.Sequencer.ActL2PipelineFull(t)
+	status = actors.ChainB.Sequencer.SyncStatus()
+	require.Equal(t, uint64(2), status.UnsafeL2.Number)
+	require.Equal(t, uint64(2), status.CrossUnsafeL2.Number)
+	require.Equal(t, uint64(0), status.LocalSafeL2.Number)
+	require.Equal(t, uint64(0), status.SafeL2.Number)
+	require.Equal(t, uint64(0), status.FinalizedL2.Number)
+}
+
+func TestTxPlanBreakTimestampInvariant(gt *testing.T) {
+	t := helpers.NewDefaultTesting(gt)
+	rng := rand.New(rand.NewSource(1234))
+	is := dsl.SetupInterop(t)
+	actors := is.CreateActors()
+	actors.PrepareChainState(t)
+	alice := setupUser(t, is, actors.ChainA, 0)
+	bob := setupUser(t, is, actors.ChainB, 0)
+
+	optsA := DefaultTxOpts(t, alice, actors.ChainA)
+	optsB := DefaultTxOpts(t, bob, actors.ChainB)
+	actors.ChainA.Sequencer.ActL2StartBlock(t)
+	// chain A progressed single unsafe block
+	eventLoggerAddress := DeployEventLogger(t, optsA)
+
+	// Intent to initiate message(or emit event) on chain A
+	txA := txintent.NewIntent[*txintent.InitTrigger, *txintent.InteropOutput](optsA)
+	randomInitTrigger := interop.RandomInitTrigger(rng, eventLoggerAddress, 3, 10)
+	txA.Content.Set(randomInitTrigger)
+
+	// Trigger single event
+	actors.ChainA.Sequencer.ActL2StartBlock(t)
+	_, err := txA.PlannedTx.Included.Eval(t.Ctx())
+	require.NoError(t, err)
+
+	status := actors.ChainA.Sequencer.SyncStatus()
+	require.Equal(t, uint64(2), status.UnsafeL2.Number)
+	require.Equal(t, uint64(0), status.CrossUnsafeL2.Number)
+	require.Equal(t, uint64(0), status.LocalSafeL2.Number)
+	require.Equal(t, uint64(0), status.SafeL2.Number)
+	require.Equal(t, uint64(0), status.FinalizedL2.Number)
+	// Ingest the new unsafe-block event
+	actors.ChainA.Sequencer.SyncSupervisor(t)
+	// Verify as cross-unsafe with supervisor
+	actors.Supervisor.ProcessFull(t)
+	actors.ChainA.Sequencer.ActL2PipelineFull(t)
+	status = actors.ChainA.Sequencer.SyncStatus()
+	require.Equal(t, uint64(2), status.UnsafeL2.Number)
+	require.Equal(t, uint64(2), status.CrossUnsafeL2.Number)
+	require.Equal(t, uint64(0), status.LocalSafeL2.Number)
+	require.Equal(t, uint64(0), status.SafeL2.Number)
+	require.Equal(t, uint64(0), status.FinalizedL2.Number)
+
+	// Intent to validate message on chain B
+	txB := txintent.NewIntent[*txintent.ExecTrigger, *txintent.InteropOutput](optsB)
+	txB.Content.DependOn(&txA.Result)
+
+	// Single event in tx so index is 0
+	txB.Content.Fn(txintent.ExecuteIndexed(constants.CrossL2Inbox, &txA.Result, 0))
+
+	actors.ChainB.Sequencer.ActL2StartBlock(t)
+	_, err = txB.PlannedTx.Included.Eval(t.Ctx())
+	require.NoError(t, err)
+
+	includedA, err := txA.PlannedTx.IncludedBlock.Eval(t.Ctx())
+	require.NoError(t, err)
+	includedB, err := txB.PlannedTx.IncludedBlock.Eval(t.Ctx())
+	require.NoError(t, err)
+
+	// initating messages time <= executing message time
+	// BUT we intentionally break the timestamp invariant
+	require.Greater(t, includedA.Time, includedB.Time)
+
+	// Now lets observe how supervisor sorts out everything
+
+	status = actors.ChainB.Sequencer.SyncStatus()
+	require.Equal(t, uint64(1), status.UnsafeL2.Number)
+	require.Equal(t, uint64(0), status.CrossUnsafeL2.Number)
+	require.Equal(t, uint64(0), status.LocalSafeL2.Number)
+	require.Equal(t, uint64(0), status.SafeL2.Number)
+	require.Equal(t, uint64(0), status.FinalizedL2.Number)
+	// Ingest the new unsafe-block event
+	actors.ChainB.Sequencer.SyncSupervisor(t)
+	// Verify as cross-unsafe with supervisor
+	actors.Supervisor.ProcessFull(t)
+
+	localUnsafe, err := actors.Supervisor.LocalUnsafe(t.Ctx(), actors.ChainB.ChainID)
+	require.NoError(t, err)
+	require.Equal(t, uint64(1), localUnsafe.Number)
+
+	actors.ChainB.Sequencer.ActL2PipelineFull(t)
+	status = actors.ChainB.Sequencer.SyncStatus()
+	// we hit a L2 reorg at chain B for preserving the timestamp invariant
+	require.Equal(t, uint64(0), status.UnsafeL2.Number)
+	require.Equal(t, uint64(0), status.CrossUnsafeL2.Number)
+	require.Equal(t, uint64(0), status.LocalSafeL2.Number)
+	require.Equal(t, uint64(0), status.SafeL2.Number)
+	require.Equal(t, uint64(0), status.FinalizedL2.Number)
 }
