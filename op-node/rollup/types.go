@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/ethereum-optimism/optimism/op-service/hardforks"
 	"io"
 	"math/big"
 	"time"
@@ -89,47 +90,7 @@ type Config struct {
 	// Required to identify the L2 network and create p2p signatures unique for this chain.
 	L2ChainID *big.Int `json:"l2_chain_id"`
 
-	// RegolithTime sets the activation time of the Regolith network-upgrade:
-	// a pre-mainnet Bedrock change that addresses findings of the Sherlock contest related to deposit attributes.
-	// "Regolith" is the loose deposited rock that sits on top of Bedrock.
-	// Active if RegolithTime != nil && L2 block timestamp >= *RegolithTime, inactive otherwise.
-	RegolithTime *uint64 `json:"regolith_time,omitempty"`
-
-	// CanyonTime sets the activation time of the Canyon network upgrade.
-	// Active if CanyonTime != nil && L2 block timestamp >= *CanyonTime, inactive otherwise.
-	CanyonTime *uint64 `json:"canyon_time,omitempty"`
-
-	// DeltaTime sets the activation time of the Delta network upgrade.
-	// Active if DeltaTime != nil && L2 block timestamp >= *DeltaTime, inactive otherwise.
-	DeltaTime *uint64 `json:"delta_time,omitempty"`
-
-	// EcotoneTime sets the activation time of the Ecotone network upgrade.
-	// Active if EcotoneTime != nil && L2 block timestamp >= *EcotoneTime, inactive otherwise.
-	EcotoneTime *uint64 `json:"ecotone_time,omitempty"`
-
-	// FjordTime sets the activation time of the Fjord network upgrade.
-	// Active if FjordTime != nil && L2 block timestamp >= *FjordTime, inactive otherwise.
-	FjordTime *uint64 `json:"fjord_time,omitempty"`
-
-	// GraniteTime sets the activation time of the Granite network upgrade.
-	// Active if GraniteTime != nil && L2 block timestamp >= *GraniteTime, inactive otherwise.
-	GraniteTime *uint64 `json:"granite_time,omitempty"`
-
-	// HoloceneTime sets the activation time of the Holocene network upgrade.
-	// Active if HoloceneTime != nil && L2 block timestamp >= *HoloceneTime, inactive otherwise.
-	HoloceneTime *uint64 `json:"holocene_time,omitempty"`
-
-	// IsthmusTime sets the activation time of the Isthmus network upgrade.
-	// Active if IsthmusTime != nil && L2 block timestamp >= *IsthmusTime, inactive otherwise.
-	IsthmusTime *uint64 `json:"isthmus_time,omitempty"`
-
-	// JovianTime sets the activation time of the Jovian network upgrade.
-	// Active if JovianTime != nil && L2 block timestamp >= *JovianTime, inactive otherwise.
-	JovianTime *uint64 `json:"jovian_time,omitempty"`
-
-	// InteropTime sets the activation time for an experimental feature-set, activated like a hardfork.
-	// Active if InteropTime != nil && L2 block timestamp >= *InteropTime, inactive otherwise.
-	InteropTime *uint64 `json:"interop_time,omitempty"`
+	HardforkSchedule *hardforks.Schedule `json:"-"`
 
 	// Note: below addresses are part of the block-derivation process,
 	// and required to be the same network-wide to stay in consensus.
