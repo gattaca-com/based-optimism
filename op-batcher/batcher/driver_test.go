@@ -179,7 +179,10 @@ func TestBatchSubmitter_ThrottlingEndpoints(t *testing.T) {
 				if req.Method == "miner_setMaxDASize" && len(req.Params) == 2 {
 					// Successfully handled the expected RPC call
 					w.Header().Set("Content-Type", "application/json")
-					w.Write([]byte(`{"jsonrpc":"2.0","id":1,"result":null}`))
+					_, err := w.Write([]byte(`{"jsonrpc":"2.0","id":1,"result":null}`))
+					if err != nil {
+						t.Logf("Error writing response: %v", err)
+					}
 					return
 				}
 			}
@@ -195,7 +198,10 @@ func TestBatchSubmitter_ThrottlingEndpoints(t *testing.T) {
 			if err := json.NewDecoder(r.Body).Decode(&req); err == nil {
 				if req.Method == "miner_setMaxDASize" && len(req.Params) == 2 {
 					w.Header().Set("Content-Type", "application/json")
-					w.Write([]byte(`{"jsonrpc":"2.0","id":1,"result":null}`))
+					_, err := w.Write([]byte(`{"jsonrpc":"2.0","id":1,"result":null}`))
+					if err != nil {
+						t.Logf("Error writing response: %v", err)
+					}
 					return
 				}
 			}
@@ -246,7 +252,10 @@ func TestBatchSubmitter_ThrottlingEndpoints(t *testing.T) {
 			if err := json.NewDecoder(r.Body).Decode(&req); err == nil {
 				if req.Method == "miner_setMaxDASize" && len(req.Params) == 2 {
 					w.Header().Set("Content-Type", "application/json")
-					w.Write([]byte(`{"jsonrpc":"2.0","id":1,"result":null}`))
+					_, err := w.Write([]byte(`{"jsonrpc":"2.0","id":1,"result":null}`))
+					if err != nil {
+						t.Logf("Error writing response: %v", err)
+					}
 					return
 				}
 			}
