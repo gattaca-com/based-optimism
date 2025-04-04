@@ -152,6 +152,20 @@ func RunEngineAPITests(t *testing.T, createBackend func(t *testing.T) engineapi.
 		api.assert.Equal(eth.ExecutionInvalid, r.Status)
 	})
 
+	t.Run("RejectNewPayloadV4WithNilExecutionRequests", func(t *testing.T) {
+		api := newTestHelper(t, createBackend)
+		genesis := api.backend.CurrentHeader()
+
+		// Build a valid block
+		payloadID := api.startBlockBuilding(genesis, eth.Uint64Quantity(genesis.Time+2))
+		envelope := api.getPayload(payloadID)
+
+		// note nil requests field:
+		r, err := api.engine.NewPayloadV4(api.ctx, envelope.ExecutionPayload, []common.Hash{}, envelope.ParentBeaconBlockRoot, nil)
+		api.assert.NoError(err)
+		api.assert.Equal(eth.ExecutionInvalid, r.Status)
+	})
+
 	t.Run("RejectBlockWithSameTimeAsParent", func(t *testing.T) {
 		api := newTestHelper(t, createBackend)
 		genesis := api.backend.CurrentHeader()
