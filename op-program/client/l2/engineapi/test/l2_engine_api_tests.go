@@ -162,7 +162,8 @@ func RunEngineAPITests(t *testing.T, createBackend func(t *testing.T) engineapi.
 
 		// note nil requests field:
 		r, err := api.engine.NewPayloadV4(api.ctx, envelope.ExecutionPayload, []common.Hash{}, envelope.ParentBeaconBlockRoot, nil)
-		api.assert.NoError(err)
+		api.assert.Error(err)
+		api.assert.ErrorContains(err, "Invalid parameters")
 		api.assert.Equal(eth.ExecutionInvalid, r.Status)
 	})
 
