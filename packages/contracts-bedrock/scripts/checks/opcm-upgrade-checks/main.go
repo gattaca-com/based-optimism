@@ -10,7 +10,7 @@ import (
 	"github.com/ethereum-optimism/optimism/packages/contracts-bedrock/scripts/checks/common"
 )
 
-var opcmArtifactPath = "forge-artifacts/OPContractsManager.sol/OPContractsManagerUpgrader.json"
+var opcmArtifactPath = "forge-artifacts/OPContractsManager.sol/OPContractsManager.json"
 var opcmAst *solc.ForgeArtifact
 var opcmUpgradeFunctionSelector = "ff2dd5a1"
 
@@ -27,7 +27,7 @@ func main() {
 	// Process.
 	if _, err := common.ProcessFilesGlob(
 		[]string{"forge-artifacts/**/*.json"},
-		[]string{"forge-artifacts/OPContractsManager.sol/*.json"},
+		[]string{"forge-artifacts/OPContractsManager.sol/*.json", "forge-artifacts/OPPrestateUpdater.sol/*.json"},
 		processFile,
 	); err != nil {
 		fmt.Printf("error: %v\n", err)
