@@ -14,6 +14,9 @@ type SimpleInterop struct {
 	Log        log.Logger
 	T          devtest.T
 	Supervisor *dsl.Supervisor
+
+	ChainA *dsl.L2Network
+	ChainB *dsl.L2Network
 }
 
 func NewSimpleInterop(dest *TestSetup[*SimpleInterop]) stack.Option {
@@ -39,16 +42,22 @@ func startInProcessSimpleInterop(orch stack.Orchestrator) {
 func hydrateSimpleInterop(t devtest.T, orch stack.Orchestrator) *SimpleInterop {
 	system := shim.NewSystem(t)
 	orch.Hydrate(system)
-
 	t.Require().GreaterOrEqual(len(system.Supervisors()), 1, "expected at least one supervisor")
+	
+	sys := dsl.Hydrate(t, system)
+
+	// Find L2 networks in a cluster with at least 2 chains
+	l2Networks := sys.ClusteredL2Networks(func(cluster stack.Cluster) bool {
+		return len(cluster.DependencySet().Chains()) >= 2
+	})
 	// At this point, any supervisor is acceptable but as the DSL gets fleshed out this should be selecting supervisors
 	// that fit with specific networks and nodes. That will likely require expanding the metadata exposed by the system
 	// since currently there's no way to tell which nodes are using which supervisor.
-	supervisorId := system.Supervisors()[0]
-	sys := dsl.Hydrate(t, system)
 	return &SimpleInterop{
 		Log:        t.Logger(),
 		T:          t,
-		Supervisor: sys.Supervisor(supervisorId),
+		Supervisor: sys.Supervisor(system.Supervisors()[0]),
+		ChainA:     l2Networks[0],
+		ChainB:     l2Networks[1],
 	}
 }

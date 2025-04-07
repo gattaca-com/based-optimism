@@ -31,6 +31,7 @@ func SortL2CLNodeIDs(ids []L2CLNodeID) []L2CLNodeID {
 
 type RollupAPI interface {
 	SyncStatus(ctx context.Context) (*eth.SyncStatus, error)
+	SequencerActive(ctx context.Context) (bool, error)
 }
 
 // L2CLNode is a L2 ethereum consensus-layer node

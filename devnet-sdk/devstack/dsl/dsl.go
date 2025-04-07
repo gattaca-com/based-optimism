@@ -50,6 +50,29 @@ func (s *System) Supervisor(id stack.SupervisorID) *Supervisor {
 	return newSupervisor(commonWithLog(s.common, s.log.New("id", id)), super)
 }
 
+func (s *System) ClusteredL2Networks(predicate func(cluster stack.Cluster) bool) []*L2Network {
+	for _, clusterID := range s.sys.Clusters() {
+		cluster := s.sys.Cluster(clusterID)
+		if !predicate(cluster) {
+			continue
+		}
+		chainIDs := cluster.DependencySet().Chains()
+		l2Networks := make([]*L2Network, len(chainIDs))
+		for i, chainID := range chainIDs {
+			l2NetworkID := s.sys.L2NetworkID(chainID)
+			l2Networks[i] = s.L2Network(l2NetworkID)
+		}
+		return l2Networks
+	}
+	s.require.Fail("No suitable cluster found")
+	return nil
+}
+
+func (s *System) L2Network(id stack.L2NetworkID) *L2Network {
+	network := s.sys.L2Network(id)
+	return newL2Network(s.common, network)
+}
+
 func Hydrate(t devtest.T, sys stack.System) *System {
 	return &System{
 		common: common{

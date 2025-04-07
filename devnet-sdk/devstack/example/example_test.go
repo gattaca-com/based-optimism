@@ -21,3 +21,11 @@ func TestExample2(gt *testing.T) {
 
 	sys.Supervisor.VerifySyncStatus(dsl.WithAllLocalUnsafeHeadsAdvancedBy(4))
 }
+
+func TestExample3(gt *testing.T) {
+	t := devtest.ParallelT(gt)
+	t.Skip("No faucet support yet")
+	sys := SimpleInterop(t)
+
+	sys.ChainA.NewWallet()
+}
