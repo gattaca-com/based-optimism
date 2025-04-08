@@ -52,7 +52,6 @@ func GetTestAPI(api *testAPI) gethrpc.API {
 
 // SetL2Scope limits the view over the L2 chain
 func (a *testAPI) SetL2Scope(ctx context.Context, start, end uint64) error {
-	a.m.RecordRPCServerRequest("batcher_setL2Scope")
 	err := a.b.SetL2Scope(ctx, start, end)
 	if err != nil {
 		a.log.Error("Failed to set L2 scope", "err", err, "start", start, "end", end)
@@ -64,7 +63,6 @@ func (a *testAPI) SetL2Scope(ctx context.Context, start, end uint64) error {
 
 // SubmitNow forces the batcher to submit the current data, even if the buffer is not full
 func (a *testAPI) SubmitNow(ctx context.Context) error {
-	a.m.RecordRPCServerRequest("batcher_submitNow")
 	err := a.b.SubmitNow(ctx)
 	if err != nil {
 		a.log.Error("Failed to submit batch now", "err", err)
@@ -76,7 +74,6 @@ func (a *testAPI) SubmitNow(ctx context.Context) error {
 
 // PublishNow manually triggers the batch publishing process
 func (a *testAPI) PublishNow(ctx context.Context) error {
-	a.m.RecordRPCServerRequest("batcher_publishNow")
 	err := a.b.PublishNow(ctx)
 	if err != nil {
 		a.log.Error("Failed to publish batch now", "err", err)
@@ -88,7 +85,6 @@ func (a *testAPI) PublishNow(ctx context.Context) error {
 
 // Buffer returns information about the batcher buffer state
 func (a *testAPI) Buffer(ctx context.Context) (map[string]uint64, error) {
-	a.m.RecordRPCServerRequest("batcher_buffer")
 	buffer, err := a.b.Buffer(ctx)
 	if err != nil {
 		a.log.Error("Failed to get buffer state", "err", err)
