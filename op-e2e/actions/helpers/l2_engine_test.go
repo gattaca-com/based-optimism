@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/consensus/beacon"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
@@ -229,6 +230,8 @@ func TestEngineAPITests(t *testing.T) {
 	test.RunEngineAPITests(t, func(t *testing.T) engineapi.EngineBackend {
 		jwtPath := e2eutils.WriteDefaultJWT(t)
 		dp := e2eutils.MakeDeployParams(t, DefaultRollupTestParams())
+		z := hexutil.Uint64(0)
+		dp.DeployConfig.L2GenesisIsthmusTimeOffset = &z
 		sd := e2eutils.Setup(t, dp, DefaultAlloc)
 		n, _, apiBackend := newBackend(t, sd.L2Cfg, jwtPath, nil)
 		err := n.Start()
