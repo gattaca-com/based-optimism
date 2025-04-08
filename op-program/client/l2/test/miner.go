@@ -67,9 +67,6 @@ func NewMiner(t *testing.T, logger log.Logger, isthmusTime uint64) (*Miner, *cor
 	}
 	n, err := node.New(nodeCfg)
 	require.NoError(t, err)
-	t.Cleanup(func() {
-		_ = n.Close()
-	})
 	backend, err := geth.New(n, ethCfg)
 	require.NoError(t, err)
 	chain := backend.BlockChain()
