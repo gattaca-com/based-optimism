@@ -111,7 +111,7 @@ type SuperSystemConfig struct {
 }
 
 // NewSuperSystem creates a new SuperSystem from a recipe. It creates an interopE2ESystem.
-func NewSuperSystem(t *testing.T, recipe *interopgen.InteropDevRecipe, w WorldResourcePaths, config SuperSystemConfig) SuperSystem {
+func NewSuperSystem(t testing.TB, recipe *interopgen.InteropDevRecipe, w WorldResourcePaths, config SuperSystemConfig) SuperSystem {
 	s2 := &interopE2ESystem{recipe: recipe, config: &config}
 	s2.prepare(t, w)
 	return s2
@@ -122,7 +122,7 @@ func NewSuperSystem(t *testing.T, recipe *interopgen.InteropDevRecipe, w WorldRe
 // the functionality is broken down into smaller functions so that
 // the system can be prepared iteratively if desired
 type interopE2ESystem struct {
-	t               *testing.T
+	t               testing.TB
 	recipe          *interopgen.InteropDevRecipe
 	logger          log.Logger
 	timeTravelClock *clock.AdvancingClock
@@ -334,7 +334,7 @@ func (s *interopE2ESystem) SupervisorClient() *sources.SupervisorClient {
 // prepare sets up the system for testing
 // components are built iteratively, so that they can be reused or modified
 // their creation can't be safely skipped or reordered at this time
-func (s *interopE2ESystem) prepare(t *testing.T, w WorldResourcePaths) {
+func (s *interopE2ESystem) prepare(t testing.TB, w WorldResourcePaths) {
 	s.t = t
 	s.logger = testlog.Logger(s.t, log.LevelDebug)
 	s.hdWallet = s.prepareHDWallet()
@@ -586,7 +586,7 @@ func (s *interopE2ESystem) DependencySet() *depset.StaticConfigDependencySet {
 	return stDepSet
 }
 
-func mustDial(t *testing.T, logger log.Logger) func(v string) *rpc.Client {
+func mustDial(t testing.TB, logger log.Logger) func(v string) *rpc.Client {
 	return func(v string) *rpc.Client {
 		cl, err := dial.DialRPCClientWithTimeout(context.Background(), 30*time.Second, logger, v)
 		require.NoError(t, err, "failed to dial")

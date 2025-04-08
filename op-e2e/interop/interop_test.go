@@ -32,7 +32,7 @@ import (
 
 // setupAndRun is a helper function that sets up a SuperSystem
 // which contains two L2 Chains, and two users on each chain.
-func setupAndRun(t *testing.T, config SuperSystemConfig, fn func(*testing.T, SuperSystem)) {
+func setupAndRun(t testing.TB, config SuperSystemConfig, fn func(testing.TB, SuperSystem)) {
 	recipe := interopgen.InteropDevRecipe{
 		L1ChainID:        900100,
 		L2s:              []interopgen.InteropDevL2Recipe{{ChainID: 900200}, {ChainID: 900201}},
@@ -61,7 +61,7 @@ func setupAndRun(t *testing.T, config SuperSystemConfig, fn func(*testing.T, Sup
 // and only Chain A is affected.
 func TestInterop_IsolatedChains(t *testing.T) {
 	t.Parallel()
-	test := func(t *testing.T, s2 SuperSystem) {
+	test := func(t testing.TB, s2 SuperSystem) {
 		ids := s2.L2IDs()
 		chainA := ids[0]
 		chainB := ids[1]
@@ -117,7 +117,7 @@ func TestInterop_IsolatedChains(t *testing.T) {
 // It waits for the finalized block to advance past the genesis block.
 func TestInterop_SupervisorFinality(t *testing.T) {
 	t.Parallel()
-	test := func(t *testing.T, s2 SuperSystem) {
+	test := func(t testing.TB, s2 SuperSystem) {
 		supervisor := s2.SupervisorClient()
 		require.Eventually(t, func() bool {
 			final, err := supervisor.FinalizedL1(context.Background())
@@ -140,7 +140,7 @@ func TestInterop_SupervisorFinality(t *testing.T) {
 // A contract is deployed on each chain, and logs are emitted repeatedly.
 func TestInterop_EmitLogs(t *testing.T) {
 	t.Parallel()
-	test := func(t *testing.T, s2 SuperSystem) {
+	test := func(t testing.TB, s2 SuperSystem) {
 		ids := s2.L2IDs()
 		chainA := ids[0]
 		chainB := ids[1]
@@ -256,7 +256,7 @@ func TestInteropBlockBuilding(t *testing.T) {
 	logger := testlog.Logger(t, log.LevelInfo)
 	oplog.SetGlobalLogHandler(logger.Handler())
 
-	test := func(t *testing.T, s2 SuperSystem) {
+	test := func(t testing.TB, s2 SuperSystem) {
 		ids := s2.L2IDs()
 		chainA := ids[0]
 		chainB := ids[1]
@@ -368,7 +368,7 @@ func TestInteropBlockBuilding(t *testing.T) {
 
 func TestMultiNode(t *testing.T) {
 	t.Parallel()
-	test := func(t *testing.T, s2 SuperSystem) {
+	test := func(t testing.TB, s2 SuperSystem) {
 		supervisor := s2.SupervisorClient()
 		require.Eventually(t, func() bool {
 			final, err := supervisor.FinalizedL1(context.Background())
@@ -416,7 +416,7 @@ func TestMultiNode(t *testing.T) {
 
 func TestProposals(t *testing.T) {
 	t.Parallel()
-	test := func(t *testing.T, s2 SuperSystem) {
+	test := func(t testing.TB, s2 SuperSystem) {
 		logger := testlog.Logger(t, log.LvlInfo)
 		ids := s2.L2IDs()
 		chainA := ids[0]
