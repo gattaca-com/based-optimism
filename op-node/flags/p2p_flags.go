@@ -56,7 +56,6 @@ var (
 	SyncReqRespName         = "p2p.sync.req-resp"
 	SyncOnlyReqToStaticName = "p2p.sync.onlyreqtostatic"
 	P2PPingName             = "p2p.ping"
-	GatewayName             = "p2p.gateway-address"
 )
 
 func deprecatedP2PFlags(envPrefix string) []cli.Flag {

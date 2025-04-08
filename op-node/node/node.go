@@ -13,7 +13,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/common"
 	gethevent "github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -63,6 +62,7 @@ type OpNode struct {
 	eventDrain event.Drainer
 
 	l1Source  *sources.L1Client     // L1 Client to fetch data from
+	registrySource *sources.RegistryClient // Registry Client to fetch gateway address
 	l2Driver  *driver.Driver        // L2 Engine to Sync
 	l2Source  *sources.EngineClient // L2 Execution Engine RPC bindings
 	server    *oprpc.Server         // RPC server hosting the rollup-node API
@@ -144,6 +144,9 @@ func (n *OpNode) init(ctx context.Context, cfg *Config) error {
 	if err := n.initL1(ctx, cfg); err != nil {
 		return fmt.Errorf("failed to init L1: %w", err)
 	}
+	if err := n.initRegistry(ctx, cfg); err != nil {
+		return fmt.Errorf("failed to init Registry: %w", err)
+	}
 	if err := n.initL1BeaconAPI(ctx, cfg); err != nil {
 		return err
 	}
@@ -156,7 +159,6 @@ func (n *OpNode) init(ctx context.Context, cfg *Config) error {
 	if err := n.initP2PSigner(ctx, cfg); err != nil {
 		return fmt.Errorf("failed to init the P2P signer: %w", err)
 	}
-	n.p2pGatewayAddress = cfg.P2PGatewayAddress
 	if err := n.initP2P(cfg); err != nil {
 		return fmt.Errorf("failed to init the P2P stack: %w", err)
 	}
@@ -233,9 +235,30 @@ func (n *OpNode) initL1(ctx context.Context, cfg *Config) error {
 	return nil
 }
 
+func (n *OpNode) initRegistry(ctx context.Context, cfg *Config) error {
+	registryNode, rpcCfg, err := cfg.Registry.Setup(ctx, n.log, &cfg.Rollup)
+	if err != nil {
+		return fmt.Errorf("failed to get Registry RPC client: %w", err)
+	}
+
+	n.registrySource, err = sources.NewRegistryClient(
+		client.NewInstrumentedRPC(registryNode, &n.metrics.RPCMetrics.RPCClientMetrics), n.log, n.metrics.RegistrySourceCache, rpcCfg)
+	if err != nil {
+		return fmt.Errorf("failed to create Registry source: %w", err)
+	}
+
+	// Initially fetch the current gateway + n gateways into the future
+	err = n.registrySource.FetchNextNGateways(ctx, 2, 3)
+	if err != nil {
+		return fmt.Errorf("failed to fetch initial gateways: %w", err)
+	}
+
+	return nil
+}
+
 func (n *OpNode) initRuntimeConfig(ctx context.Context, cfg *Config) error {
 	// attempt to load runtime config, repeat N times
-	n.runCfg = NewRuntimeConfig(n.log, n.l1Source, &cfg.Rollup, cfg.P2PGatewayAddress)
+	n.runCfg = NewRuntimeConfig(n.log, n.l1Source, &cfg.Rollup, n.registrySource)
 
 	confDepth := cfg.Driver.VerifierConfDepth
 	reload := func(ctx context.Context) (eth.L1BlockRef, error) {
@@ -472,7 +495,7 @@ func (n *OpNode) initRPCServer(cfg *Config) error {
 		n.log.Info("Admin RPC enabled")
 	}
 	if cfg.RPC.EnableBased {
-		server.EnableBasedAPI(NewBasedAPI(n.p2pNode, n.log, n.metrics))
+		server.EnableBasedAPI(NewBasedAPI(n.p2pNode, n.registrySource, n.log, n.metrics))
 		n.log.Info("Based RPC enabled")
 	}
 	n.log.Info("Starting JSON-RPC server")
@@ -528,7 +551,7 @@ func (n *OpNode) initP2P(cfg *Config) (err error) {
 	}
 	if n.p2pEnabled() {
 		// TODO(protocol-quest#97): Use EL Sync instead of CL Alt sync for fetching missing blocks in the payload queue.
-		n.p2pNode, err = p2p.NewNodeP2P(n.resourcesCtx, &cfg.Rollup, n.log, cfg.P2P, cfg.P2PGatewayAddress, n, n.l2Source, n.runCfg, n.metrics, false)
+		n.p2pNode, err = p2p.NewNodeP2P(n.resourcesCtx, &cfg.Rollup, n.log, cfg.P2P, n, n.l2Source, n.runCfg, n.metrics, false)
 		if err != nil {
 			return
 		}
@@ -710,7 +733,7 @@ func (n *OpNode) OnNewFrag(ctx context.Context, from peer.ID, frag *eth.SignedNe
 	// }
 
 	n.tracer.OnNewFrag(ctx, from, frag)
-	n.log.Info("Received new fragment", "frag", frag.Frag.BlockNumber, frag.Frag.Seq)
+	n.log.Info("Received new fragment", "block", frag.Frag.BlockNumber, "frag", frag.Frag.Seq)
 	n.preconfChannels.SendFrag(frag)
 	return nil
 }
@@ -725,6 +748,17 @@ func (n *OpNode) OnSealFrag(ctx context.Context, from peer.ID, seal *eth.SignedS
 	n.tracer.OnSealFrag(ctx, from, seal)
 	n.log.Info("Received new seal", "seal", seal)
 	n.preconfChannels.SendSeal(seal)
+
+	// Start fetching future gateways
+	go func() {
+		fetchCtx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+		defer cancel()
+
+		if err := n.registrySource.FetchNextNGateways(fetchCtx, 2, 3); err != nil {
+			n.log.Warn("registry fetch error", "err", err)
+		}
+	}()
+
 	return nil
 }
 

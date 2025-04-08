@@ -81,8 +81,9 @@ type Metrics struct {
 
 	metrics.RPCMetrics
 
-	L1SourceCache *metrics.CacheMetrics
-	L2SourceCache *metrics.CacheMetrics
+	L1SourceCache       *metrics.CacheMetrics
+	RegistrySourceCache *metrics.CacheMetrics
+	L2SourceCache       *metrics.CacheMetrics
 
 	DerivationIdle prometheus.Gauge
 
