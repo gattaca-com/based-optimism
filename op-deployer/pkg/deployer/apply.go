@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/ethereum-optimism/optimism/devnet-sdk/proofs/prestate"
 	"github.com/ethereum-optimism/optimism/op-chain-ops/foundry"
 	"github.com/ethereum-optimism/optimism/op-chain-ops/script"
 	"github.com/ethereum-optimism/optimism/op-chain-ops/script/forking"
@@ -39,6 +40,7 @@ type ApplyConfig struct {
 	Logger           log.Logger
 	CacheDir         string
 	privateKeyECDSA  *ecdsa.PrivateKey
+	PreStateBuilder  pipeline.PreStateBuilder
 }
 
 func (a *ApplyConfig) Check() error {
@@ -56,6 +58,12 @@ func (a *ApplyConfig) Check() error {
 
 	if a.Logger == nil {
 		return fmt.Errorf("logger must be specified")
+	}
+
+	if a.DeploymentTarget == DeploymentTargetGenesis {
+		if a.L1RPCUrl != "" {
+			return fmt.Errorf("l1-rpc-url should not be specified when deployment-target is genesis")
+		}
 	}
 
 	if a.DeploymentTarget == DeploymentTargetLive {
@@ -82,6 +90,13 @@ func ApplyCLI() func(cliCtx *cli.Context) error {
 		privateKey := cliCtx.String(PrivateKeyFlagName)
 		cacheDir := cliCtx.String(CacheDirFlagName)
 		depTarget, err := NewDeploymentTarget(cliCtx.String(DeploymentTargetFlag.Name))
+		opProgramSvcUrl := cliCtx.String(OpProgramSvcUrlFlag.Name)
+
+		var preStateBuilder pipeline.PreStateBuilder
+		if opProgramSvcUrl != "" {
+			preStateBuilder = prestate.NewPrestateBuilderClient(opProgramSvcUrl)
+		}
+
 		if err != nil {
 			return fmt.Errorf("failed to parse deployment target: %w", err)
 		}
@@ -95,6 +110,7 @@ func ApplyCLI() func(cliCtx *cli.Context) error {
 			DeploymentTarget: depTarget,
 			Logger:           l,
 			CacheDir:         cacheDir,
+			PreStateBuilder:  preStateBuilder,
 		})
 	}
 }
@@ -123,6 +139,7 @@ func Apply(ctx context.Context, cfg ApplyConfig) error {
 		Logger:             cfg.Logger,
 		StateWriter:        pipeline.WorkdirStateWriter(cfg.Workdir),
 		CacheDir:           cfg.CacheDir,
+		PreStateBuilder:    cfg.PreStateBuilder,
 	}); err != nil {
 		return err
 	}
@@ -144,6 +161,7 @@ type ApplyPipelineOpts struct {
 	Logger             log.Logger
 	StateWriter        pipeline.StateWriter
 	CacheDir           string
+	PreStateBuilder    pipeline.PreStateBuilder
 }
 
 func ApplyPipeline(
@@ -336,12 +354,30 @@ func ApplyPipeline(
 			fmt.Sprintf("set-start-block-%s", chainID.Hex()),
 			func() error {
 				if opts.DeploymentTarget == DeploymentTargetGenesis {
-					return pipeline.SetStartBlockGenesisStrategy(pEnv, st, chainID)
+					return pipeline.SetStartBlockGenesisStrategy(pEnv, intent, st, chainID)
 				}
-				return pipeline.SetStartBlockLiveStrategy(ctx, pEnv, st, chainID)
+				return pipeline.SetStartBlockLiveStrategy(ctx, intent, pEnv, st, chainID)
 			},
 		})
 	}
+
+	// Generate the interop dependency set if interop is enabled
+	if intent.UseInterop {
+		pline = append(pline, pipelineStage{
+			"generate-interop-depset",
+			func() error {
+				return pipeline.GenerateInteropDepset(ctx, pEnv, intent, st)
+			},
+		})
+	}
+
+	// Generate the prestate for all chains
+	pline = append(pline, pipelineStage{
+		"deploy-pre-state",
+		func() error {
+			return pipeline.GeneratePreState(ctx, pEnv, intent, st, opts.PreStateBuilder)
+		},
+	})
 
 	// Run through the pipeline.
 	for _, stage := range pline {

@@ -167,7 +167,7 @@ func TestRejectBlockWithStateRootMismatch(t *testing.T) {
 	invalidBlock := types.NewBlockWithHeader(newBlock.Header())
 
 	_, err := chain.InsertBlockWithoutSetHead(invalidBlock, false)
-	require.ErrorContains(t, err, "block root mismatch")
+	require.ErrorIs(t, err, ErrUnexpectedBlockHash)
 }
 
 func TestGetHeaderByNumber(t *testing.T) {
@@ -343,7 +343,7 @@ func setupOracle(t *testing.T, blockCount int, headBlockNumber int, enableEcoton
 	}
 	l1Genesis, err := genesis.NewL1Genesis(deployConfig)
 	require.NoError(t, err)
-	l2Genesis, err := genesis.NewL2Genesis(deployConfig, l1Genesis.ToBlock().Header())
+	l2Genesis, err := genesis.NewL2Genesis(deployConfig, eth.BlockRefFromHeader(l1Genesis.ToBlock().Header()))
 	require.NoError(t, err)
 
 	l2Genesis.Alloc[fundedAddress] = types.Account{

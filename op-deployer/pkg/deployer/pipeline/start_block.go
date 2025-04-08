@@ -11,25 +11,42 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 )
 
-func SetStartBlockLiveStrategy(ctx context.Context, env *Env, st *state.State, chainID common.Hash) error {
+func SetStartBlockLiveStrategy(ctx context.Context, intent *state.Intent, env *Env, st *state.State, chainID common.Hash) error {
 	lgr := env.Logger.New("stage", "set-start-block", "strategy", "live")
 	lgr.Info("setting start block", "id", chainID.Hex())
+
+	thisIntent, err := intent.Chain(chainID)
+	if err != nil {
+		return fmt.Errorf("failed to get chain intent: %w", err)
+	}
 
 	thisChainState, err := st.Chain(chainID)
 	if err != nil {
 		return fmt.Errorf("failed to get chain state: %w", err)
 	}
 
-	startHeader, err := env.L1Client.HeaderByNumber(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("failed to get start block: %w", err)
+	l1Client := env.L1Client.Client()
+
+	var headerBlockRef *state.L1BlockRefJSON
+	if thisIntent.L1StartBlockHash != nil {
+		var l1BRJ state.L1BlockRefJSON
+		if err := l1Client.CallContext(ctx, &l1BRJ, "eth_getBlockByHash", thisIntent.L1StartBlockHash.Hex(), false); err != nil {
+			return fmt.Errorf("failed to get L1 block header for block: %w", err)
+		}
+		headerBlockRef = &l1BRJ
+	} else {
+		var l1BRJ state.L1BlockRefJSON
+		if err := l1Client.CallContext(ctx, &l1BRJ, "eth_getBlockByNumber", "latest", false); err != nil {
+			return fmt.Errorf("failed to get L1 block header for block: %w", err)
+		}
+		headerBlockRef = &l1BRJ
 	}
-	thisChainState.StartBlock = startHeader
+	thisChainState.StartBlock = headerBlockRef
 
 	return nil
 }
 
-func SetStartBlockGenesisStrategy(env *Env, st *state.State, chainID common.Hash) error {
+func SetStartBlockGenesisStrategy(env *Env, intent *state.Intent, st *state.State, chainID common.Hash) error {
 	lgr := env.Logger.New("stage", "set-start-block", "strategy", "genesis")
 	lgr.Info("setting start block", "id", chainID.Hex())
 
@@ -38,10 +55,17 @@ func SetStartBlockGenesisStrategy(env *Env, st *state.State, chainID common.Hash
 		return fmt.Errorf("failed to get chain state: %w", err)
 	}
 
+	var timestamp uint64
+	if intent.L1StartTimestamp != nil {
+		timestamp = *intent.L1StartTimestamp
+	} else {
+		timestamp = uint64(time.Now().Unix())
+	}
+
 	deployConfig := &genesis.DeployConfig{
 		DevL1DeployConfig: genesis.DevL1DeployConfig{
 			L1BlockTime:             12,
-			L1GenesisBlockTimestamp: hexutil.Uint64(time.Now().Unix()),
+			L1GenesisBlockTimestamp: hexutil.Uint64(timestamp),
 		},
 		L2InitializationConfig: genesis.L2InitializationConfig{
 			L2CoreDeployConfig: genesis.L2CoreDeployConfig{
@@ -57,7 +81,7 @@ func SetStartBlockGenesisStrategy(env *Env, st *state.State, chainID common.Hash
 	if err != nil {
 		return fmt.Errorf("failed to build L1 developer genesis: %w", err)
 	}
-	thisChainState.StartBlock = devGenesis.ToBlock().Header()
+	thisChainState.StartBlock = state.BlockRefJsonFromHeader(devGenesis.ToBlock().Header())
 
 	return nil
 }

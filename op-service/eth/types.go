@@ -234,7 +234,6 @@ type (
 type ExecutionPayloadEnvelope struct {
 	ParentBeaconBlockRoot *common.Hash      `json:"parentBeaconBlockRoot,omitempty"`
 	ExecutionPayload      *ExecutionPayload `json:"executionPayload"`
-	RequestsHash          *common.Hash      `json:"requestsHash,omitempty"`
 }
 
 func (env *ExecutionPayloadEnvelope) ID() BlockID {
@@ -332,12 +331,12 @@ func (envelope *ExecutionPayloadEnvelope) CheckBlockHash() (actual common.Hash, 
 		BlobGasUsed:      (*uint64)(payload.BlobGasUsed),
 		ExcessBlobGas:    (*uint64)(payload.ExcessBlobGas),
 		ParentBeaconRoot: envelope.ParentBeaconBlockRoot,
-		RequestsHash:     envelope.RequestsHash,
 	}
 
-	if payload.WithdrawalsRoot != nil {
+	if payload.WithdrawalsRoot != nil { // Isthmus
 		header.WithdrawalsHash = payload.WithdrawalsRoot
-	} else if payload.Withdrawals != nil {
+		header.RequestsHash = &types.EmptyRequestsHash
+	} else if payload.Withdrawals != nil { // Canyon
 		withdrawalHash := types.DeriveSha(*payload.Withdrawals, hasher)
 		header.WithdrawalsHash = &withdrawalHash
 	}
@@ -380,6 +379,7 @@ func BlockAsPayload(bl *types.Block, config *params.ChainConfig) (*ExecutionPayl
 		Transactions:  opaqueTxs,
 		ExcessBlobGas: (*Uint64Quantity)(bl.ExcessBlobGas()),
 		BlobGasUsed:   (*Uint64Quantity)(bl.BlobGasUsed()),
+		// WithdrawalsRoot is only set starting at Isthmus
 	}
 
 	if config.ShanghaiTime != nil && uint64(payload.Timestamp) >= *config.ShanghaiTime {
@@ -401,7 +401,6 @@ func BlockAsPayloadEnv(bl *types.Block, config *params.ChainConfig) (*ExecutionP
 	return &ExecutionPayloadEnvelope{
 		ExecutionPayload:      payload,
 		ParentBeaconBlockRoot: bl.BeaconRoot(),
-		RequestsHash:          bl.RequestsHash(),
 	}, nil
 }
 
@@ -517,6 +516,8 @@ type SystemConfig struct {
 	// value will be 0 if Holocene is not active, or if derivation has yet to
 	// process any EIP_1559_PARAMS system config update events.
 	EIP1559Params Bytes8 `json:"eip1559Params"`
+	// OperatorFeeParams identifies the operator fee parameters.
+	OperatorFeeParams Bytes32 `json:"operatorFeeParams"`
 	// More fields can be added for future SystemConfig versions.
 
 	// MarshalPreHolocene indicates whether or not this struct should be
@@ -625,6 +626,31 @@ func CheckEcotoneL1SystemConfigScalar(scalar [32]byte) error {
 		// ignore the event if it's an unknown scalar format
 		return fmt.Errorf("unrecognized scalar version: %d", versionByte)
 	}
+}
+
+type OperatorFeeParams struct {
+	Scalar   uint32
+	Constant uint64
+}
+
+func (sysCfg *SystemConfig) OperatorFee() OperatorFeeParams {
+	return DecodeOperatorFeeParams(sysCfg.OperatorFeeParams)
+}
+
+// DecodeScalar decodes the operatorFeeScalar and operatorFeeConstant from a 32-byte scalar value.
+// It uses the first byte to determine the scalar format.
+func DecodeOperatorFeeParams(scalar [32]byte) OperatorFeeParams {
+	return OperatorFeeParams{
+		Scalar:   binary.BigEndian.Uint32(scalar[20:24]),
+		Constant: binary.BigEndian.Uint64(scalar[24:32]),
+	}
+}
+
+// EncodeOperatorFeeParams encodes the OperatorFeeParams into a 32-byte value
+func EncodeOperatorFeeParams(params OperatorFeeParams) (scalar [32]byte) {
+	binary.BigEndian.PutUint32(scalar[20:24], params.Scalar)
+	binary.BigEndian.PutUint64(scalar[24:32], params.Constant)
+	return
 }
 
 type Bytes48 [48]byte
