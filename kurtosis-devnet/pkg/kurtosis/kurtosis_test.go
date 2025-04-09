@@ -313,7 +313,7 @@ func TestGetEnvironmentInfo(t *testing.T) {
 			},
 			jwt: testJWTs,
 			want: &KurtosisEnvironment{
-				DevnetEnvironment: descriptors.DevnetEnvironment{
+				DevnetEnvironment: &descriptors.DevnetEnvironment{
 					ReverseProxyURL: kurtosisReverseProxyURL,
 					L1: &descriptors.Chain{
 						ID:       "1234",
@@ -393,7 +393,7 @@ func TestGetEnvironmentInfo(t *testing.T) {
 			},
 			jwt: testJWTs,
 			want: &KurtosisEnvironment{
-				DevnetEnvironment: descriptors.DevnetEnvironment{
+				DevnetEnvironment: &descriptors.DevnetEnvironment{
 					ReverseProxyURL: kurtosisReverseProxyURL,
 					L1: &descriptors.Chain{
 						ID:       "1234",
@@ -453,7 +453,7 @@ func TestGetEnvironmentInfo(t *testing.T) {
 			},
 			jwt: testJWTs,
 			want: &KurtosisEnvironment{
-				DevnetEnvironment: descriptors.DevnetEnvironment{
+				DevnetEnvironment: &descriptors.DevnetEnvironment{
 					ReverseProxyURL: kurtosisReverseProxyURL,
 					L1: &descriptors.Chain{
 						ID:       "1234",
