@@ -489,30 +489,6 @@ func verifyAllContractsHaveInterfaces() error {
 		return fmt.Errorf("failed to get current working directory: %w", err)
 	}
 
-	var interfaceTracker = make(map[string]bool)
-
-	// First, get all interface files to track which interfaces exist
-	interfaceFiles, err := common.FindFiles([]string{"forge-artifacts/**/*.json"}, []string{})
-	if err != nil {
-		return fmt.Errorf("failed to find interface files: %w", err)
-	}
-
-	for _, path := range interfaceFiles {
-		artifact, err := readArtifact(path)
-		if err != nil {
-			continue
-		}
-
-		contractName := strings.Split(filepath.Base(path), ".")[0]
-		contractDef := getContractDefinition(artifact, contractName)
-
-		if contractDef != nil && contractDef.ContractKind == "interface" && strings.HasPrefix(contractName, "I") {
-			// This is an interface, track the base name it corresponds to
-			baseName := contractName[1:] // Remove the "I" prefix
-			interfaceTracker[baseName] = true
-		}
-	}
-
 	// Process contract files using common.ProcessFilesGlob
 	processContract := func(path string) (*common.Void, []error) {
 		// Read the file to determine if it's a contract
@@ -535,11 +511,19 @@ func verifyAllContractsHaveInterfaces() error {
 					continue
 				}
 
-				// Check if interface exists
-				if !interfaceTracker[contractName] {
-					relativePath, _ := filepath.Rel(cwd, path)
-					errs = append(errs, fmt.Errorf("Contract %s in %s does not have a corresponding interface I%s",
-						contractName, relativePath, contractName))
+				// Get the relative path in the src directory
+				relativePath, _ := filepath.Rel(filepath.Join(cwd, "src"), path)
+				relativeDir := filepath.Dir(relativePath)
+
+				// Check if interface exists at the predictable location
+				// For src/path/to/my/Contract.sol, interface should be at interfaces/path/to/my/IContract.sol
+				interfacePath := filepath.Join(cwd, "interfaces", relativeDir, "I"+contractName+".sol")
+				if _, err := os.Stat(interfacePath); os.IsNotExist(err) {
+					// Get relative paths for error message
+					contractRelPath, _ := filepath.Rel(cwd, path)
+					interfaceRelPath := filepath.Join("interfaces", relativeDir, "I"+contractName+".sol")
+					errs = append(errs, fmt.Errorf("Contract %s in %s does not have a corresponding interface at %s",
+						contractName, contractRelPath, interfaceRelPath))
 				}
 			}
 		}
