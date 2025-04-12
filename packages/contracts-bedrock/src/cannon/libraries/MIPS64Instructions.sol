@@ -595,8 +595,8 @@ library MIPS64Instructions {
     function signExtend(uint64 _dat, uint64 _idx) internal pure returns (uint64 out_) {
         unchecked {
             bool isSigned = (_dat >> (_idx - 1)) & 1 != 0;
-            uint256 signed = ((1 << (arch.WORD_SIZE - _idx)) - 1) << _idx;
             uint256 mask = (1 << _idx) - 1;
+            uint256 signed = ~mask;
             return uint64(_dat & mask | (isSigned ? signed : 0));
         }
     }
