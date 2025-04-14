@@ -502,6 +502,8 @@ type ForkchoiceUpdatedResult struct {
 type SystemConfig struct {
 	// BatcherAddr identifies the batch-sender address used in batch-inbox data-transaction filtering.
 	BatcherAddr common.Address `json:"batcherAddr"`
+	// L1 address that batches are sent to.
+	BatchInboxAddr common.Address `json:"batchInboxAddr"`
 	// Overhead identifies the L1 fee overhead.
 	// Pre-Ecotone this is passed as-is to the engine.
 	// Post-Ecotone this is always zero, and not passed into the engine.

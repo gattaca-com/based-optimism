@@ -356,7 +356,7 @@ func (s *L2Batcher) ActL2BatchSubmitRaw(t Testing, payload []byte, txOpts ...fun
 		rawTx := &types.DynamicFeeTx{
 			ChainID:   s.rollupCfg.L1ChainID,
 			Nonce:     nonce,
-			To:        &s.rollupCfg.BatchInboxAddress,
+			To:        &s.rollupCfg.Genesis.SystemConfig.BatchInboxAddr,
 			GasTipCap: gasTipCap,
 			GasFeeCap: gasFeeCap,
 			Data:      payload,
@@ -381,7 +381,7 @@ func (s *L2Batcher) ActL2BatchSubmitRaw(t Testing, payload []byte, txOpts ...fun
 			blobFeeCap = uint256.NewInt(params.GWei)
 		}
 		txData = &types.BlobTx{
-			To:         s.rollupCfg.BatchInboxAddress,
+			To:         s.rollupCfg.Genesis.SystemConfig.BatchInboxAddr,
 			Data:       nil,
 			Gas:        params.TxGas, // intrinsic gas only
 			BlobHashes: blobHashes,
@@ -465,7 +465,7 @@ func (s *L2Batcher) ActL2BatchSubmitMultiBlob(t Testing, numBlobs int) {
 		blobFeeCap = uint256.NewInt(params.GWei)
 	}
 	txData := &types.BlobTx{
-		To:         s.rollupCfg.BatchInboxAddress,
+		To:         s.rollupCfg.Genesis.SystemConfig.BatchInboxAddr,
 		Data:       nil,
 		Gas:        params.TxGas, // intrinsic gas only
 		BlobHashes: blobHashes,
@@ -561,7 +561,7 @@ func (s *L2Batcher) ActSubmitSetCodeTx(t Testing) {
 	nonce, err := s.l1.PendingNonceAt(t.Ctx(), s.BatcherAddr)
 	require.NoError(t, err, "need batcher nonce")
 
-	tx, err := PrepareSignedSetCodeTx(chainId, s.l2BatcherCfg.BatcherKey, s.l1Signer, nonce, s.rollupCfg.BatchInboxAddress, s.ReadNextOutputFrame(t))
+	tx, err := PrepareSignedSetCodeTx(chainId, s.l2BatcherCfg.BatcherKey, s.l1Signer, nonce, s.rollupCfg.Genesis.SystemConfig.BatchInboxAddr, s.ReadNextOutputFrame(t))
 	require.NoError(t, err, "need to sign tx")
 
 	t.Log("submitting EIP 7702 Set Code Batcher Transaction...")

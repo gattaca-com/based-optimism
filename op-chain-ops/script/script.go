@@ -229,7 +229,7 @@ func NewHost(
 		HoloceneTime: nil,
 		JovianTime:   nil,
 		InteropTime:  nil,
-		Optimism:     nil,
+		FeeParams:    nil,
 	}
 
 	// Create an in-memory database, to host our temporary script state changes

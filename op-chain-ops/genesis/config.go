@@ -1010,7 +1010,7 @@ func (d *DeployConfig) RollupConfig(l1StartBlock *eth.BlockRef, l2GenesisBlockHa
 		return nil, errors.New("SystemConfigProxy cannot be address(0)")
 	}
 
-	chainOpConfig := &params.OptimismConfig{
+	chainFeeParams := &params.FeeParamsConfig{
 		EIP1559Elasticity:        d.EIP1559Elasticity,
 		EIP1559Denominator:       d.EIP1559Denominator,
 		EIP1559DenominatorCanyon: &d.EIP1559DenominatorCanyon,
@@ -1040,6 +1040,7 @@ func (d *DeployConfig) RollupConfig(l1StartBlock *eth.BlockRef, l2GenesisBlockHa
 			},
 			L2Time:       l1StartBlock.Time,
 			SystemConfig: d.GenesisSystemConfig(),
+			FeeParams:    chainFeeParams,
 		},
 		BlockTime:               d.L2BlockTime,
 		MaxSequencerDrift:       d.MaxSequencerDrift,
@@ -1047,7 +1048,6 @@ func (d *DeployConfig) RollupConfig(l1StartBlock *eth.BlockRef, l2GenesisBlockHa
 		ChannelTimeoutBedrock:   d.ChannelTimeoutBedrock,
 		L1ChainID:               new(big.Int).SetUint64(d.L1ChainID),
 		L2ChainID:               new(big.Int).SetUint64(d.L2ChainID),
-		BatchInboxAddress:       d.BatchInboxAddress,
 		DepositContractAddress:  d.OptimismPortalProxy,
 		L1SystemConfigAddress:   d.SystemConfigProxy,
 		RegolithTime:            d.RegolithTime(l1StartTime),
@@ -1063,7 +1063,6 @@ func (d *DeployConfig) RollupConfig(l1StartBlock *eth.BlockRef, l2GenesisBlockHa
 		InteropTime:             d.InteropTime(l1StartTime),
 		ProtocolVersionsAddress: d.ProtocolVersionsProxy,
 		AltDAConfig:             altDA,
-		ChainOpConfig:           chainOpConfig,
 	}, nil
 }
 
@@ -1072,6 +1071,7 @@ func (d *DeployConfig) RollupConfig(l1StartBlock *eth.BlockRef, l2GenesisBlockHa
 func (d *DeployConfig) GenesisSystemConfig() eth.SystemConfig {
 	return eth.SystemConfig{
 		BatcherAddr:       d.BatchSenderAddress,
+		BatchInboxAddr:    d.BatchInboxAddress,
 		Overhead:          eth.Bytes32(common.BigToHash(new(big.Int).SetUint64(d.GasPriceOracleOverhead))),
 		Scalar:            d.FeeScalar(),
 		GasLimit:          uint64(d.L2GenesisBlockGasLimit),

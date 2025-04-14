@@ -145,7 +145,7 @@ func TestBatchSubmitter_sendTx_FloorDataGas(t *testing.T) {
 		},
 	}
 	candidate := txmgr.TxCandidate{
-		To:     &bs.RollupConfig.BatchInboxAddress,
+		To:     &bs.RollupConfig.Genesis.SystemConfig.BatchInboxAddr,
 		TxData: txData.CallData(),
 	}
 

@@ -49,6 +49,11 @@ type Genesis struct {
 	// The L2 genesis block may not include transactions, and thus cannot encode the config values,
 	// unlike later L2 blocks.
 	SystemConfig eth.SystemConfig `json:"system_config"`
+	// FeeParams relates to the EIP1559 fees for the execution layer of the given L2 chain.
+	// It is used during safe chain consolidation to translate zero SystemConfig EIP1559
+	// parameters to the protocol values, like the execution layer does.
+	// If missing, it is loaded by the op-node from the embedded superchain config at startup.
+	FeeParams *params.FeeParamsConfig `json:"fee_params,omitempty"`
 }
 
 type AltDAConfig struct {
@@ -134,8 +139,6 @@ type Config struct {
 	// Note: below addresses are part of the block-derivation process,
 	// and required to be the same network-wide to stay in consensus.
 
-	// L1 address that batches are sent to.
-	BatchInboxAddress common.Address `json:"batch_inbox_address"`
 	// L1 Deposit Contract Address
 	DepositContractAddress common.Address `json:"deposit_contract_address"`
 	// L1 System Config Address
@@ -143,12 +146,6 @@ type Config struct {
 
 	// L1 address that declares the protocol versions, optional (Beta feature)
 	ProtocolVersionsAddress common.Address `json:"protocol_versions_address,omitempty"`
-
-	// ChainOpConfig is the OptimismConfig of the execution layer ChainConfig.
-	// It is used during safe chain consolidation to translate zero SystemConfig EIP1559
-	// parameters to the protocol values, like the execution layer does.
-	// If missing, it is loaded by the op-node from the embedded superchain config at startup.
-	ChainOpConfig *params.OptimismConfig `json:"chain_op_config,omitempty"`
 
 	// Optional Features
 
@@ -308,7 +305,7 @@ func (cfg *Config) Check() error {
 	if cfg.Genesis.SystemConfig.GasLimit == 0 {
 		return ErrMissingGasLimit
 	}
-	if cfg.BatchInboxAddress == (common.Address{}) {
+	if cfg.Genesis.SystemConfig.BatchInboxAddr == (common.Address{}) {
 		return ErrMissingBatchInboxAddress
 	}
 	if cfg.DepositContractAddress == (common.Address{}) {

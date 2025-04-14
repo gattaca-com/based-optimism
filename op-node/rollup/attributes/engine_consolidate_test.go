@@ -20,7 +20,7 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/testutils"
 )
 
-var defaultOpConfig = &params.OptimismConfig{
+var defaultOpConfig = &params.FeeParamsConfig{
 	EIP1559Elasticity:        6,
 	EIP1559Denominator:       50,
 	EIP1559DenominatorCanyon: ptr(uint64(250)),
@@ -188,8 +188,8 @@ func TestAttributesMatch(t *testing.T) {
 	pastTime := uint64(0)
 	futureTime := uint64(100)
 
-	rollupCfgPreCanyon := &rollup.Config{CanyonTime: &futureTime, ChainOpConfig: defaultOpConfig}
-	rollupCfgPreIsthmus := &rollup.Config{CanyonTime: &pastTime, IsthmusTime: &futureTime, ChainOpConfig: defaultOpConfig}
+	rollupCfgPreCanyon := &rollup.Config{CanyonTime: &futureTime, Genesis: rollup.Genesis{FeeParams: defaultOpConfig}}
+	rollupCfgPreIsthmus := &rollup.Config{CanyonTime: &pastTime, IsthmusTime: &futureTime, Genesis: rollup.Genesis{FeeParams: defaultOpConfig}}
 
 	tests := []struct {
 		args      matchArgs
@@ -324,9 +324,9 @@ func TestWithdrawalsMatch(t *testing.T) {
 
 	emptyWithdrawals := make(types.Withdrawals, 0)
 
-	rollupCfgPreCanyonChecks := &rollup.Config{CanyonTime: &canyonTimeInFuture, ChainOpConfig: defaultOpConfig}
-	rollupCfgPreIsthmusChecks := &rollup.Config{CanyonTime: &canyonTimeInPast, IsthmusTime: &isthmusTimeInFuture, ChainOpConfig: defaultOpConfig}
-	rollupCfgPostIsthmusChecks := &rollup.Config{CanyonTime: &canyonTimeInPast, IsthmusTime: &isthmusTimeInPast, ChainOpConfig: defaultOpConfig}
+	rollupCfgPreCanyonChecks := &rollup.Config{CanyonTime: &canyonTimeInFuture, Genesis: rollup.Genesis{FeeParams: defaultOpConfig}}
+	rollupCfgPreIsthmusChecks := &rollup.Config{CanyonTime: &canyonTimeInPast, IsthmusTime: &isthmusTimeInFuture, Genesis: rollup.Genesis{FeeParams: defaultOpConfig}}
+	rollupCfgPostIsthmusChecks := &rollup.Config{CanyonTime: &canyonTimeInPast, IsthmusTime: &isthmusTimeInPast, Genesis: rollup.Genesis{FeeParams: defaultOpConfig}}
 
 	tests := []struct {
 		cfg   *rollup.Config

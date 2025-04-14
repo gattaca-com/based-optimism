@@ -84,10 +84,12 @@ func TestAltDADataSource(t *testing.T) {
 			L1:     refA.ID(),
 			L2:     refA0.ID(),
 			L2Time: refA0.Time,
+			SystemConfig: eth.SystemConfig{
+				BatchInboxAddr: batcherInbox,
+			},
 		},
-		BlockTime:         1,
-		SeqWindowSize:     20,
-		BatchInboxAddress: batcherInbox,
+		BlockTime:     1,
+		SeqWindowSize: 20,
 		AltDAConfig: &rollup.AltDAConfig{
 			DAChallengeWindow: pcfg.ChallengeWindow,
 			DAResolveWindow:   pcfg.ResolveWindow,
@@ -327,10 +329,12 @@ func TestAltDADataSourceStall(t *testing.T) {
 			L1:     refA.ID(),
 			L2:     refA0.ID(),
 			L2Time: refA0.Time,
+			SystemConfig: eth.SystemConfig{
+				BatchInboxAddr: batcherInbox,
+			},
 		},
-		BlockTime:         1,
-		SeqWindowSize:     20,
-		BatchInboxAddress: batcherInbox,
+		BlockTime:     1,
+		SeqWindowSize: 20,
 		AltDAConfig: &rollup.AltDAConfig{
 			DAChallengeWindow: pcfg.ChallengeWindow,
 			DAResolveWindow:   pcfg.ResolveWindow,
@@ -449,10 +453,12 @@ func TestAltDADataSourceInvalidData(t *testing.T) {
 			L1:     refA.ID(),
 			L2:     refA0.ID(),
 			L2Time: refA0.Time,
+			SystemConfig: eth.SystemConfig{
+				BatchInboxAddr: batcherInbox,
+			},
 		},
-		BlockTime:         1,
-		SeqWindowSize:     20,
-		BatchInboxAddress: batcherInbox,
+		BlockTime:     1,
+		SeqWindowSize: 20,
 		AltDAConfig: &rollup.AltDAConfig{
 			DAChallengeWindow: pcfg.ChallengeWindow,
 			DAResolveWindow:   pcfg.ResolveWindow,

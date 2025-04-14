@@ -191,6 +191,11 @@ func Setup(t require.TestingT, deployParams *DeployParams, alloc *AllocParams) *
 			},
 			L2Time:       uint64(deployConf.L1GenesisBlockTimestamp),
 			SystemConfig: SystemConfigFromDeployConfig(deployConf),
+			FeeParams: &params.FeeParamsConfig{
+				EIP1559Elasticity:        deployConf.EIP1559Elasticity,
+				EIP1559Denominator:       deployConf.EIP1559Denominator,
+				EIP1559DenominatorCanyon: &deployConf.EIP1559DenominatorCanyon,
+			},
 		},
 		BlockTime:              deployConf.L2BlockTime,
 		MaxSequencerDrift:      deployConf.MaxSequencerDrift,
@@ -198,7 +203,6 @@ func Setup(t require.TestingT, deployParams *DeployParams, alloc *AllocParams) *
 		ChannelTimeoutBedrock:  deployConf.ChannelTimeoutBedrock,
 		L1ChainID:              new(big.Int).SetUint64(deployConf.L1ChainID),
 		L2ChainID:              new(big.Int).SetUint64(deployConf.L2ChainID),
-		BatchInboxAddress:      deployConf.BatchInboxAddress,
 		DepositContractAddress: deployConf.OptimismPortalProxy,
 		L1SystemConfigAddress:  deployConf.SystemConfigProxy,
 		RegolithTime:           deployConf.RegolithTime(uint64(deployConf.L1GenesisBlockTimestamp)),
@@ -213,11 +217,6 @@ func Setup(t require.TestingT, deployParams *DeployParams, alloc *AllocParams) *
 		JovianTime:             deployConf.JovianTime(uint64(deployConf.L1GenesisBlockTimestamp)),
 		InteropTime:            deployConf.InteropTime(uint64(deployConf.L1GenesisBlockTimestamp)),
 		AltDAConfig:            pcfg,
-		ChainOpConfig: &params.OptimismConfig{
-			EIP1559Elasticity:        deployConf.EIP1559Elasticity,
-			EIP1559Denominator:       deployConf.EIP1559Denominator,
-			EIP1559DenominatorCanyon: &deployConf.EIP1559DenominatorCanyon,
-		},
 	}
 
 	require.NoError(t, rollupCfg.Check())

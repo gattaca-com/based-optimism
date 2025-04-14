@@ -919,7 +919,7 @@ func (l *BatchSubmitter) blobTxCandidate(data txData) (*txmgr.TxCandidate, error
 		"size", size, "last_size", lastSize, "num_blobs", len(blobs))
 	l.Metr.RecordBlobUsedBytes(lastSize)
 	return &txmgr.TxCandidate{
-		To:    &l.RollupConfig.BatchInboxAddress,
+		To:    &l.RollupConfig.Genesis.SystemConfig.BatchInboxAddr,
 		Blobs: blobs,
 	}, nil
 }
@@ -927,7 +927,7 @@ func (l *BatchSubmitter) blobTxCandidate(data txData) (*txmgr.TxCandidate, error
 func (l *BatchSubmitter) calldataTxCandidate(data []byte) *txmgr.TxCandidate {
 	l.Log.Info("Building Calldata transaction candidate", "size", len(data))
 	return &txmgr.TxCandidate{
-		To:     &l.RollupConfig.BatchInboxAddress,
+		To:     &l.RollupConfig.Genesis.SystemConfig.BatchInboxAddr,
 		TxData: data,
 	}
 }

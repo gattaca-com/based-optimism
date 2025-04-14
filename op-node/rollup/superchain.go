@@ -24,10 +24,10 @@ func LoadOPStackRollupConfig(chainID uint64) (*Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to retrieve chain %d config: %w", chainID, err)
 	}
-	chOpConfig := &params.OptimismConfig{
-		EIP1559Elasticity:        chConfig.Optimism.EIP1559Elasticity,
-		EIP1559Denominator:       chConfig.Optimism.EIP1559Denominator,
-		EIP1559DenominatorCanyon: chConfig.Optimism.EIP1559DenominatorCanyon,
+	chFeeConfig := &params.FeeParamsConfig{
+		EIP1559Elasticity:        chConfig.Genesis.FeeParams.EIP1559Elasticity,
+		EIP1559Denominator:       chConfig.Genesis.FeeParams.EIP1559Denominator,
+		EIP1559DenominatorCanyon: chConfig.Genesis.FeeParams.EIP1559DenominatorCanyon,
 	}
 
 	superConfig, err := superchain.GetSuperchain(chain.Network)
@@ -38,10 +38,11 @@ func LoadOPStackRollupConfig(chainID uint64) (*Config, error) {
 	sysCfg := chConfig.Genesis.SystemConfig
 
 	genesisSysConfig := eth.SystemConfig{
-		BatcherAddr: sysCfg.BatcherAddr,
-		Overhead:    eth.Bytes32(sysCfg.Overhead),
-		Scalar:      eth.Bytes32(sysCfg.Scalar),
-		GasLimit:    sysCfg.GasLimit,
+		BatcherAddr:    sysCfg.BatcherAddr,
+		BatchInboxAddr: sysCfg.BatchInboxAddr,
+		Overhead:       eth.Bytes32(sysCfg.Overhead),
+		Scalar:         eth.Bytes32(sysCfg.Scalar),
+		GasLimit:       sysCfg.GasLimit,
 	}
 
 	addrs := chConfig.Addresses
@@ -69,6 +70,7 @@ func LoadOPStackRollupConfig(chainID uint64) (*Config, error) {
 				Number: chConfig.Genesis.L2.Number,
 			},
 			L2Time:       chConfig.Genesis.L2Time,
+			FeeParams:    chFeeConfig,
 			SystemConfig: genesisSysConfig,
 		},
 		// The below chain parameters can be different per OP-Stack chain,
@@ -91,11 +93,9 @@ func LoadOPStackRollupConfig(chainID uint64) (*Config, error) {
 		PectraBlobScheduleTime: hardforks.PectraBlobScheduleTime,
 		IsthmusTime:            hardforks.IsthmusTime,
 		JovianTime:             hardforks.JovianTime,
-		BatchInboxAddress:      chConfig.BatchInboxAddr,
 		DepositContractAddress: *addrs.OptimismPortalProxy,
 		L1SystemConfigAddress:  *addrs.SystemConfigProxy,
 		AltDAConfig:            altDA,
-		ChainOpConfig:          chOpConfig,
 	}
 
 	cfg.ProtocolVersionsAddress = superConfig.ProtocolVersionsAddr

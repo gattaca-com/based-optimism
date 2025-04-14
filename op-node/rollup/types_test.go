@@ -34,10 +34,11 @@ func randConfig() *Config {
 			L2:     eth.BlockID{Hash: randHash(), Number: 1337},
 			L2Time: uint64(time.Now().Unix()),
 			SystemConfig: eth.SystemConfig{
-				BatcherAddr: randAddr(),
-				Overhead:    randHash(),
-				Scalar:      randHash(),
-				GasLimit:    1234567,
+				BatcherAddr:    randAddr(),
+				BatchInboxAddr: randAddr(),
+				Overhead:       randHash(),
+				Scalar:         randHash(),
+				GasLimit:       1234567,
 			},
 		},
 		BlockTime:              2,
@@ -46,7 +47,6 @@ func randConfig() *Config {
 		ChannelTimeoutBedrock:  123,
 		L1ChainID:              big.NewInt(900),
 		L2ChainID:              big.NewInt(901),
-		BatchInboxAddress:      randAddr(),
 		DepositContractAddress: randAddr(),
 		L1SystemConfigAddress:  randAddr(),
 	}
@@ -488,7 +488,7 @@ func TestConfig_Check(t *testing.T) {
 		},
 		{
 			name:        "NoBatchInboxAddress",
-			modifier:    func(cfg *Config) { cfg.BatchInboxAddress = common.Address{} },
+			modifier:    func(cfg *Config) { cfg.Genesis.SystemConfig.BatchInboxAddr = common.Address{} },
 			expectedErr: ErrMissingBatchInboxAddress,
 		},
 		{

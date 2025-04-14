@@ -41,7 +41,7 @@ func NewMiner(t *testing.T, logger log.Logger, isthmusTime uint64) (*Miner, *cor
 	config.IsthmusTime = &isthmusTime
 	config.PragueTime = &isthmusTime
 	denomCanyon := uint64(250)
-	config.Optimism = &params.OptimismConfig{
+	config.FeeParams = &params.FeeParamsConfig{
 		EIP1559Denominator:       50,
 		EIP1559Elasticity:        10,
 		EIP1559DenominatorCanyon: &denomCanyon,

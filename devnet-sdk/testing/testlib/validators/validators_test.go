@@ -52,7 +52,7 @@ func TestValidators(t *testing.T) {
 							},
 						},
 						config: &params.ChainConfig{
-							Optimism:    &params.OptimismConfig{},
+							FeeParams:   &params.FeeParamsConfig{},
 							IsthmusTime: Uint64Ptr(0),
 						},
 						nodes: []system.Node{
@@ -97,7 +97,7 @@ func TestValidators(t *testing.T) {
 				&mockL2Chain{
 					mockChain: mockChain{
 						config: &params.ChainConfig{
-							Optimism:    &params.OptimismConfig{},
+							FeeParams:   &params.FeeParamsConfig{},
 							IsthmusTime: Uint64Ptr(50),
 						},
 						nodes: []system.Node{
@@ -131,7 +131,7 @@ func TestValidators(t *testing.T) {
 				&mockL2Chain{
 					mockChain: mockChain{
 						config: &params.ChainConfig{
-							Optimism:    &params.OptimismConfig{},
+							FeeParams:   &params.FeeParamsConfig{},
 							IsthmusTime: Uint64Ptr(150),
 						},
 						nodes: []system.Node{
@@ -159,7 +159,7 @@ func TestValidators(t *testing.T) {
 				&mockL2Chain{
 					mockChain: mockChain{
 						config: &params.ChainConfig{
-							Optimism:    &params.OptimismConfig{},
+							FeeParams:   &params.FeeParamsConfig{},
 							IsthmusTime: Uint64Ptr(150), // Activates after current timestamp
 						},
 						nodes: []system.Node{
@@ -193,7 +193,7 @@ func TestValidators(t *testing.T) {
 				&mockL2Chain{
 					mockChain: mockChain{
 						config: &params.ChainConfig{
-							Optimism:    &params.OptimismConfig{},
+							FeeParams:   &params.FeeParamsConfig{},
 							IsthmusTime: Uint64Ptr(50),
 						},
 						nodes: []system.Node{
