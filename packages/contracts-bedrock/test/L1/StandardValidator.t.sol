@@ -8,7 +8,7 @@ import { Test } from "forge-std/Test.sol";
 import { Config } from "scripts/libraries/Config.sol";
 
 // Target contract
-import { StandardValidatorBase, StandardValidatorV300 } from "src/L1/StandardValidator.sol";
+import { StandardValidator } from "src/L1/StandardValidator.sol";
 
 // Libraries
 import { GameType, GameTypes, Hash } from "src/dispute/lib/Types.sol";
@@ -38,7 +38,7 @@ import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
 import { IStandardBridge } from "interfaces/universal/IStandardBridge.sol";
 
 contract StandardValidatorTest is Test {
-    StandardValidatorV300 validator;
+    StandardValidator validator;
     ISuperchainConfig superchainConfig;
     address l1PAOMultisig;
     address mips;
@@ -105,8 +105,8 @@ contract StandardValidatorTest is Test {
         vm.mockCall(address(proxyAdmin), abi.encodeCall(IProxyAdmin.owner, ()), abi.encode(l1PAOMultisig));
 
         // Deploy validator with all required constructor args
-        validator = new StandardValidatorV300(
-            StandardValidatorBase.ImplementationsBase({
+        validator = new StandardValidator(
+            StandardValidator.ImplementationsBase({
                 systemConfigImpl: makeAddr("systemConfigImpl"),
                 optimismPortalImpl: makeAddr("optimismPortalImpl"),
                 l1CrossDomainMessengerImpl: makeAddr("l1CrossDomainMessengerImpl"),
@@ -965,7 +965,7 @@ contract StandardValidatorTest is Test {
     }
 
     function validate(bool _allowFailure) internal view returns (string memory) {
-        StandardValidatorV300.InputV300 memory input = StandardValidatorV300.InputV300({
+        StandardValidator.InputV300 memory input = StandardValidator.InputV300({
             proxyAdmin: proxyAdmin,
             sysCfg: systemConfig,
             absolutePrestate: absolutePrestate,
@@ -986,7 +986,7 @@ contract StandardValidatorTest is Test {
         );
 
         // Expect revert with PDDG-10 error message
-        vm.expectRevert("StandardValidatorV300: PDDG-10");
+        vm.expectRevert("StandardValidator: PDDG-10");
         validate(false);
     }
 
