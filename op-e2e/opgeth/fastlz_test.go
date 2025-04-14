@@ -137,7 +137,7 @@ func FuzzFjordCostFunction(f *testing.F) {
 	zeroTime := uint64(0)
 	// create a config where ecotone/fjord upgrades are active
 	config := &params.ChainConfig{
-		Optimism:     params.OptimismTestConfig.Optimism,
+		FeeParams:    params.OptimismTestConfig.FeeParams,
 		RegolithTime: &zeroTime,
 		EcotoneTime:  &zeroTime,
 		FjordTime:    &zeroTime,
