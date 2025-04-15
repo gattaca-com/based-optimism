@@ -38,6 +38,8 @@ cannon-embeds: cannon32-impl cannon64-impl
 	# 32-bit multithreaded vm
 	@cp bin/cannon32-impl ./multicannon/embeds/cannon-5
 	# 64-bit multithreaded vm
+	@cp bin/cannon64-impl ./multicannon/embeds/cannon-6
+	# 64-bit multithreaded vm with eventfd2
 	@cp bin/cannon64-impl ./multicannon/embeds/cannon-7
 
 cannon: cannon-embeds
