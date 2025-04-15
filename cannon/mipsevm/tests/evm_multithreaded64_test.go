@@ -10,6 +10,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/ethereum-optimism/optimism/cannon/mipsevm/versions"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
 
@@ -464,7 +465,14 @@ var NoopSyscalls64 = map[string]uint32{
 }
 
 func TestEVM_NoopSyscall64(t *testing.T) {
-	testNoopSyscall(t, NoopSyscalls64)
+	t.Parallel()
+	for _, version := range GetMultiThreadedTestCases(t) {
+		noOpCalls := maps.Clone(NoopSyscalls64)
+		if version.Version == versions.VersionMultiThreaded64_v3 {
+			delete(noOpCalls, "SysEventFd2")
+		}
+		testNoopSyscall(t, version, noOpCalls)
+	}
 }
 
 func TestEVM_UnsupportedSyscall64(t *testing.T) {
@@ -481,7 +489,13 @@ func TestEVM_UnsupportedSyscall64(t *testing.T) {
 		unsupportedSyscalls = append(unsupportedSyscalls, candidate)
 	}
 
-	testUnsupportedSyscall(t, unsupportedSyscalls)
+	for _, version := range GetMultiThreadedTestCases(t) {
+		unsupported := unsupportedSyscalls
+		if version.Version == versions.VersionMultiThreaded64_v3 {
+			unsupported = append(slices.Clone(unsupported), arch.SysEventFd2)
+		}
+		testUnsupportedSyscall(t, version, unsupported)
+	}
 }
 
 // Asserts the undefined syscall handling on cannon64 triggers a VM panic
@@ -493,16 +507,18 @@ func TestEVM_UndefinedSyscall(t *testing.T) {
 		"SysLlseek":  arch.SysLlseek,
 	}
 	for name, val := range undefinedSyscalls {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			goVm, state, contracts := setup(t, int(val), nil)
-			testutil.StoreInstruction(state.Memory, state.GetPC(), syscallInsn)
-			state.GetRegistersRef()[2] = Word(val) // Set syscall number
-			proofData := multiThreadedProofGenerator(t, state)
+		for _, version := range GetMultiThreadedTestCases(t) {
+			t.Run(fmt.Sprintf("%v-%v", version.Name, name), func(t *testing.T) {
+				t.Parallel()
+				goVm, state, contracts := setupWithTestCase(t, version, int(val), nil)
+				testutil.StoreInstruction(state.Memory, state.GetPC(), syscallInsn)
+				state.GetRegistersRef()[2] = Word(val) // Set syscall number
+				proofData := multiThreadedProofGenerator(t, state)
 
-			require.Panics(t, func() { _, _ = goVm.Step(true) })
-			errorMessage := "unimplemented syscall"
-			testutil.AssertEVMReverts(t, state, contracts, nil, proofData, testutil.CreateErrorStringMatcher(errorMessage))
-		})
+				require.Panics(t, func() { _, _ = goVm.Step(true) })
+				errorMessage := "unimplemented syscall"
+				testutil.AssertEVMReverts(t, state, contracts, nil, proofData, testutil.CreateErrorStringMatcher(errorMessage))
+			})
+		}
 	}
 }
