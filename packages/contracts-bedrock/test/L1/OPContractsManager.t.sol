@@ -941,7 +941,7 @@ contract OPContractsManager_TestInit is Test {
                 _args: DeployUtils.encodeConstructor(abi.encodeCall(IDelayedWETH.__constructor__, (3)))
             }),
             mipsImpl: DeployUtils.create1({
-                _name: "MIPS64",
+                _name: "MIPS64_v4",
                 _args: DeployUtils.encodeConstructor(abi.encodeCall(IMIPS.__constructor__, (oracle)))
             })
         });

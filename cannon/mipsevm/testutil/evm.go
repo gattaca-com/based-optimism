@@ -72,8 +72,12 @@ func loadArtifacts(version MipsVersion) (*Artifacts, error) {
 		} else {
 			mips, err = artifactFS.ReadArtifact("MIPS64.sol", "MIPS64")
 		}
+
+	case MipsMultithreaded_v4:
+		mips, err = artifactFS.ReadArtifact("MIPS64_v4.sol", "MIPS64_v4")
+
 	default:
-		return nil, fmt.Errorf("Unknown MipsVersion supplied: %v", version)
+		return nil, fmt.Errorf("unknown MipsVersion supplied: %v", version)
 	}
 	if err != nil {
 		return nil, err
@@ -185,6 +189,8 @@ func SourceMapTracer(t require.TestingT, version MipsVersion, mips *foundry.Arti
 		} else {
 			mipsSrcMap, err = srcFS.SourceMap(mips, "MIPS64")
 		}
+	case MipsMultithreaded_v4:
+		mipsSrcMap, err = srcFS.SourceMap(mips, "MIPS64_v4")
 	default:
 		require.Fail(t, "invalid mips version")
 	}

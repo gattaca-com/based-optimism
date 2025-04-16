@@ -847,10 +847,19 @@ contract DeployImplementations is Script {
                 revert("DeployImplementations: Only Mips64 should be deployed on Mainnet or Sepolia");
             }
         }
-
+        string memory contractName;
+        if (mipsVersion == 1) {
+            contractName = "MIPS";
+        } else if (mipsVersion == 2) {
+            contractName = "MIPS64";
+        } else if (mipsVersion == 3) {
+            contractName = "MIPS64_v4";
+        } else {
+            revert("Unknown MIPS version");
+        }
         IMIPS singleton = IMIPS(
             DeployUtils.createDeterministic({
-                _name: mipsVersion == 1 ? "MIPS" : "MIPS64",
+                _name: contractName,
                 _args: DeployUtils.encodeConstructor(abi.encodeCall(IMIPS.__constructor__, (preimageOracle))),
                 _salt: _salt
             })

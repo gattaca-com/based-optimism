@@ -34,7 +34,17 @@ contract DeployMIPS2 is Script {
 
     function deployMipsSingleton(Input memory _input, Output memory _output) internal {
         uint256 mipsVersion = _input.mipsVersion;
-        string memory contractName = mipsVersion == 1 ? "MIPS" : "MIPS64";
+
+        string memory contractName;
+        if (mipsVersion == 1) {
+            contractName = "MIPS";
+        } else if (mipsVersion == 2) {
+            contractName = "MIPS64";
+        } else if (mipsVersion == 3) {
+            contractName = "MIPS64_v4";
+        } else {
+            revert("Unknown MIPS version");
+        }
 
         IMIPS singleton = IMIPS(
             DeployUtils.createDeterministic({

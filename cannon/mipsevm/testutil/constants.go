@@ -11,4 +11,5 @@ type MipsVersion int
 const (
 	MipsSingleThreaded MipsVersion = iota
 	MipsMultithreaded
+	MipsMultithreaded_v4
 )
