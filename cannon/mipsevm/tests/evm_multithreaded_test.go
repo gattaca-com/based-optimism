@@ -234,7 +234,6 @@ func TestEVM_MT_StoreOpsClearMemReservation32(t *testing.T) {
 }
 
 func TestEVM_SysClone_FlagHandling(t *testing.T) {
-	contracts := testutil.TestContractsSetup(t, testutil.MipsMultithreaded)
 
 	cases := []struct {
 		name  string
@@ -263,6 +262,7 @@ func TestEVM_SysClone_FlagHandling(t *testing.T) {
 				continue
 			}
 			t.Run(fmt.Sprintf("%v-%v", version.String(), c.name), func(t *testing.T) {
+				contracts := testutil.TestContractsSetup(t, testutil.MipsMultithreaded, uint8(version))
 				state := multithreaded.CreateEmptyState()
 				testutil.StoreInstruction(state.Memory, state.GetPC(), syscallInsn)
 				state.GetRegistersRef()[2] = arch.SysClone // Set syscall number
