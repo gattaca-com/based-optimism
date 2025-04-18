@@ -91,7 +91,7 @@ func TestChannelManager_NextTxData(t *testing.T) {
 
 	// Nil pending channel should return EOF
 	returnedTxData, err := m.nextTxData(nil)
-	require.ErrorIs(t, err, io.EOF)
+	require.ErrorIs(t, err, ErrNoTxData)
 	require.Equal(t, txData{}, returnedTxData)
 
 	// Set the pending channel
@@ -101,7 +101,7 @@ func TestChannelManager_NextTxData(t *testing.T) {
 	channel := m.currentChannel
 	require.NotNil(t, channel)
 	returnedTxData, err = m.nextTxData(channel)
-	require.ErrorIs(t, err, io.EOF)
+	require.ErrorIs(t, err, ErrNoTxData)
 	require.Equal(t, txData{}, returnedTxData)
 
 	// Manually push a frame into the pending channel
