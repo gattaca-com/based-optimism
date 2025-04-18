@@ -104,7 +104,7 @@ func ChannelManagerReturnsErrReorgWhenDrained(t *testing.T, batchType uint) {
 	_, err := m.TxData(eth.BlockID{}, false)
 	require.NoError(t, err)
 	_, err = m.TxData(eth.BlockID{}, false)
-	require.ErrorIs(t, err, io.EOF)
+	require.ErrorIs(t, err, ErrNoTxData)
 
 	require.ErrorIs(t, m.AddL2Block(x), ErrReorg)
 }
@@ -213,7 +213,7 @@ func ChannelManager_TxResend(t *testing.T, batchType uint) {
 
 	// ensure channel is drained
 	_, err = m.TxData(eth.BlockID{}, false)
-	require.ErrorIs(err, io.EOF)
+	require.ErrorIs(err, ErrNoTxData)
 
 	// requeue frame
 	m.TxFailed(txdata0.ID())
@@ -362,7 +362,7 @@ func TestChannelManager_TxData(t *testing.T) {
 
 			// Call TxData a first time to trigger blocks->channels pipeline
 			_, err := m.TxData(eth.BlockID{}, false)
-			require.ErrorIs(t, err, io.EOF)
+			require.ErrorIs(t, err, ErrNoTxData)
 
 			// The test requires us to have something in the channel queue
 			// at this point, but not yet ready to send and not full
@@ -384,7 +384,7 @@ func TestChannelManager_TxData(t *testing.T) {
 				if err == nil && data.Len() > 0 {
 					break
 				}
-				if !errors.Is(err, io.EOF) {
+				if !errors.Is(err, ErrNoTxData) {
 					require.NoError(t, err)
 				}
 			}
