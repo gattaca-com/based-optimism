@@ -1028,7 +1028,7 @@ func TestEVM_HelloProgram(t *testing.T) {
 			state := goVm.GetState()
 
 			start := time.Now()
-			for i := 0; i < 430_000; i++ {
+			for i := 0; i < 450_000; i++ {
 				step := goVm.GetState().GetStep()
 				if goVm.GetState().GetExited() {
 					break
