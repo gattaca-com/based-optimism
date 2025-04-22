@@ -85,20 +85,12 @@ func (store *BlobsStore) GetAllSidecars(ctx context.Context, l1Timestamp uint64)
 		return nil, fmt.Errorf("no blobs known with given time: %w", ethereum.NotFound)
 	}
 
-	// Find the maximum index to properly size the slice
-	maxIndex := uint64(0)
-	for h := range m {
-		if h.Index > maxIndex {
-			maxIndex = h.Index
-		}
-	}
-
-	// Create a slice with appropriate size
-	out := make([]*eth.BlobSidecar, maxIndex+1)
+	// Create a slice with capacity based on number of blobs
+	result := make([]*eth.BlobSidecar, 0, len(m))
 
 	for h, b := range m {
 		if b == nil {
-			return nil, fmt.Errorf("blob %d %s is nil, cannot copy: %w", h.Index, h.Hash, ethereum.NotFound)
+			return nil, fmt.Errorf("blob %d %s is nil, cannot process: %w", h.Index, h.Hash, ethereum.NotFound)
 		}
 
 		commitment, err := kzg4844.BlobToCommitment(b.KZGBlob())
@@ -109,20 +101,13 @@ func (store *BlobsStore) GetAllSidecars(ctx context.Context, l1Timestamp uint64)
 		if err != nil {
 			return nil, fmt.Errorf("failed to compute blob proof: %w", err)
 		}
-		out[h.Index] = &eth.BlobSidecar{
+
+		result = append(result, &eth.BlobSidecar{
 			Index:         eth.Uint64String(h.Index),
 			Blob:          *b,
 			KZGCommitment: eth.Bytes48(commitment),
 			KZGProof:      eth.Bytes48(proof),
-		}
-	}
-
-	// Remove any nil elements from the slice
-	result := make([]*eth.BlobSidecar, 0, len(m))
-	for _, sidecar := range out {
-		if sidecar != nil {
-			result = append(result, sidecar)
-		}
+		})
 	}
 
 	return result, nil
