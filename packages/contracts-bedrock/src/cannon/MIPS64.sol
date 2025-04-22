@@ -92,8 +92,8 @@ contract MIPS64 is ISemver {
 
     /// @param _oracle The address of the preimage oracle contract.
     constructor(IPreimageOracle _oracle, uint256 _stateVersion) {
-        // Supports VersionMultiThreaded64_v3 (v6)
-        if (_stateVersion != 6) {
+        // Supports VersionMultiThreaded64_v3 (6) and VersionMultiThreaded64_v4 (7)
+        if (_stateVersion != 6 && _stateVersion != 7) {
             revert UnsupportedStateVersion();
         }
         ORACLE = _oracle;
@@ -622,8 +622,9 @@ contract MIPS64 is ISemver {
             } else if (syscall_no == sys.SYS_LSEEK) {
                 // ignored
             } else if (syscall_no == sys.SYS_EVENTFD2) {
-                // ignored
-                // TODO(#14692) Switch based on VM version / feature toggle here
+                if (STATE_VERSION < 7) {
+                    revert("MIPS64: unimplemented syscall");
+                }
             } else {
                 revert("MIPS64: unimplemented syscall");
             }
