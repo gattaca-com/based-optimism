@@ -486,7 +486,7 @@ contract StandardValidator {
         );
         _errors = internalRequire(
             _admin.getProxyImplementation(address(_asr)) == anchorStateRegistryImpl,
-            string.concat(_errorPrefix, "-ANCHORP-20"),
+            string.concat(_errorPrefix, "-20"),
             _errors
         );
         return _errors;
