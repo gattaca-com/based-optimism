@@ -20,11 +20,14 @@ import (
 const (
 	DefaultPackageName = "github.com/ethpandaops/optimism-package"
 	DefaultEnclave     = "devnet"
+
+	// static URL for kurtosis reverse proxy
+	defaultKurtosisReverseProxyURL = "http://127.0.0.1:9730"
 )
 
 // KurtosisEnvironment represents the output of a Kurtosis deployment
 type KurtosisEnvironment struct {
-	descriptors.DevnetEnvironment
+	*descriptors.DevnetEnvironment
 }
 
 // KurtosisDeployer handles deploying packages using Kurtosis
@@ -144,7 +147,7 @@ func NewKurtosisDeployer(opts ...KurtosisDeployerOptions) (*KurtosisDeployer, er
 func (d *KurtosisDeployer) getWallets(wallets deployer.WalletList) descriptors.WalletMap {
 	walletMap := make(descriptors.WalletMap)
 	for _, wallet := range wallets {
-		walletMap[wallet.Name] = descriptors.Wallet{
+		walletMap[wallet.Name] = &descriptors.Wallet{
 			Address:    types.Address(wallet.Address),
 			PrivateKey: wallet.PrivateKey,
 		}
@@ -181,7 +184,10 @@ func (d *KurtosisDeployer) GetEnvironmentInfo(ctx context.Context, s *spec.Encla
 	}
 
 	env := &KurtosisEnvironment{
-		DevnetEnvironment: descriptors.DevnetEnvironment{
+		DevnetEnvironment: &descriptors.DevnetEnvironment{
+			Name:            d.enclave,
+			ReverseProxyURL: defaultKurtosisReverseProxyURL,
+
 			L2:       make([]*descriptors.L2Chain, 0, len(s.Chains)),
 			Features: s.Features,
 			DepSet:   depsetData,
@@ -217,7 +223,7 @@ func (d *KurtosisDeployer) GetEnvironmentInfo(ctx context.Context, s *spec.Encla
 		nodes, services := finder.FindL2Services(chainSpec.Name)
 
 		chain := &descriptors.L2Chain{
-			Chain: descriptors.Chain{
+			Chain: &descriptors.Chain{
 				Name:     chainSpec.Name,
 				ID:       chainSpec.NetworkID,
 				Services: services,

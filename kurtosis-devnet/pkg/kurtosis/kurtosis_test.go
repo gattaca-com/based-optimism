@@ -35,7 +35,7 @@ func TestKurtosisDeployer(t *testing.T) {
 			wantBaseDir: ".",
 			wantPkg:     DefaultPackageName,
 			wantDryRun:  false,
-			wantEnclave: "devnet",
+			wantEnclave: DefaultEnclave,
 		},
 		{
 			name: "with options",
@@ -264,7 +264,7 @@ func TestGetEnvironmentInfo(t *testing.T) {
 	// Create test services map with the expected structure
 	testServices := make(inspect.ServiceMap)
 	testServices["el-1-geth-lighthouse"] = inspect.PortMap{
-		"rpc": descriptors.PortInfo{Port: 52645},
+		"rpc": &descriptors.PortInfo{Port: 52645},
 	}
 
 	testWallet := &deployer.Wallet{
@@ -281,10 +281,10 @@ func TestGetEnvironmentInfo(t *testing.T) {
 
 	// Create expected L1 services
 	l1Services := make(descriptors.ServiceMap)
-	l1Services["el"] = descriptors.Service{
+	l1Services["el"] = &descriptors.Service{
 		Name: "el-1-geth-lighthouse",
 		Endpoints: descriptors.EndpointMap{
-			"rpc": descriptors.PortInfo{Port: 52645},
+			"rpc": &descriptors.PortInfo{Port: 52645},
 		},
 	}
 
@@ -313,7 +313,9 @@ func TestGetEnvironmentInfo(t *testing.T) {
 			},
 			jwt: testJWTs,
 			want: &KurtosisEnvironment{
-				DevnetEnvironment: descriptors.DevnetEnvironment{
+				DevnetEnvironment: &descriptors.DevnetEnvironment{
+					Name:            DefaultEnclave,
+					ReverseProxyURL: defaultKurtosisReverseProxyURL,
 					L1: &descriptors.Chain{
 						ID:       "1234",
 						Name:     "Ethereum",
@@ -336,7 +338,7 @@ func TestGetEnvironmentInfo(t *testing.T) {
 					},
 					L2: []*descriptors.L2Chain{
 						{
-							Chain: descriptors.Chain{
+							Chain: &descriptors.Chain{
 								Name:     "op-kurtosis",
 								ID:       "1234",
 								Services: make(descriptors.ServiceMap),
@@ -392,7 +394,9 @@ func TestGetEnvironmentInfo(t *testing.T) {
 			},
 			jwt: testJWTs,
 			want: &KurtosisEnvironment{
-				DevnetEnvironment: descriptors.DevnetEnvironment{
+				DevnetEnvironment: &descriptors.DevnetEnvironment{
+					Name:            DefaultEnclave,
+					ReverseProxyURL: defaultKurtosisReverseProxyURL,
 					L1: &descriptors.Chain{
 						ID:       "1234",
 						Name:     "Ethereum",
@@ -415,7 +419,7 @@ func TestGetEnvironmentInfo(t *testing.T) {
 					},
 					L2: []*descriptors.L2Chain{
 						{
-							Chain: descriptors.Chain{
+							Chain: &descriptors.Chain{
 								Name:     "op-kurtosis",
 								ID:       "1234",
 								Services: make(descriptors.ServiceMap),
@@ -451,7 +455,9 @@ func TestGetEnvironmentInfo(t *testing.T) {
 			},
 			jwt: testJWTs,
 			want: &KurtosisEnvironment{
-				DevnetEnvironment: descriptors.DevnetEnvironment{
+				DevnetEnvironment: &descriptors.DevnetEnvironment{
+					Name:            DefaultEnclave,
+					ReverseProxyURL: defaultKurtosisReverseProxyURL,
 					L1: &descriptors.Chain{
 						ID:       "1234",
 						Name:     "Ethereum",
@@ -474,7 +480,7 @@ func TestGetEnvironmentInfo(t *testing.T) {
 					},
 					L2: []*descriptors.L2Chain{
 						{
-							Chain: descriptors.Chain{
+							Chain: &descriptors.Chain{
 								Name:     "op-kurtosis",
 								ID:       "1234",
 								Services: make(descriptors.ServiceMap),
