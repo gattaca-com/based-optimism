@@ -97,7 +97,7 @@ func executionPayloadFixedPart(version BlockVersion) uint32 {
 	}
 }
 
-func (payload *ExecutionPayload) inferVersion() BlockVersion {
+func (payload *ExecutionPayload) InferVersion() BlockVersion {
 	if payload.WithdrawalsRoot != nil && *payload.WithdrawalsRoot != types.EmptyWithdrawalsHash {
 		return BlockV4
 	} else if payload.ExcessBlobGas != nil && payload.BlobGasUsed != nil {
@@ -110,7 +110,7 @@ func (payload *ExecutionPayload) inferVersion() BlockVersion {
 }
 
 func (payload *ExecutionPayload) SizeSSZ() (full uint32) {
-	return executionPayloadFixedPart(payload.inferVersion()) + uint32(len(payload.ExtraData)) + payload.transactionSize() + payload.withdrawalSize()
+	return executionPayloadFixedPart(payload.InferVersion()) + uint32(len(payload.ExtraData)) + payload.transactionSize() + payload.withdrawalSize()
 }
 
 func (payload *ExecutionPayload) withdrawalSize() uint32 {
@@ -150,7 +150,7 @@ func unmarshalBytes32LE(in []byte, z *Uint256Quantity) {
 
 // MarshalSSZ encodes the ExecutionPayload as SSZ type
 func (payload *ExecutionPayload) MarshalSSZ(w io.Writer) (n int, err error) {
-	fixedSize := executionPayloadFixedPart(payload.inferVersion())
+	fixedSize := executionPayloadFixedPart(payload.InferVersion())
 	transactionSize := payload.transactionSize()
 
 	// Cast to uint32 to enable 32-bit MIPS support where math.MaxUint32-executionPayloadFixedPart is too big for int
@@ -211,7 +211,7 @@ func (payload *ExecutionPayload) MarshalSSZ(w io.Writer) (n int, err error) {
 		offset += 4
 	}
 
-	payloadVersion := payload.inferVersion()
+	payloadVersion := payload.InferVersion()
 	if payloadVersion.HasBlobProperties() {
 		if payload.BlobGasUsed == nil || payload.ExcessBlobGas == nil {
 			return 0, errors.New("cannot encode ecotone payload without dencun header attributes")
@@ -224,7 +224,7 @@ func (payload *ExecutionPayload) MarshalSSZ(w io.Writer) (n int, err error) {
 
 	if payloadVersion.HasWithdrawalsRoot() {
 		if payload.WithdrawalsRoot == nil {
-			return 0, errors.New("cannot encode Isthmus payload without withdrawals root")
+			return 0, fmt.Errorf("cannot encode payload version %d without withdrawals root", payloadVersion)
 		}
 		copy(buf[offset:offset+32], (*payload.WithdrawalsRoot)[:])
 		offset += 32

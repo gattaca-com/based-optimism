@@ -561,8 +561,7 @@ func (p *publisher) PublishSignedL2Payload(ctx context.Context, signedEnvelope *
 	}
 
 	data := buf.Bytes()
-	timestamp := uint64(signedEnvelope.Envelope.ExecutionPayload.Timestamp)
-	return p.publishRawSignedPayload(ctx, timestamp, data)
+	return p.publishRawSignedPayload(ctx, signedEnvelope.Envelope.ExecutionPayload.InferVersion(), data)
 }
 
 func (p *publisher) SignAndPublishL2Payload(ctx context.Context, envelope *eth.ExecutionPayloadEnvelope, signer Signer) error {
@@ -593,21 +592,22 @@ func (p *publisher) SignAndPublishL2Payload(ctx context.Context, envelope *eth.E
 		return fmt.Errorf("failed to sign execution payload with signer: %w", err)
 	}
 	copy(data[:65], sig[:])
-	return p.publishRawSignedPayload(ctx, uint64(envelope.ExecutionPayload.Timestamp), data)
+	return p.publishRawSignedPayload(ctx, envelope.ExecutionPayload.InferVersion(), data)
 }
 
-func (p *publisher) publishRawSignedPayload(ctx context.Context, timestamp uint64, data []byte) error {
+func (p *publisher) publishRawSignedPayload(ctx context.Context, version eth.BlockVersion, data []byte) error {
 	// compress the full message
 	// This also copies the data, freeing up the original buffer to go back into the pool
 	out := snappy.Encode(nil, data)
 
-	if p.cfg.IsIsthmus(timestamp) {
+	switch version {
+	case eth.BlockV4:
 		return p.blocksV4.topic.Publish(ctx, out)
-	} else if p.cfg.IsEcotone(timestamp) {
+	case eth.BlockV3:
 		return p.blocksV3.topic.Publish(ctx, out)
-	} else if p.cfg.IsCanyon(timestamp) {
+	case eth.BlockV2:
 		return p.blocksV2.topic.Publish(ctx, out)
-	} else {
+	default:
 		return p.blocksV1.topic.Publish(ctx, out)
 	}
 }
