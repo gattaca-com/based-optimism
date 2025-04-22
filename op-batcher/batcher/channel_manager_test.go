@@ -2,7 +2,6 @@ package batcher
 
 import (
 	"errors"
-	"io"
 	"math/big"
 	"math/rand"
 	"testing"
