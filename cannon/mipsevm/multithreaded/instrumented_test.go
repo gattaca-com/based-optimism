@@ -37,6 +37,7 @@ func TestInstrumentedState_Claim(t *testing.T) {
 
 func TestInstrumentedState_UtilsCheck(t *testing.T) {
 	// Sanity check that test running utilities will return a non-zero exit code on failure
+	testutil.Cannon64OnlyTest(t, "32-bit Cannon is deprecated")
 	t.Parallel()
 	cases := []struct {
 		name           string
@@ -75,6 +76,7 @@ func TestInstrumentedState_UtilsCheck(t *testing.T) {
 }
 
 func TestInstrumentedState_MultithreadedProgram(t *testing.T) {
+	testutil.Cannon64OnlyTest(t, "32-bit Cannon is deprecated")
 	if os.Getenv("SKIP_SLOW_TESTS") == "true" {
 		t.Skip("Skipping slow test because SKIP_SLOW_TESTS is enabled")
 	}
@@ -208,6 +210,7 @@ func TestInstrumentedState_MultithreadedProgram(t *testing.T) {
 	}
 }
 func TestInstrumentedState_Alloc(t *testing.T) {
+	testutil.Cannon64OnlyTest(t, "32-bit Cannon is deprecated")
 	if os.Getenv("SKIP_SLOW_TESTS") == "true" {
 		t.Skip("Skipping slow test because SKIP_SLOW_TESTS is enabled")
 	}
