@@ -259,9 +259,14 @@ func TestInstrumentedState_Alloc(t *testing.T) {
 // dependency loop, so we just cover the everything enabled case as that should be the upcoming version.
 func allFeaturesEnabled() mipsevm.FeatureToggles {
 	toggles := mipsevm.FeatureToggles{}
-	tRef := reflect.ValueOf(toggles)
+	tRef := reflect.ValueOf(&toggles).Elem() // Get a pointer and then dereference
+
 	for i := 0; i < tRef.NumField(); i++ {
-		tRef.Field(i).Set(reflect.ValueOf(true))
+		field := tRef.Field(i)
+		if field.Kind() == reflect.Bool && field.CanSet() {
+			field.SetBool(true)
+		}
 	}
+
 	return toggles
 }
