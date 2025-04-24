@@ -11,4 +11,4 @@ require (
 	golang.org/x/sys v0.30.0 // indirect
 )
 
-replace github.com/ethereum-optimism/optimism v0.0.0 => ../../../..
+replace github.com/ethereum-optimism/optimism v0.0.0 => ./../../../..

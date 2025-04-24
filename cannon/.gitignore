@@ -5,7 +5,7 @@ cache
 venv
 .idea
 *.log
-testdata/example/bin
+testdata/go-1-23/bin
 contracts/out
 *.pprof
 *.out

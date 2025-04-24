@@ -26,5 +26,5 @@ bin/%.elf: bin
 
 # take any ELF and dump it
 # TODO: currently have the little-endian toolchain, but should use the big-endian one. The -EB compat flag works though.
-bin/%.dump: bin/%.elf
+bin/%.dump: bin
 	mipsel-linux-gnu-objdump -D --disassembler-options=no-aliases --wide --source -m mips:3000 -EB $(@:%.dump=%.elf) > $@
