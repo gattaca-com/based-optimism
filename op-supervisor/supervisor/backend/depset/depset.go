@@ -2,6 +2,7 @@ package depset
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/types"
@@ -41,6 +42,9 @@ type DependencySet interface {
 
 	ChainIndexFromID
 	ChainIDFromIndex
+
+	json.Marshaler
+	json.Unmarshaler
 }
 
 type ChainIndexFromID interface {

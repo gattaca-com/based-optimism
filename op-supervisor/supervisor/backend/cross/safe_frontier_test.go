@@ -173,6 +173,16 @@ type mockDependencySet struct {
 	messageExpiryWindow uint64
 }
 
+func (m mockDependencySet) MarshalJSON() ([]byte, error) {
+	return nil, errors.New("unsupported")
+}
+
+func (m mockDependencySet) UnmarshalJSON(bytes []byte) error {
+	return errors.New("unsupported")
+}
+
+var _ depset.DependencySet = (*mockDependencySet)(nil)
+
 func (m mockDependencySet) CanExecuteAt(chain eth.ChainID, timestamp uint64) (bool, error) {
 	if m.canExecuteAtfn != nil {
 		return m.canExecuteAtfn()

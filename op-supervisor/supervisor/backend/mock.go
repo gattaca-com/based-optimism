@@ -6,11 +6,13 @@ import (
 	"io"
 	"sync/atomic"
 
-	"github.com/ethereum-optimism/optimism/op-service/eth"
-	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/frontend"
-	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+
+	"github.com/ethereum-optimism/optimism/op-service/eth"
+	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/backend/depset"
+	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/frontend"
+	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/types"
 )
 
 type MockBackend struct {
@@ -78,6 +80,10 @@ func (m *MockBackend) SuperRootAtTimestamp(ctx context.Context, timestamp hexuti
 
 func (m *MockBackend) SyncStatus(ctx context.Context) (eth.SupervisorSyncStatus, error) {
 	return eth.SupervisorSyncStatus{}, nil
+}
+
+func (m *MockBackend) DependencySet(ctx context.Context) (depset.DependencySet, error) {
+	return nil, errors.New("not supported")
 }
 
 func (m *MockBackend) Close() error {
