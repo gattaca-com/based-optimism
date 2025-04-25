@@ -49,9 +49,10 @@ func (testSuite *PeerScorerTestSuite) TestScorer_SnapshotHook() {
 	)
 	inspectFn := scorer.SnapshotHook()
 
+	emptyBlocks := make(map[string]store.TopicScores)
 	scores := store.PeerScores{Gossip: store.GossipScores{Total: 3}}
 	// Expect updating the peer store
-	testSuite.mockStore.On("SetScore", peer.ID("peer1"), &store.GossipScores{Total: float64(-100)}).Return(scores, nil).Once()
+	testSuite.mockStore.On("SetScore", peer.ID("peer1"), &store.GossipScores{Total: float64(-100), Blocks: emptyBlocks}).Return(scores, nil).Once()
 
 	// The metricer should then be called with the peer score band map
 	testSuite.mockMetricer.On("SetPeerScores", []store.PeerScores{scores}).Return(nil).Once()
@@ -65,7 +66,7 @@ func (testSuite *PeerScorerTestSuite) TestScorer_SnapshotHook() {
 	inspectFn(snapshotMap)
 
 	// Expect updating the peer store
-	testSuite.mockStore.On("SetScore", peer.ID("peer1"), &store.GossipScores{Total: 0}).Return(scores, nil).Once()
+	testSuite.mockStore.On("SetScore", peer.ID("peer1"), &store.GossipScores{Total: 0, Blocks: emptyBlocks}).Return(scores, nil).Once()
 
 	// The metricer should then be called with the peer score band map
 	testSuite.mockMetricer.On("SetPeerScores", []store.PeerScores{scores}).Return(nil).Once()
