@@ -170,13 +170,14 @@ abstract contract OPContractsManagerBase {
         if (_who.code.length == 0) revert OPContractsManager.AddressHasNoCode(_who);
     }
 
+    /// TODO:
     function encodePermissionlessFDGConstructor(IFaultDisputeGame.GameConstructorParams memory _params)
         internal
         view
         virtual
         returns (bytes memory)
     {
-        bytes memory dataWithSelector = abi.encodeCall(IFaultDisputeGame.__constructor__, (_params));
+        bytes memory dataWithSelector = abi.encodeCall(IFaultDisputeGame.__constructor__, ());
         return Bytes.slice(dataWithSelector, 4);
     }
 
@@ -191,7 +192,7 @@ abstract contract OPContractsManagerBase {
         returns (bytes memory)
     {
         bytes memory dataWithSelector =
-            abi.encodeCall(IPermissionedDisputeGame.__constructor__, (_params, _proposer, _challenger));
+            abi.encodeCall(IPermissionedDisputeGame.__constructor__, (_proposer, _challenger));
         return Bytes.slice(dataWithSelector, 4);
     }
 

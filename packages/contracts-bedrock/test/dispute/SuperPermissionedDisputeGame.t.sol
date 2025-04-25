@@ -64,30 +64,25 @@ contract SuperPermissionedDisputeGame_Init is DisputeGameFactory_Init {
             })
         );
 
+        //     IFaultDisputeGame.GameConstructorParams({
+        //     gameType: GAME_TYPE,
+        //     absolutePrestate: absolutePrestate,
+        //     maxGameDepth: 2 ** 3,
+        //     splitDepth: 2 ** 2,
+        //     clockExtension: Duration.wrap(3 hours),
+        //     maxClockDuration: Duration.wrap(3.5 days),
+        //     vm: _vm,
+        //     weth: _weth,
+        //     anchorStateRegistry: anchorStateRegistry,
+        //     l2ChainId: 0
+        // }),
+
         // Deploy an implementation of the fault game
         gameImpl = IPermissionedDisputeGame(
             DeployUtils.create1({
                 _name: "SuperPermissionedDisputeGame",
                 _args: DeployUtils.encodeConstructor(
-                    abi.encodeCall(
-                        IPermissionedDisputeGame.__constructor__,
-                        (
-                            IFaultDisputeGame.GameConstructorParams({
-                                gameType: GAME_TYPE,
-                                absolutePrestate: absolutePrestate,
-                                maxGameDepth: 2 ** 3,
-                                splitDepth: 2 ** 2,
-                                clockExtension: Duration.wrap(3 hours),
-                                maxClockDuration: Duration.wrap(3.5 days),
-                                vm: _vm,
-                                weth: _weth,
-                                anchorStateRegistry: anchorStateRegistry,
-                                l2ChainId: 0
-                            }),
-                            PROPOSER,
-                            CHALLENGER
-                        )
-                    )
+                    abi.encodeCall(IPermissionedDisputeGame.__constructor__, (PROPOSER, CHALLENGER))
                 )
             })
         );

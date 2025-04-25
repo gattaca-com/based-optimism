@@ -8,6 +8,7 @@ import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/O
 import { LibClone } from "@solady/utils/LibClone.sol";
 import { GameType, Claim, GameId, Timestamp, Hash, LibGameId } from "src/dispute/lib/Types.sol";
 import { NoImplementation, IncorrectBondAmount, GameAlreadyExists } from "src/dispute/lib/Errors.sol";
+import { DisputeGameConfig } from "src/dispute/DisputeGameConfig.sol";
 
 // Interfaces
 import { ISemver } from "interfaces/universal/ISemver.sol";
@@ -55,6 +56,8 @@ contract DisputeGameFactory is OwnableUpgradeable, ISemver {
     /// @notice `gameImpls` is a mapping that maps `GameType`s to their respective
     ///         `IDisputeGame` implementations.
     mapping(GameType => IDisputeGame) public gameImpls;
+
+    mapping(GameType => DisputeGameConfig) public gameConfigs;
 
     /// @notice Returns the required bonds for initializing a dispute game of the given type.
     mapping(GameType => uint256) public initBonds;
@@ -162,7 +165,8 @@ contract DisputeGameFactory is OwnableUpgradeable, ISemver {
         // │ [84, 84 + n) │ Extra data (opaque)                │
         // └──────────────┴────────────────────────────────────┘
         proxy_ = IDisputeGame(address(impl).clone(abi.encodePacked(msg.sender, _rootClaim, parentHash, _extraData)));
-        proxy_.initialize{ value: msg.value }();
+        DisputeGameConfig config = gameConfigs[_gameType];
+        proxy_.initialize{ value: msg.value }(config);
 
         // Compute the unique identifier for the dispute game.
         Hash uuid = getGameUUID(_gameType, _rootClaim, _extraData);
@@ -260,6 +264,10 @@ contract DisputeGameFactory is OwnableUpgradeable, ISemver {
     function setImplementation(GameType _gameType, IDisputeGame _impl) external onlyOwner {
         gameImpls[_gameType] = _impl;
         emit ImplementationSet(address(_impl), _gameType);
+    }
+
+    function setGameConfig(GameType _gameType, DisputeGameConfig _config) external onlyOwner {
+        gameConfigs[_gameType] = _config;
     }
 
     /// @notice Sets the bond (in wei) for initializing a game type.

@@ -6,6 +6,7 @@ import { Vm } from "forge-std/Vm.sol";
 import { DisputeGameFactory_Init } from "test/dispute/DisputeGameFactory.t.sol";
 import { AlphabetVM } from "test/mocks/AlphabetVM.sol";
 import { stdError } from "forge-std/StdError.sol";
+import { DisputeGameConfig } from "src/dispute/DisputeGameConfig.sol";
 
 // Scripts
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
@@ -561,7 +562,8 @@ contract SuperFaultDisputeGame_Test is SuperFaultDisputeGame_Init {
     /// @dev Tests that the game cannot be initialized twice.
     function test_initialize_onlyOnce_succeeds() public {
         vm.expectRevert(AlreadyInitialized.selector);
-        gameProxy.initialize();
+        gameProxy.initialize(DisputeGameConfig(address(420)));
+        /// TODO:
     }
 
     /// @dev Tests that startingProposal and it's getters are set correctly.

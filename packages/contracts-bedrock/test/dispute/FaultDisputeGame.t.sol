@@ -28,6 +28,7 @@ import { IPreimageOracle } from "interfaces/dispute/IBigStepper.sol";
 import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
 import { IFaultDisputeGame } from "interfaces/dispute/IFaultDisputeGame.sol";
 import { IDelayedWETH } from "interfaces/dispute/IDelayedWETH.sol";
+import { DisputeGameConfig } from "src/dispute/DisputeGameConfig.sol";
 
 contract FaultDisputeGame_Init is DisputeGameFactory_Init {
     /// @dev The type of the game being tested.
@@ -67,34 +68,31 @@ contract FaultDisputeGame_Init is DisputeGameFactory_Init {
             )
         );
 
+        // Create a DisputeGameConfig contract with the parameters for the game
+        DisputeGameConfig gameConfig = new DisputeGameConfig(
+            absolutePrestate,
+            2 ** 3,
+            2 ** 2,
+            Duration.wrap(3 hours),
+            Duration.wrap(3.5 days),
+            _vm,
+            GAME_TYPE,
+            delayedWeth,
+            address(anchorStateRegistry),
+            10
+        );
+
         // Deploy an implementation of the fault game
         gameImpl = IFaultDisputeGame(
             DeployUtils.create1({
                 _name: "FaultDisputeGame",
-                _args: DeployUtils.encodeConstructor(
-                    abi.encodeCall(
-                        IFaultDisputeGame.__constructor__,
-                        (
-                            IFaultDisputeGame.GameConstructorParams({
-                                gameType: GAME_TYPE,
-                                absolutePrestate: absolutePrestate,
-                                maxGameDepth: 2 ** 3,
-                                splitDepth: 2 ** 2,
-                                clockExtension: Duration.wrap(3 hours),
-                                maxClockDuration: Duration.wrap(3.5 days),
-                                vm: _vm,
-                                weth: delayedWeth,
-                                anchorStateRegistry: anchorStateRegistry,
-                                l2ChainId: 10
-                            })
-                        )
-                    )
-                )
+                _args: DeployUtils.encodeConstructor(abi.encodeCall(IFaultDisputeGame.__constructor__, ()))
             })
         );
 
         // Register the game implementation with the factory.
         disputeGameFactory.setImplementation(GAME_TYPE, gameImpl);
+        disputeGameFactory.setGameConfig(GAME_TYPE, gameConfig);
         uint256 bondAmount = disputeGameFactory.initBonds(GAME_TYPE);
 
         // Warp ahead of the game retirement timestamp if needed.
@@ -177,28 +175,25 @@ contract FaultDisputeGame_Test is FaultDisputeGame_Init {
         AlphabetVM alphabetVM = new AlphabetVM(absolutePrestate, oracle);
 
         _maxGameDepth = bound(_maxGameDepth, LibPosition.MAX_POSITION_BITLEN, type(uint256).max - 1);
+
+        // Create a DisputeGameConfig contract with the parameters for the game
+        DisputeGameConfig gameConfig = new DisputeGameConfig(
+            absolutePrestate,
+            _maxGameDepth,
+            _maxGameDepth + 1,
+            Duration.wrap(3 hours),
+            Duration.wrap(3.5 days),
+            alphabetVM,
+            GAME_TYPE,
+            IDelayedWETH(payable(address(0))),
+            address(0),
+            10
+        );
+
         vm.expectRevert(MaxDepthTooLarge.selector);
         DeployUtils.create1({
             _name: "FaultDisputeGame",
-            _args: DeployUtils.encodeConstructor(
-                abi.encodeCall(
-                    IFaultDisputeGame.__constructor__,
-                    (
-                        IFaultDisputeGame.GameConstructorParams({
-                            gameType: GAME_TYPE,
-                            absolutePrestate: absolutePrestate,
-                            maxGameDepth: _maxGameDepth,
-                            splitDepth: _maxGameDepth + 1,
-                            clockExtension: Duration.wrap(3 hours),
-                            maxClockDuration: Duration.wrap(3.5 days),
-                            vm: alphabetVM,
-                            weth: IDelayedWETH(payable(address(0))),
-                            anchorStateRegistry: IAnchorStateRegistry(address(0)),
-                            l2ChainId: 10
-                        })
-                    )
-                )
-            )
+            _args: DeployUtils.encodeConstructor(abi.encodeCall(IFaultDisputeGame.__constructor__, ()))
         });
     }
 
@@ -221,28 +216,24 @@ contract FaultDisputeGame_Test is FaultDisputeGame_Init {
         // is allowed to be too large.
         vm.mockCall(address(oracle), abi.encodeCall(IPreimageOracle.challengePeriod, ()), abi.encode(_challengePeriod));
 
+        // Create a DisputeGameConfig contract with the parameters for the game
+        DisputeGameConfig gameConfig = new DisputeGameConfig(
+            absolutePrestate,
+            2 ** 3,
+            2 ** 2,
+            Duration.wrap(3 hours),
+            Duration.wrap(3.5 days),
+            alphabetVM,
+            GAME_TYPE,
+            IDelayedWETH(payable(address(0))),
+            address(0),
+            10
+        );
+
         vm.expectRevert(InvalidChallengePeriod.selector);
         DeployUtils.create1({
             _name: "FaultDisputeGame",
-            _args: DeployUtils.encodeConstructor(
-                abi.encodeCall(
-                    IFaultDisputeGame.__constructor__,
-                    (
-                        IFaultDisputeGame.GameConstructorParams({
-                            gameType: GAME_TYPE,
-                            absolutePrestate: absolutePrestate,
-                            maxGameDepth: 2 ** 3,
-                            splitDepth: 2 ** 2,
-                            clockExtension: Duration.wrap(3 hours),
-                            maxClockDuration: Duration.wrap(3.5 days),
-                            vm: alphabetVM,
-                            weth: IDelayedWETH(payable(address(0))),
-                            anchorStateRegistry: IAnchorStateRegistry(address(0)),
-                            l2ChainId: 10
-                        })
-                    )
-                )
-            )
+            _args: DeployUtils.encodeConstructor(abi.encodeCall(IFaultDisputeGame.__constructor__, ()))
         });
     }
 
@@ -261,28 +252,25 @@ contract FaultDisputeGame_Test is FaultDisputeGame_Init {
 
         uint256 maxGameDepth = 2 ** 3;
         _splitDepth = bound(_splitDepth, maxGameDepth - 1, type(uint256).max);
+
+        // Create a DisputeGameConfig contract with the parameters for the game
+        DisputeGameConfig gameConfig = new DisputeGameConfig(
+            absolutePrestate,
+            maxGameDepth,
+            _splitDepth,
+            Duration.wrap(3 hours),
+            Duration.wrap(3.5 days),
+            alphabetVM,
+            GAME_TYPE,
+            IDelayedWETH(payable(address(0))),
+            address(0),
+            10
+        );
+
         vm.expectRevert(InvalidSplitDepth.selector);
         DeployUtils.create1({
             _name: "FaultDisputeGame",
-            _args: DeployUtils.encodeConstructor(
-                abi.encodeCall(
-                    IFaultDisputeGame.__constructor__,
-                    (
-                        IFaultDisputeGame.GameConstructorParams({
-                            gameType: GAME_TYPE,
-                            absolutePrestate: absolutePrestate,
-                            maxGameDepth: maxGameDepth,
-                            splitDepth: _splitDepth,
-                            clockExtension: Duration.wrap(3 hours),
-                            maxClockDuration: Duration.wrap(3.5 days),
-                            vm: alphabetVM,
-                            weth: IDelayedWETH(payable(address(0))),
-                            anchorStateRegistry: IAnchorStateRegistry(address(0)),
-                            l2ChainId: 10
-                        })
-                    )
-                )
-            )
+            _args: DeployUtils.encodeConstructor(abi.encodeCall(IFaultDisputeGame.__constructor__, ()))
         });
     }
 
@@ -301,28 +289,25 @@ contract FaultDisputeGame_Test is FaultDisputeGame_Init {
 
         uint256 minSplitDepth = 2;
         _splitDepth = bound(_splitDepth, 0, minSplitDepth - 1);
+
+        // Create a DisputeGameConfig contract with the parameters for the game
+        DisputeGameConfig gameConfig = new DisputeGameConfig(
+            absolutePrestate,
+            2 ** 3,
+            _splitDepth,
+            Duration.wrap(3 hours),
+            Duration.wrap(3.5 days),
+            alphabetVM,
+            GAME_TYPE,
+            IDelayedWETH(payable(address(0))),
+            address(0),
+            10
+        );
+
         vm.expectRevert(InvalidSplitDepth.selector);
         DeployUtils.create1({
             _name: "FaultDisputeGame",
-            _args: DeployUtils.encodeConstructor(
-                abi.encodeCall(
-                    IFaultDisputeGame.__constructor__,
-                    (
-                        IFaultDisputeGame.GameConstructorParams({
-                            gameType: GAME_TYPE,
-                            absolutePrestate: absolutePrestate,
-                            maxGameDepth: 2 ** 3,
-                            splitDepth: _splitDepth,
-                            clockExtension: Duration.wrap(3 hours),
-                            maxClockDuration: Duration.wrap(3.5 days),
-                            vm: alphabetVM,
-                            weth: IDelayedWETH(payable(address(0))),
-                            anchorStateRegistry: IAnchorStateRegistry(address(0)),
-                            l2ChainId: 10
-                        })
-                    )
-                )
-            )
+            _args: DeployUtils.encodeConstructor(abi.encodeCall(IFaultDisputeGame.__constructor__, ()))
         });
     }
 
@@ -349,28 +334,24 @@ contract FaultDisputeGame_Test is FaultDisputeGame_Init {
         _maxClockDuration = uint64(bound(_maxClockDuration, 0, type(uint64).max / 2 - 1));
         _clockExtension = uint64(bound(_clockExtension, _maxClockDuration / 2 + 1, type(uint64).max / 2));
 
+        // Create a DisputeGameConfig contract with the parameters for the game
         vm.expectRevert(InvalidClockExtension.selector);
+        DisputeGameConfig gameConfig = new DisputeGameConfig(
+            absolutePrestate,
+            16,
+            8,
+            Duration.wrap(_clockExtension),
+            Duration.wrap(_maxClockDuration),
+            alphabetVM,
+            GAME_TYPE,
+            IDelayedWETH(payable(address(0))),
+            address(0),
+            10
+        );
+
         DeployUtils.create1({
             _name: "FaultDisputeGame",
-            _args: DeployUtils.encodeConstructor(
-                abi.encodeCall(
-                    IFaultDisputeGame.__constructor__,
-                    (
-                        IFaultDisputeGame.GameConstructorParams({
-                            gameType: GAME_TYPE,
-                            absolutePrestate: absolutePrestate,
-                            maxGameDepth: 16,
-                            splitDepth: 8,
-                            clockExtension: Duration.wrap(_clockExtension),
-                            maxClockDuration: Duration.wrap(_maxClockDuration),
-                            vm: alphabetVM,
-                            weth: IDelayedWETH(payable(address(0))),
-                            anchorStateRegistry: IAnchorStateRegistry(address(0)),
-                            l2ChainId: 10
-                        })
-                    )
-                )
-            )
+            _args: DeployUtils.encodeConstructor(abi.encodeCall(IFaultDisputeGame.__constructor__, ()))
         });
     }
 
@@ -387,28 +368,11 @@ contract FaultDisputeGame_Test is FaultDisputeGame_Init {
             )
         );
 
+        /// TODO: handled in config now
         vm.expectRevert(ReservedGameType.selector);
         DeployUtils.create1({
             _name: "FaultDisputeGame",
-            _args: DeployUtils.encodeConstructor(
-                abi.encodeCall(
-                    IFaultDisputeGame.__constructor__,
-                    (
-                        IFaultDisputeGame.GameConstructorParams({
-                            gameType: GameType.wrap(type(uint32).max),
-                            absolutePrestate: absolutePrestate,
-                            maxGameDepth: 16,
-                            splitDepth: 8,
-                            clockExtension: Duration.wrap(3 hours),
-                            maxClockDuration: Duration.wrap(3.5 days),
-                            vm: alphabetVM,
-                            weth: IDelayedWETH(payable(address(0))),
-                            anchorStateRegistry: IAnchorStateRegistry(address(0)),
-                            l2ChainId: 10
-                        })
-                    )
-                )
-            )
+            _args: DeployUtils.encodeConstructor(abi.encodeCall(IFaultDisputeGame.__constructor__, ()))
         });
     }
 
@@ -549,7 +513,7 @@ contract FaultDisputeGame_Test is FaultDisputeGame_Init {
     /// @dev Tests that the game cannot be initialized twice.
     function test_initialize_onlyOnce_succeeds() public {
         vm.expectRevert(AlreadyInitialized.selector);
-        gameProxy.initialize();
+        gameProxy.initialize(DisputeGameConfig(address(420))); // TODO:
     }
 
     /// @dev Tests that startingOutputRoot and it's getters are set correctly.

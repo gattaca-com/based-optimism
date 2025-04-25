@@ -3,6 +3,7 @@ pragma solidity 0.8.15;
 
 // Contracts
 import { FaultDisputeGame } from "src/dispute/FaultDisputeGame.sol";
+import { DisputeGameConfig } from "src/dispute/DisputeGameConfig.sol";
 
 // Libraries
 import { Claim } from "src/dispute/lib/Types.sol";
@@ -37,16 +38,9 @@ contract PermissionedDisputeGame is FaultDisputeGame {
         return "1.5.0";
     }
 
-    /// @param _params Parameters for creating a new FaultDisputeGame.
     /// @param _proposer Address that is allowed to create instances of this contract.
     /// @param _challenger Address that is allowed to challenge instances of this contract.
-    constructor(
-        GameConstructorParams memory _params,
-        address _proposer,
-        address _challenger
-    )
-        FaultDisputeGame(_params)
-    {
+    constructor(address _proposer, address _challenger) FaultDisputeGame() {
         PROPOSER = _proposer;
         CHALLENGER = _challenger;
     }
@@ -85,12 +79,13 @@ contract PermissionedDisputeGame is FaultDisputeGame {
     }
 
     /// @notice Initializes the contract.
-    function initialize() public payable override {
+    /// @param _config The configuration contract for this dispute game.
+    function initialize(DisputeGameConfig _config) public payable override {
         // The creator of the dispute game must be the proposer EOA.
         if (tx.origin != PROPOSER) revert BadAuth();
 
         // Fallthrough initialization.
-        super.initialize();
+        super.initialize(_config);
     }
 
     ////////////////////////////////////////////////////////////////

@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { IInitializable } from "interfaces/dispute/IInitializable.sol";
 import { Timestamp, GameStatus, GameType, Claim, Hash } from "src/dispute/lib/Types.sol";
+import { DisputeGameConfig } from "src/dispute/DisputeGameConfig.sol";
 
-interface IDisputeGame is IInitializable {
+
+interface IDisputeGame {
     event Resolved(GameStatus indexed status);
 
     function createdAt() external view returns (Timestamp);
@@ -19,4 +20,5 @@ interface IDisputeGame is IInitializable {
     function resolve() external returns (GameStatus status_);
     function gameData() external view returns (GameType gameType_, Claim rootClaim_, bytes memory extraData_);
     function wasRespectedGameTypeWhenCreated() external view returns (bool);
+    function initialize(DisputeGameConfig config) external payable;
 }

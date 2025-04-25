@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import { IDisputeGame } from "interfaces/dispute/IDisputeGame.sol";
 import { GameId, Timestamp, Claim, Hash, GameType } from "src/dispute/lib/Types.sol";
+import {DisputeGameConfig} from "src/dispute/DisputeGameConfig.sol";
 
 interface IDisputeGameFactory {
     struct GameSearchResult {
@@ -66,6 +67,7 @@ interface IDisputeGameFactory {
     function owner() external view returns (address);
     function renounceOwnership() external;
     function setImplementation(GameType _gameType, IDisputeGame _impl) external;
+    function setGameConfig(GameType _gameType, DisputeGameConfig _config) external;
     function setInitBond(GameType _gameType, uint256 _initBond) external;
     function transferOwnership(address newOwner) external; // nosemgrep
     function version() external view returns (string memory);
