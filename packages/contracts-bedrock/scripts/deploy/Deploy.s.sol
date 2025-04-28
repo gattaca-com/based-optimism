@@ -864,7 +864,7 @@ contract Deploy is Deployer {
         string memory saltMixer = "salt mixer";
         return IOPContractsManager.DeployInput({
             roles: IOPContractsManager.Roles({
-                opChainProxyAdminOwner: msg.sender,
+                opChainProxyAdminOwner: cfg.finalSystemOwner(),
                 systemConfigOwner: cfg.finalSystemOwner(),
                 batcher: cfg.batchSenderAddress(),
                 unsafeBlockSigner: cfg.p2pSequencerAddress(),
