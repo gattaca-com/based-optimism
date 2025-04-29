@@ -21,6 +21,9 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/plan"
 )
 
+type Intent interface {
+}
+
 type PlannedTx struct {
 	// Block that we schedule against
 	AgainstBlock  plan.Lazy[eth.BlockInfo]
@@ -122,6 +125,32 @@ func WithAuthorizations(auths []types.SetCodeAuthorization) Option {
 func WithType(t uint8) Option {
 	return func(tx *PlannedTx) {
 		tx.Type.Set(t)
+	}
+}
+
+func WithTypedInput() Option {
+	return func(tx *PlannedTx) {
+		tx.Data.DependOn(tx.TypedInput)
+		tx.Data.Fn(func(ctx context.Context) (hexutil.Bytes, error) {
+			// TODO encode
+			return nil, nil
+		})
+	}
+}
+
+type ReceiptParser interface {
+	UnmarshalReceipt(tx *PlannedTx) error
+}
+
+func WithOutput[V any]() Option {
+	return func(tx *PlannedTx) {
+		tx.ParsedReceipt.DependOn(&tx.Success, &tx.Included)
+		tx.ParsedReceipt.Fn(func(ctx context.Context) (any, error) {
+			receipt := tx.Included.Value()
+			// TODO parse into destination
+			var v V
+			return v, nil
+		})
 	}
 }
 
