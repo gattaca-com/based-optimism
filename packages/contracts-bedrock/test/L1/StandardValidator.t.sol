@@ -43,42 +43,21 @@ import { IPermissionedDisputeGame } from "interfaces/dispute/IPermissionedDisput
 import { IBigStepper } from "interfaces/dispute/IBigStepper.sol";
 import { OPContractsManager } from "src/L1/OPContractsManager.sol";
 
-contract StandardValidatorTest is Test {
-    CommonTest commonTest;
-
+contract StandardValidatorTest is CommonTest {
     StandardValidator validator;
-    ISuperchainConfig superchainConfig;
     address l1PAOMultisig;
     address mips;
     address guardian;
     address challenger;
 
-    // Mock contracts for validation
-    IProxyAdmin proxyAdmin;
-    ISystemConfig systemConfig;
     bytes32 absolutePrestate;
     uint256 l2ChainID;
 
-    // Mock addresses for dependencies
-    address disputeGameFactory;
-    address permissionedDisputeGame;
-    address permissionlessDisputeGame;
-    address anchorStateRegistry;
-    address optimismPortal;
-    address l1CrossDomainMessenger;
-    address l1StandardBridge;
-    address l1ERC721Bridge;
-    address optimismMintableERC20Factory;
-    address permissionedDelayedWETH;
-    address permissionlessDelayedWETH;
     address preimageOracle;
 
-    function setUp() public virtual {
-        commonTest = new CommonTest();
-        commonTest.setUp();
+    function setUp() public virtual override {
+        super.setUp();
 
-        // TODO: remove once inheriting from Commont test
-        Artifacts artifacts = Artifacts(address(uint160(uint256(keccak256(abi.encode("optimism.artifacts"))))));
         // Get OPContractsManager instance
         address opcmAddress = artifacts.mustGetAddress("OPContractsManager");
         OPContractsManager opcm = OPContractsManager(opcmAddress);
@@ -97,7 +76,6 @@ contract StandardValidatorTest is Test {
         );
 
         // Setup mock contracts for validation
-        systemConfig = commonTest.systemConfig();
         vm.prank(address(0));
         proxyAdmin = IProxyAdmin(IProxy(payable(address(systemConfig))).admin());
 
@@ -105,19 +83,14 @@ contract StandardValidatorTest is Test {
         l2ChainID = 10;
 
         // Setup mock dependency addresses
-        disputeGameFactory = address(commonTest.disputeGameFactory());
-        permissionedDisputeGame =
-            address(IDisputeGameFactory(disputeGameFactory).gameImpls(GameTypes.PERMISSIONED_CANNON));
-        permissionlessDisputeGame = address(IDisputeGameFactory(disputeGameFactory).gameImpls(GameTypes.CANNON));
-        anchorStateRegistry = address(commonTest.anchorStateRegistry());
-        optimismPortal = makeAddr("optimismPortal");
-        l1CrossDomainMessenger = makeAddr("l1CrossDomainMessenger");
-        l1StandardBridge = makeAddr("l1StandardBridge");
-        l1ERC721Bridge = makeAddr("l1ERC721Bridge");
-        optimismMintableERC20Factory = makeAddr("optimismMintableERC20Factory");
-        permissionedDelayedWETH = address(IDelayedWETH(IFaultDisputeGame(permissionedDisputeGame).weth()));
-        permissionlessDelayedWETH = address(IDelayedWETH(IFaultDisputeGame(permissionlessDisputeGame).weth()));
-        mips = address(IFaultDisputeGame(permissionedDisputeGame).vm());
+        permissionedDisputeGame = IPermissionedDisputeGame(
+            address(IDisputeGameFactory(disputeGameFactory).gameImpls(GameTypes.PERMISSIONED_CANNON))
+        );
+        faultDisputeGame =
+            IFaultDisputeGame(address(IDisputeGameFactory(disputeGameFactory).gameImpls(GameTypes.CANNON)));
+        delayedWETHPermissionedGameProxy = IDelayedWETH(IFaultDisputeGame(address(permissionedDisputeGame)).weth());
+        delayedWeth = IDelayedWETH(IFaultDisputeGame(address(faultDisputeGame)).weth());
+        mips = address(IFaultDisputeGame(address(permissionedDisputeGame)).vm());
         preimageOracle = address(IBigStepper(mips).oracle());
 
         // Mock proxyAdmin owner
@@ -304,13 +277,13 @@ contract StandardValidatorTest is Test {
     function test_validate_optimismMintableERC20Factory_succeeds() public {
         // Test invalid version
         _mockValidationCalls();
-        vm.mockCall(address(optimismMintableERC20Factory), abi.encodeCall(ISemver.version, ()), abi.encode("1.0.0"));
+        vm.mockCall(address(l1OptimismMintableERC20Factory), abi.encodeCall(ISemver.version, ()), abi.encode("1.0.0"));
         assertEq("MERC20F-10", validate(true));
 
         // Test invalid BRIDGE
         _mockValidationCalls();
         vm.mockCall(
-            address(optimismMintableERC20Factory),
+            address(l1OptimismMintableERC20Factory),
             abi.encodeCall(IOptimismMintableERC20Factory.BRIDGE, ()),
             abi.encode(address(0xbad))
         );
@@ -319,7 +292,7 @@ contract StandardValidatorTest is Test {
         // Test invalid bridge
         _mockValidationCalls();
         vm.mockCall(
-            address(optimismMintableERC20Factory),
+            address(l1OptimismMintableERC20Factory),
             abi.encodeCall(IOptimismMintableERC20Factory.bridge, ()),
             abi.encode(address(0xbad))
         );
@@ -365,26 +338,28 @@ contract StandardValidatorTest is Test {
     function test_validate_optimismPortal_succeeds() public {
         // Test invalid version
         _mockValidationCalls();
-        vm.mockCall(address(optimismPortal), abi.encodeCall(ISemver.version, ()), abi.encode("1.0.0"));
+        vm.mockCall(address(optimismPortal2), abi.encodeCall(ISemver.version, ()), abi.encode("1.0.0"));
         assertEq("PORTAL-10", validate(true));
 
         // Test invalid disputeGameFactory
         _mockValidationCalls();
         vm.mockCall(
-            address(optimismPortal), abi.encodeCall(IOptimismPortal2.disputeGameFactory, ()), abi.encode(address(0xbad))
+            address(optimismPortal2),
+            abi.encodeCall(IOptimismPortal2.disputeGameFactory, ()),
+            abi.encode(address(0xbad))
         );
         assertEq("PORTAL-30", validate(true));
 
         // Test invalid systemConfig
         _mockValidationCalls();
         vm.mockCall(
-            address(optimismPortal), abi.encodeCall(IOptimismPortal2.systemConfig, ()), abi.encode(address(0xbad))
+            address(optimismPortal2), abi.encodeCall(IOptimismPortal2.systemConfig, ()), abi.encode(address(0xbad))
         );
         assertEq("PORTAL-40", validate(true));
 
         // Test invalid l2Sender
         _mockValidationCalls();
-        vm.mockCall(address(optimismPortal), abi.encodeCall(IOptimismPortal2.l2Sender, ()), abi.encode(address(0xbad)));
+        vm.mockCall(address(optimismPortal2), abi.encodeCall(IOptimismPortal2.l2Sender, ()), abi.encode(address(0xbad)));
         assertEq("PORTAL-80", validate(true));
     }
 
@@ -416,14 +391,16 @@ contract StandardValidatorTest is Test {
     /// validated for each PDG and so are included here.
     function test_validate_permissionedDisputeGame_succeeds() public {
         _testDisputeGame(
-            "PDDG", permissionedDisputeGame, anchorStateRegistry, permissionedDelayedWETH, GameTypes.PERMISSIONED_CANNON
+            "PDDG",
+            address(permissionedDisputeGame),
+            anchorStateRegistry,
+            delayedWETHPermissionedGameProxy,
+            GameTypes.PERMISSIONED_CANNON
         );
     }
 
     function test_validate_permissionlessDisputeGame_succeeds() public {
-        _testDisputeGame(
-            "PLDG", permissionlessDisputeGame, anchorStateRegistry, permissionlessDelayedWETH, GameTypes.CANNON
-        );
+        _testDisputeGame("PLDG", address(faultDisputeGame), anchorStateRegistry, delayedWeth, GameTypes.CANNON);
     }
 
     /// @notice Tests validation of L1StandardBridge
@@ -472,8 +449,8 @@ contract StandardValidatorTest is Test {
     function _testDisputeGame(
         string memory errorPrefix,
         address _disputeGame,
-        address _asr,
-        address _weth,
+        IAnchorStateRegistry _asr,
+        IDelayedWETH _weth,
         GameType _gameType
     )
         public
@@ -627,7 +604,7 @@ contract StandardValidatorTest is Test {
     function _mockValidationCalls() internal virtual {
         // Mock OptimismPortal superchainConfig call
         vm.mockCall(
-            address(optimismPortal), abi.encodeCall(IOptimismPortal2.systemConfig, ()), abi.encode(systemConfig)
+            address(optimismPortal2), abi.encodeCall(IOptimismPortal2.systemConfig, ()), abi.encode(systemConfig)
         );
 
         // Mock SystemConfig dependencies
@@ -642,7 +619,9 @@ contract StandardValidatorTest is Test {
             abi.encodeCall(ISystemConfig.l1CrossDomainMessenger, ()),
             abi.encode(l1CrossDomainMessenger)
         );
-        vm.mockCall(address(systemConfig), abi.encodeCall(ISystemConfig.optimismPortal, ()), abi.encode(optimismPortal));
+        vm.mockCall(
+            address(systemConfig), abi.encodeCall(ISystemConfig.optimismPortal, ()), abi.encode(optimismPortal2)
+        );
         vm.mockCall(
             address(systemConfig), abi.encodeCall(ISystemConfig.l1StandardBridge, ()), abi.encode(l1StandardBridge)
         );
@@ -650,7 +629,7 @@ contract StandardValidatorTest is Test {
         vm.mockCall(
             address(systemConfig),
             abi.encodeCall(ISystemConfig.optimismMintableERC20Factory, ()),
-            abi.encode(optimismMintableERC20Factory)
+            abi.encode(l1OptimismMintableERC20Factory)
         );
         vm.mockCall(
             address(systemConfig), abi.encodeCall(ISystemConfig.superchainConfig, ()), abi.encode(superchainConfig)
@@ -664,7 +643,7 @@ contract StandardValidatorTest is Test {
         );
         vm.mockCall(
             address(proxyAdmin),
-            abi.encodeCall(IProxyAdmin.getProxyImplementation, (address(optimismPortal))),
+            abi.encodeCall(IProxyAdmin.getProxyImplementation, (address(optimismPortal2))),
             abi.encode(validator.optimismPortalImpl())
         );
         vm.mockCall(
@@ -684,7 +663,7 @@ contract StandardValidatorTest is Test {
         );
         vm.mockCall(
             address(proxyAdmin),
-            abi.encodeCall(IProxyAdmin.getProxyImplementation, (address(optimismMintableERC20Factory))),
+            abi.encodeCall(IProxyAdmin.getProxyImplementation, (address(l1OptimismMintableERC20Factory))),
             abi.encode(validator.optimismMintableERC20FactoryImpl())
         );
         vm.mockCall(
@@ -699,12 +678,12 @@ contract StandardValidatorTest is Test {
         );
         vm.mockCall(
             address(proxyAdmin),
-            abi.encodeCall(IProxyAdmin.getProxyImplementation, (address(permissionedDelayedWETH))),
+            abi.encodeCall(IProxyAdmin.getProxyImplementation, (address(delayedWETHPermissionedGameProxy))),
             abi.encode(validator.delayedWETHImpl())
         );
         vm.mockCall(
             address(proxyAdmin),
-            abi.encodeCall(IProxyAdmin.getProxyImplementation, (address(permissionlessDelayedWETH))),
+            abi.encodeCall(IProxyAdmin.getProxyImplementation, (address(delayedWeth))),
             abi.encode(validator.delayedWETHImpl())
         );
         vm.mockCall(
@@ -736,7 +715,7 @@ contract StandardValidatorTest is Test {
         vm.mockCall(
             address(disputeGameFactory),
             abi.encodeCall(IDisputeGameFactory.gameImpls, (GameTypes.CANNON)),
-            abi.encode(permissionlessDisputeGame)
+            abi.encode(faultDisputeGame)
         );
         vm.mockCall(address(disputeGameFactory), abi.encodeCall(ISemver.version, ()), abi.encode("1.0.0"));
         vm.mockCall(
@@ -744,16 +723,12 @@ contract StandardValidatorTest is Test {
         );
 
         _mockDisputeGame(
-            permissionlessDisputeGame,
-            anchorStateRegistry,
-            permissionlessDelayedWETH,
-            absolutePrestate,
-            GameTypes.CANNON
+            address(faultDisputeGame), anchorStateRegistry, delayedWeth, absolutePrestate, GameTypes.CANNON
         );
         _mockDisputeGame(
-            permissionedDisputeGame,
+            address(permissionedDisputeGame),
             anchorStateRegistry,
-            permissionedDelayedWETH,
+            delayedWETHPermissionedGameProxy,
             absolutePrestate,
             GameTypes.PERMISSIONED_CANNON
         );
@@ -786,12 +761,12 @@ contract StandardValidatorTest is Test {
         vm.mockCall(
             address(l1CrossDomainMessenger),
             abi.encodeCall(IL1CrossDomainMessenger.PORTAL, ()),
-            abi.encode(optimismPortal)
+            abi.encode(optimismPortal2)
         );
         vm.mockCall(
             address(l1CrossDomainMessenger),
             abi.encodeCall(IL1CrossDomainMessenger.portal, ()),
-            abi.encode(optimismPortal)
+            abi.encode(optimismPortal2)
         );
         vm.mockCall(
             address(l1CrossDomainMessenger),
@@ -800,27 +775,27 @@ contract StandardValidatorTest is Test {
         );
 
         // Mock OptimismPortal
-        vm.mockCall(address(optimismPortal), abi.encodeCall(ISemver.version, ()), abi.encode("3.10.0"));
+        vm.mockCall(address(optimismPortal2), abi.encodeCall(ISemver.version, ()), abi.encode("3.10.0"));
         vm.mockCall(
-            address(optimismPortal),
+            address(optimismPortal2),
             abi.encodeCall(IOptimismPortal2.disputeGameFactory, ()),
             abi.encode(disputeGameFactory)
         );
         vm.mockCall(
-            address(optimismPortal), abi.encodeCall(IOptimismPortal2.systemConfig, ()), abi.encode(systemConfig)
+            address(optimismPortal2), abi.encodeCall(IOptimismPortal2.systemConfig, ()), abi.encode(systemConfig)
         );
         vm.mockCall(
-            address(optimismPortal),
+            address(optimismPortal2),
             abi.encodeCall(IOptimismPortal2.guardian, ()),
             abi.encode(superchainConfig.guardian())
         );
         vm.mockCall(
-            address(optimismPortal),
+            address(optimismPortal2),
             abi.encodeCall(IOptimismPortal2.paused, ()),
             abi.encode(superchainConfig.paused(address(0)))
         );
         vm.mockCall(
-            address(optimismPortal),
+            address(optimismPortal2),
             abi.encodeCall(IOptimismPortal2.l2Sender, ()),
             abi.encode(address(0x000000000000000000000000000000000000dEaD))
         );
@@ -876,20 +851,20 @@ contract StandardValidatorTest is Test {
         vm.mockCall(address(l1ERC721Bridge), abi.encodeCall(IL1ERC721Bridge.systemConfig, ()), abi.encode(systemConfig));
 
         // Mock OptimismMintableERC20Factory
-        vm.mockCall(address(optimismMintableERC20Factory), abi.encodeCall(ISemver.version, ()), abi.encode("1.9.0"));
+        vm.mockCall(address(l1OptimismMintableERC20Factory), abi.encodeCall(ISemver.version, ()), abi.encode("1.9.0"));
         vm.mockCall(
-            address(optimismMintableERC20Factory),
+            address(l1OptimismMintableERC20Factory),
             abi.encodeCall(IOptimismMintableERC20Factory.BRIDGE, ()),
             abi.encode(l1StandardBridge)
         );
         vm.mockCall(
-            address(optimismMintableERC20Factory),
+            address(l1OptimismMintableERC20Factory),
             abi.encodeCall(IOptimismMintableERC20Factory.bridge, ()),
             abi.encode(l1StandardBridge)
         );
 
-        _mockDelayedWETH(permissionedDelayedWETH);
-        _mockDelayedWETH(permissionlessDelayedWETH);
+        _mockDelayedWETH(delayedWETHPermissionedGameProxy);
+        _mockDelayedWETH(delayedWeth);
 
         // Mock operator fee calls with valid values
         vm.mockCall(address(systemConfig), abi.encodeCall(ISystemConfig.operatorFeeScalar, ()), abi.encode(0));
@@ -897,22 +872,28 @@ contract StandardValidatorTest is Test {
 
         // Override version numbers for V300
         vm.mockCall(address(l1ERC721Bridge), abi.encodeCall(ISemver.version, ()), abi.encode("2.4.0"));
-        vm.mockCall(address(optimismPortal), abi.encodeCall(ISemver.version, ()), abi.encode("3.14.0"));
+        vm.mockCall(address(optimismPortal2), abi.encodeCall(ISemver.version, ()), abi.encode("3.14.0"));
         vm.mockCall(address(systemConfig), abi.encodeCall(ISemver.version, ()), abi.encode("2.5.0"));
-        vm.mockCall(address(optimismMintableERC20Factory), abi.encodeCall(ISemver.version, ()), abi.encode("1.10.1"));
+        vm.mockCall(address(l1OptimismMintableERC20Factory), abi.encodeCall(ISemver.version, ()), abi.encode("1.10.1"));
         vm.mockCall(address(l1CrossDomainMessenger), abi.encodeCall(ISemver.version, ()), abi.encode("2.6.0"));
         vm.mockCall(address(l1StandardBridge), abi.encodeCall(ISemver.version, ()), abi.encode("2.3.0"));
         vm.mockCall(address(disputeGameFactory), abi.encodeCall(ISemver.version, ()), abi.encode("1.0.1"));
         vm.mockCall(address(anchorStateRegistry), abi.encodeCall(ISemver.version, ()), abi.encode("2.2.2"));
-        vm.mockCall(address(permissionedDelayedWETH), abi.encodeCall(ISemver.version, ()), abi.encode("1.3.0"));
-        vm.mockCall(address(permissionlessDelayedWETH), abi.encodeCall(ISemver.version, ()), abi.encode("1.3.0"));
+        vm.mockCall(address(delayedWETHPermissionedGameProxy), abi.encodeCall(ISemver.version, ()), abi.encode("1.3.0"));
+        vm.mockCall(address(delayedWeth), abi.encodeCall(ISemver.version, ()), abi.encode("1.3.0"));
         vm.mockCall(address(mips), abi.encodeCall(ISemver.version, ()), abi.encode("1.0.0"));
         vm.mockCall(address(permissionedDisputeGame), abi.encodeCall(ISemver.version, ()), abi.encode("1.4.1"));
-        vm.mockCall(address(permissionlessDisputeGame), abi.encodeCall(ISemver.version, ()), abi.encode("1.4.1"));
+        vm.mockCall(address(faultDisputeGame), abi.encodeCall(ISemver.version, ()), abi.encode("1.4.1"));
         vm.mockCall(address(preimageOracle), abi.encodeCall(ISemver.version, ()), abi.encode("1.1.4"));
     }
 
-    function _mockAnchorStateRegistry(address _asr, address _disputeGameFactory, GameType _gameType) internal {
+    function _mockAnchorStateRegistry(
+        IAnchorStateRegistry _asr,
+        IDisputeGameFactory _disputeGameFactory,
+        GameType _gameType
+    )
+        internal
+    {
         vm.mockCall(address(_asr), abi.encodeCall(ISemver.version, ()), abi.encode("2.0.0"));
         vm.mockCall(
             address(_asr), abi.encodeCall(IAnchorStateRegistry.disputeGameFactory, ()), abi.encode(_disputeGameFactory)
@@ -927,8 +908,8 @@ contract StandardValidatorTest is Test {
 
     function _mockDisputeGame(
         address _disputeGame,
-        address _asr,
-        address _weth,
+        IAnchorStateRegistry _asr,
+        IDelayedWETH _weth,
         bytes32 _absolutePrestate,
         GameType _gameType
     )
@@ -964,7 +945,7 @@ contract StandardValidatorTest is Test {
         vm.mockCall(address(_disputeGame), abi.encodeCall(IPermissionedDisputeGame.weth, ()), abi.encode(_weth));
     }
 
-    function _mockDelayedWETH(address _weth) public {
+    function _mockDelayedWETH(IDelayedWETH _weth) public {
         vm.mockCall(address(_weth), abi.encodeCall(ISemver.version, ()), abi.encode("1.1.0"));
         vm.mockCall(address(_weth), abi.encodeCall(IDelayedWETH.proxyAdminOwner, ()), abi.encode(l1PAOMultisig));
         vm.mockCall(address(_weth), abi.encodeCall(IDelayedWETH.delay, ()), abi.encode(1 weeks / 2));
