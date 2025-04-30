@@ -99,7 +99,8 @@ contract StandardValidatorTest is Test {
 
         // Setup mock dependency addresses
         disputeGameFactory = address(commonTest.disputeGameFactory());
-        permissionedDisputeGame = address(IDisputeGameFactory(disputeGameFactory).gameImpls(GameTypes.PERMISSIONED_CANNON));
+        permissionedDisputeGame =
+            address(IDisputeGameFactory(disputeGameFactory).gameImpls(GameTypes.PERMISSIONED_CANNON));
         permissionlessDisputeGame = address(IDisputeGameFactory(disputeGameFactory).gameImpls(GameTypes.CANNON));
         anchorStateRegistry = address(commonTest.anchorStateRegistry());
         optimismPortal = makeAddr("optimismPortal");
