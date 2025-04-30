@@ -565,14 +565,14 @@ contract StandardValidatorTest is Test {
         // Test invalid anchor state registry version
         _mockValidationCalls();
         vm.mockCall(address(_asr), abi.encodeCall(ISemver.version, ()), abi.encode("1.0.0"));
-        assertEq(string.concat(errorPrefix, "-ANCHORP-10"), validate(true));
+        assertEq("PDDG-ANCHORP-10,PLDG-ANCHORP-10", validate(true));
 
         // Test invalid anchor state registry factory
         _mockValidationCalls();
         vm.mockCall(
             address(_asr), abi.encodeCall(IAnchorStateRegistry.disputeGameFactory, ()), abi.encode(address(0xbad))
         );
-        assertEq(string.concat(errorPrefix, "-ANCHORP-30"), validate(true));
+        assertEq("PDDG-ANCHORP-30,PLDG-ANCHORP-30", validate(true));
 
         // Test invalid DelayedWETH version
         _mockValidationCalls();
@@ -623,7 +623,7 @@ contract StandardValidatorTest is Test {
             abi.encodeCall(IProxyAdmin.getProxyImplementation, (address(_asr))),
             abi.encode(address(0xbad))
         );
-        assertEq(string.concat(errorPrefix, "-ANCHORP-20"), validate(true));
+        assertEq("PDDG-ANCHORP-20,PLDG-ANCHORP-20", validate(true));
     }
 
     function _mockValidationCalls() internal virtual {
@@ -696,7 +696,7 @@ contract StandardValidatorTest is Test {
         );
         vm.mockCall(
             address(proxyAdmin),
-            abi.encodeCall(IProxyAdmin.getProxyImplementation, (address(permissionedASR))),
+            abi.encodeCall(IProxyAdmin.getProxyImplementation, (address(anchorStateRegistry))),
             abi.encode(validator.anchorStateRegistryImpl())
         );
         vm.mockCall(
@@ -711,18 +711,12 @@ contract StandardValidatorTest is Test {
         );
         vm.mockCall(
             address(proxyAdmin),
-            abi.encodeCall(IProxyAdmin.getProxyImplementation, (address(permissionedASR))),
-            abi.encode(validator.anchorStateRegistryImpl())
-        );
-        vm.mockCall(
-            address(proxyAdmin),
-            abi.encodeCall(IProxyAdmin.getProxyImplementation, (address(permissionlessASR))),
+            abi.encodeCall(IProxyAdmin.getProxyImplementation, (address(anchorStateRegistry))),
             abi.encode(validator.anchorStateRegistryImpl())
         );
 
         // Mock AnchorStateRegistry
-        _mockAnchorStateRegistry(permissionedASR, disputeGameFactory, GameTypes.PERMISSIONED_CANNON);
-        _mockAnchorStateRegistry(permissionlessASR, disputeGameFactory, GameTypes.CANNON);
+        _mockAnchorStateRegistry(anchorStateRegistry, disputeGameFactory, GameTypes.PERMISSIONED_CANNON);
 
         // Mock resource config
         IResourceMetering.ResourceConfig memory config = IResourceMetering.ResourceConfig({
@@ -752,11 +746,15 @@ contract StandardValidatorTest is Test {
         );
 
         _mockDisputeGame(
-            permissionlessDisputeGame, permissionlessASR, permissionlessDelayedWETH, absolutePrestate, GameTypes.CANNON
+            permissionlessDisputeGame,
+            anchorStateRegistry,
+            permissionlessDelayedWETH,
+            absolutePrestate,
+            GameTypes.CANNON
         );
         _mockDisputeGame(
             permissionedDisputeGame,
-            permissionedASR,
+            anchorStateRegistry,
             permissionedDelayedWETH,
             absolutePrestate,
             GameTypes.PERMISSIONED_CANNON
@@ -907,9 +905,8 @@ contract StandardValidatorTest is Test {
         vm.mockCall(address(l1CrossDomainMessenger), abi.encodeCall(ISemver.version, ()), abi.encode("2.6.0"));
         vm.mockCall(address(l1StandardBridge), abi.encodeCall(ISemver.version, ()), abi.encode("2.3.0"));
         vm.mockCall(address(disputeGameFactory), abi.encodeCall(ISemver.version, ()), abi.encode("1.0.1"));
-        vm.mockCall(address(permissionedASR), abi.encodeCall(ISemver.version, ()), abi.encode("2.2.2"));
+        vm.mockCall(address(anchorStateRegistry), abi.encodeCall(ISemver.version, ()), abi.encode("2.2.2"));
         vm.mockCall(address(permissionedDelayedWETH), abi.encodeCall(ISemver.version, ()), abi.encode("1.3.0"));
-        vm.mockCall(address(permissionlessASR), abi.encodeCall(ISemver.version, ()), abi.encode("2.2.2"));
         vm.mockCall(address(permissionlessDelayedWETH), abi.encodeCall(ISemver.version, ()), abi.encode("1.3.0"));
         vm.mockCall(address(mips), abi.encodeCall(ISemver.version, ()), abi.encode("1.0.0"));
         vm.mockCall(address(permissionedDisputeGame), abi.encodeCall(ISemver.version, ()), abi.encode("1.4.1"));

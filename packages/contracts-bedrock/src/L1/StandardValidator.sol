@@ -418,7 +418,7 @@ contract StandardValidator {
         );
 
         _errors = assertValidDelayedWETH(_errors, _sysCfg, _game.weth(), _admin, _errorPrefix);
-        _errors = assertValidAnchorStateRegistry(_errors, _sysCfg, _factory, _asr, _admin, _gameType, _errorPrefix);
+        _errors = assertValidAnchorStateRegistry(_errors, _sysCfg, _factory, _asr, _admin, _errorPrefix);
 
         // Only assert valid preimage oracle if the game VM is valid, since otherwise
         // the contract is likely to revert.
@@ -461,7 +461,6 @@ contract StandardValidator {
         IDisputeGameFactory _dgf,
         IAnchorStateRegistry _asr,
         IProxyAdmin _admin,
-        GameType _gameType,
         string memory _errorPrefix
     )
         internal
