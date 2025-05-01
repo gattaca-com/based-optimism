@@ -92,8 +92,8 @@ contract MIPS64 is ISemver {
 
     /// @param _oracle The address of the preimage oracle contract.
     constructor(IPreimageOracle _oracle, uint256 _stateVersion) {
-        // Supports VersionMultiThreaded64_v4 (7)
-        if (_stateVersion != 7) {
+        // Supports VersionMultiThreaded64_v4 (7) and VersionMultiThreaded64_v5 (8)
+        if (_stateVersion != 7 && _stateVersion != 8) {
             revert UnsupportedStateVersion();
         }
         ORACLE = _oracle;
