@@ -40,8 +40,8 @@ type MIPSEVM struct {
 	lastPreimageOracleInput []byte
 }
 
-func newMIPSEVM(contracts *ContractMetadata, opts ...evmOption) *MIPSEVM {
-	env, evmState := NewEVMEnv(contracts)
+func newMIPSEVM(t testing.TB, contracts *ContractMetadata, opts ...evmOption) *MIPSEVM {
+	env, evmState := NewEVMEnv(t, contracts)
 	sender := common.Address{0x13, 0x37}
 	startingGas := uint64(maxStepGas)
 	evm := &MIPSEVM{sender, startingGas, env, evmState, contracts.Addresses, nil, contracts.Artifacts, math.MaxUint64, nil, nil}
@@ -205,7 +205,7 @@ type EvmValidator struct {
 
 // NewEvmValidator creates a validator that can be run repeatedly across multiple steps
 func NewEvmValidator(t *testing.T, hashFn mipsevm.HashFn, contracts *ContractMetadata, opts ...evmOption) *EvmValidator {
-	evm := newMIPSEVM(contracts, opts...)
+	evm := newMIPSEVM(t, contracts, opts...)
 	LogStepFailureAtCleanup(t, evm)
 
 	return &EvmValidator{
@@ -261,7 +261,7 @@ func AssertEVMReverts(t *testing.T, state mipsevm.FPVMState, contracts *Contract
 	input := EncodeStepInput(t, stepWitness, mipsevm.LocalContext{}, contracts.Artifacts.MIPS)
 	startingGas := uint64(maxStepGas)
 
-	env, evmState := NewEVMEnv(contracts)
+	env, evmState := NewEVMEnv(t, contracts)
 	env.Config.Tracer = tracer
 	sender := common.Address{0x13, 0x37}
 	ret, _, err := env.Call(sender, contracts.Addresses.MIPS, input, startingGas, common.U2560)
@@ -274,7 +274,7 @@ func AssertEVMReverts(t *testing.T, state mipsevm.FPVMState, contracts *Contract
 }
 
 func AssertPreimageOracleReverts(t *testing.T, preimageKey [32]byte, preimageValue []byte, preimageOffset arch.Word, contracts *ContractMetadata, opts ...evmOption) {
-	evm := newMIPSEVM(contracts, opts...)
+	evm := newMIPSEVM(t, contracts, opts...)
 	LogStepFailureAtCleanup(t, evm)
 
 	evm.assertPreimageOracleReverts(t, preimageKey, preimageValue, preimageOffset)
