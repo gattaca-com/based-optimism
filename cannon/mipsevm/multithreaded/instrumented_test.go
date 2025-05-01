@@ -2,6 +2,7 @@ package multithreaded
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"os"
 	"reflect"
@@ -18,27 +19,23 @@ import (
 	"github.com/ethereum-optimism/optimism/cannon/mipsevm/testutil"
 )
 
-func vmFactory(state *State, po mipsevm.PreimageOracle, stdOut, stdErr io.Writer, log log.Logger, meta *program.Metadata) mipsevm.FPVM {
-	return NewInstrumentedState(state, po, stdOut, stdErr, log, meta, allFeaturesEnabled())
-}
-
 func TestInstrumentedState_Hello(t *testing.T) {
-	t.Parallel()
-	testutil.RunVMTest_Hello(t, CreateInitialState, vmFactory)
+	runTestAcrossVms(t, "Hello", func(t *testing.T, vmFactory testutil.VMFactory[*State], goTarget testutil.GoTarget) {
+		testutil.RunVMTest_Hello(t, CreateInitialState, vmFactory, goTarget)
+	})
 }
 
 func TestInstrumentedState_Claim(t *testing.T) {
-	t.Parallel()
-	testutil.RunVMTest_Claim(t, CreateInitialState, vmFactory)
+	runTestAcrossVms(t, "Claim", func(t *testing.T, vmFactory testutil.VMFactory[*State], goTarget testutil.GoTarget) {
+		testutil.RunVMTest_Claim(t, CreateInitialState, vmFactory, goTarget)
+	})
 }
 
 func TestInstrumentedState_Random(t *testing.T) {
 	state, meta := testutil.LoadELFProgram(t, testutil.ProgramPath("random", testutil.Go1_24), CreateInitialState)
 
 	var stdOutBuf, stdErrBuf bytes.Buffer
-	us := vmFactory(state, nil, io.MultiWriter(&stdOutBuf, os.Stdout), io.MultiWriter(&stdErrBuf, os.Stderr), testutil.CreateLogger(), meta)
-	err := us.InitDebug()
-	require.NoError(t, err)
+	us := latestVm(state, nil, io.MultiWriter(&stdOutBuf, os.Stdout), io.MultiWriter(&stdErrBuf, os.Stderr), testutil.CreateLogger(), meta)
 
 	for i := 0; i < 500_000; i++ {
 		if us.GetState().GetExited() {
@@ -72,41 +69,44 @@ func TestInstrumentedState_Random(t *testing.T) {
 
 func TestInstrumentedState_UtilsCheck(t *testing.T) {
 	// Sanity check that test running utilities will return a non-zero exit code on failure
-	t.Parallel()
-	cases := []struct {
+	type TestCase struct {
 		name           string
 		expectedOutput string
-	}{
+	}
+
+	cases := []TestCase{
 		{name: "utilscheck", expectedOutput: "Test failed: ShouldFail"},
 		{name: "utilscheck2", expectedOutput: "Test failed: ShouldFail (subtest 2)"},
 		{name: "utilscheck3", expectedOutput: "Test panicked: ShouldFail (panic test)"},
 		{name: "utilscheck4", expectedOutput: "Test panicked: ShouldFail"},
 	}
 
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			state, meta := testutil.LoadELFProgram(t, testutil.ProgramPath(c.name, testutil.Go1_23), CreateInitialState)
-			oracle := testutil.StaticOracle(t, []byte{})
-
-			var stdOutBuf, stdErrBuf bytes.Buffer
-			us := NewInstrumentedState(state, oracle, io.MultiWriter(&stdOutBuf, os.Stdout), io.MultiWriter(&stdErrBuf, os.Stderr), testutil.CreateLogger(), meta, allFeaturesEnabled())
-
-			for i := 0; i < 1_000_000; i++ {
-				if us.GetState().GetExited() {
-					break
-				}
-				_, err := us.Step(false)
-				require.NoError(t, err)
-			}
-			t.Logf("Completed in %d steps", state.Step)
-
-			require.True(t, state.Exited, "must complete program")
-			require.Equal(t, uint8(1), state.ExitCode, "exit with 1")
-			require.Contains(t, stdOutBuf.String(), c.expectedOutput)
-			require.NotContains(t, stdOutBuf.String(), "Passed test that should have failed")
-			require.Equal(t, "", stdErrBuf.String(), "should not print any errors")
-		})
+	testNamer := func(vm string, testCase TestCase) string {
+		return fmt.Sprintf("%v-%v", testCase.name, vm)
 	}
+
+	runTestsAcrossVms(t, testNamer, cases, func(t *testing.T, vmFactory testutil.VMFactory[*State], goTarget testutil.GoTarget, test TestCase) {
+		state, meta := testutil.LoadELFProgram(t, testutil.ProgramPath(test.name, goTarget), CreateInitialState)
+		oracle := testutil.StaticOracle(t, []byte{})
+
+		var stdOutBuf, stdErrBuf bytes.Buffer
+		us := vmFactory(state, oracle, io.MultiWriter(&stdOutBuf, os.Stdout), io.MultiWriter(&stdErrBuf, os.Stderr), testutil.CreateLogger(), meta)
+
+		for i := 0; i < 1_000_000; i++ {
+			if us.GetState().GetExited() {
+				break
+			}
+			_, err := us.Step(false)
+			require.NoError(t, err)
+		}
+		t.Logf("Completed in %d steps", state.Step)
+
+		require.True(t, state.Exited, "must complete program")
+		require.Equal(t, uint8(1), state.ExitCode, "exit with 1")
+		require.Contains(t, stdOutBuf.String(), test.expectedOutput)
+		require.NotContains(t, stdOutBuf.String(), "Passed test that should have failed")
+		require.Equal(t, "", stdErrBuf.String(), "should not print any errors")
+	})
 }
 
 func TestInstrumentedState_MultithreadedProgram(t *testing.T) {
@@ -114,13 +114,14 @@ func TestInstrumentedState_MultithreadedProgram(t *testing.T) {
 		t.Skip("Skipping slow test because SKIP_SLOW_TESTS is enabled")
 	}
 
-	t.Parallel()
-	cases := []struct {
+	type TestCase struct {
 		name           string
 		expectedOutput []string
 		programName    string
 		steps          int
-	}{
+	}
+
+	cases := []TestCase{
 		{
 			name: "general concurrency test",
 			expectedOutput: []string{
@@ -213,35 +214,34 @@ func TestInstrumentedState_MultithreadedProgram(t *testing.T) {
 		},
 	}
 
-	for _, test := range cases {
-		test := test
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-
-			state, meta := testutil.LoadELFProgram(t, testutil.ProgramPath(test.programName, testutil.Go1_23), CreateInitialState)
-			oracle := testutil.StaticOracle(t, []byte{})
-
-			var stdOutBuf, stdErrBuf bytes.Buffer
-			us := NewInstrumentedState(state, oracle, io.MultiWriter(&stdOutBuf, os.Stdout), io.MultiWriter(&stdErrBuf, os.Stderr), testutil.CreateLogger(), meta, allFeaturesEnabled())
-
-			for i := 0; i < test.steps; i++ {
-				if us.GetState().GetExited() {
-					break
-				}
-				_, err := us.Step(false)
-				require.NoError(t, err)
-			}
-			t.Logf("Completed in %d steps", state.Step)
-
-			require.True(t, state.Exited, "must complete program")
-			require.Equal(t, uint8(0), state.ExitCode, "exit with 0")
-			for _, expected := range test.expectedOutput {
-				require.Contains(t, stdOutBuf.String(), expected)
-			}
-			require.Equal(t, "", stdErrBuf.String(), "should not print any errors")
-		})
+	testNamer := func(vm string, testCase TestCase) string {
+		return fmt.Sprintf("%v-%v", testCase.name, vm)
 	}
+
+	runTestsAcrossVms(t, testNamer, cases, func(t *testing.T, vmFactory testutil.VMFactory[*State], goTarget testutil.GoTarget, test TestCase) {
+		state, meta := testutil.LoadELFProgram(t, testutil.ProgramPath(test.programName, goTarget), CreateInitialState)
+		oracle := testutil.StaticOracle(t, []byte{})
+
+		var stdOutBuf, stdErrBuf bytes.Buffer
+		us := vmFactory(state, oracle, io.MultiWriter(&stdOutBuf, os.Stdout), io.MultiWriter(&stdErrBuf, os.Stderr), testutil.CreateLogger(), meta)
+		for i := 0; i < test.steps; i++ {
+			if us.GetState().GetExited() {
+				break
+			}
+			_, err := us.Step(false)
+			require.NoError(t, err)
+		}
+		t.Logf("Completed in %d steps", state.Step)
+
+		require.True(t, state.Exited, "must complete program")
+		require.Equal(t, uint8(0), state.ExitCode, "exit with 0")
+		for _, expected := range test.expectedOutput {
+			require.Contains(t, stdOutBuf.String(), expected)
+		}
+		require.Equal(t, "", stdErrBuf.String(), "should not print any errors")
+	})
 }
+
 func TestInstrumentedState_Alloc(t *testing.T) {
 	if os.Getenv("SKIP_SLOW_TESTS") == "true" {
 		t.Skip("Skipping slow test because SKIP_SLOW_TESTS is enabled")
@@ -249,49 +249,101 @@ func TestInstrumentedState_Alloc(t *testing.T) {
 
 	const MiB = 1024 * 1024
 
-	cases := []struct {
+	type TestCase struct {
 		name                string
 		numAllocs           int
 		allocSize           int
 		maxMemoryUsageCheck int
-	}{
+	}
+
+	cases := []TestCase{
 		{name: "10 32MiB allocations", numAllocs: 10, allocSize: 32 * MiB, maxMemoryUsageCheck: 256 * MiB},
 		{name: "5 64MiB allocations", numAllocs: 5, allocSize: 64 * MiB, maxMemoryUsageCheck: 256 * MiB},
 		{name: "5 128MiB allocations", numAllocs: 5, allocSize: 128 * MiB, maxMemoryUsageCheck: 128 * 3 * MiB},
 	}
 
-	for _, test := range cases {
-		test := test
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-			state, meta := testutil.LoadELFProgram(t, testutil.ProgramPath("alloc", testutil.Go1_23), CreateInitialState)
-			oracle := testutil.AllocOracle(t, test.numAllocs, test.allocSize)
+	testNamer := func(vm string, testCase TestCase) string {
+		return fmt.Sprintf("%v-%v", testCase.name, vm)
+	}
 
-			us := NewInstrumentedState(state, oracle, os.Stdout, os.Stderr, testutil.CreateLogger(), meta, allFeaturesEnabled())
-			require.NoError(t, us.InitDebug())
-			// emulation shouldn't take more than 20 B steps
-			for i := 0; i < 20_000_000_000; i++ {
-				if us.GetState().GetExited() {
-					break
-				}
-				_, err := us.Step(false)
-				require.NoError(t, err)
-				if state.Step%10_000_000 == 0 {
-					t.Logf("Completed %d steps", state.Step)
-				}
+	runTestsAcrossVms(t, testNamer, cases, func(t *testing.T, vmFactory testutil.VMFactory[*State], goTarget testutil.GoTarget, test TestCase) {
+		state, meta := testutil.LoadELFProgram(t, testutil.ProgramPath("alloc", goTarget), CreateInitialState)
+		oracle := testutil.AllocOracle(t, test.numAllocs, test.allocSize)
+
+		us := vmFactory(state, oracle, os.Stdout, os.Stderr, testutil.CreateLogger(), meta)
+		require.NoError(t, us.InitDebug())
+		// emulation shouldn't take more than 20 B steps
+		for i := 0; i < 20_000_000_000; i++ {
+			if us.GetState().GetExited() {
+				break
 			}
-			memUsage := state.Memory.PageCount() * memory.PageSize
-			t.Logf("Completed in %d steps. cannon memory usage: %d KiB", state.Step, memUsage/1024/1024.0)
-			require.True(t, state.Exited, "must complete program")
-			require.Equal(t, uint8(0), state.ExitCode, "exit with 0")
-			require.Less(t, memUsage, test.maxMemoryUsageCheck, "memory allocation is too large")
-		})
+			_, err := us.Step(false)
+			require.NoError(t, err)
+			if state.Step%10_000_000 == 0 {
+				t.Logf("Completed %d steps", state.Step)
+			}
+		}
+		memUsage := state.Memory.PageCount() * memory.PageSize
+		t.Logf("Completed in %d steps. cannon memory usage: %d KiB", state.Step, memUsage/1024/1024.0)
+		require.True(t, state.Exited, "must complete program")
+		require.Equal(t, uint8(0), state.ExitCode, "exit with 0")
+		require.Less(t, memUsage, test.maxMemoryUsageCheck, "memory allocation is too large")
+	})
+}
+
+type VMTest func(t *testing.T, vmFactory testutil.VMFactory[*State], goTarget testutil.GoTarget)
+type VMTestCase[T any] func(t *testing.T, vmFactory testutil.VMFactory[*State], goTarget testutil.GoTarget, testCase T)
+
+type TestNamer[T any] func(vmName string, testCase T) string
+
+func runTestAcrossVms(t *testing.T, testName string, vmTest VMTest) {
+	testNamer := func(vm string, _ any) string {
+		return fmt.Sprintf("%v-%v", testName, vm)
+	}
+
+	runTestsAcrossVms[any](t, testNamer, []any{nil}, func(t *testing.T, vmFactory testutil.VMFactory[*State], goTarget testutil.GoTarget, _ any) {
+		vmTest(t, vmFactory, goTarget)
+	})
+}
+
+func runTestsAcrossVms[T any](t *testing.T, testNamer TestNamer[T], testCases []T, vmTestCase VMTestCase[T]) {
+	t.Parallel()
+	type VMVariations struct {
+		name     string
+		goTarget testutil.GoTarget
+		features mipsevm.FeatureToggles
+	}
+
+	variations := []VMVariations{
+		{name: "Go 1.23 VM", goTarget: testutil.Go1_23, features: mipsevm.FeatureToggles{SupportNoopSysEventFd2: true, SupportDclzDclo: true}},
+		{name: "Go 1.24 VM", goTarget: testutil.Go1_24, features: allFeaturesEnabled()},
+	}
+
+	for _, testCase := range testCases {
+		for _, variation := range variations {
+			testName := testNamer(variation.name, testCase)
+			testCase := testCase
+			variation := variation
+			t.Run(testName, func(t *testing.T) {
+				t.Parallel()
+				vmTestCase(t, getVmFactory(variation.features), variation.goTarget, testCase)
+			})
+		}
 	}
 }
 
+func getVmFactory(featureToggles mipsevm.FeatureToggles) testutil.VMFactory[*State] {
+	return func(state *State, po mipsevm.PreimageOracle, stdOut, stdErr io.Writer, log log.Logger, meta *program.Metadata) mipsevm.FPVM {
+		return NewInstrumentedState(state, po, stdOut, stdErr, log, meta, featureToggles)
+	}
+}
+
+func latestVm(state *State, po mipsevm.PreimageOracle, stdOut, stdErr io.Writer, log log.Logger, meta *program.Metadata) mipsevm.FPVM {
+	vmFactory := getVmFactory(allFeaturesEnabled())
+	return vmFactory(state, po, stdOut, stdErr, log, meta)
+}
+
 // allFeaturesEnabled returns a FeatureToggles with all toggles enabled.
-// We can't use versions.FeaturesForVersion to test the specific toggles for each version because it creates a
-// dependency loop, so we just cover the everything enabled case as that should be the upcoming version.
 func allFeaturesEnabled() mipsevm.FeatureToggles {
 	toggles := mipsevm.FeatureToggles{}
 	tRef := reflect.ValueOf(&toggles).Elem() // Get a pointer and then dereference
