@@ -172,6 +172,83 @@ func TestInteropFaultProofs_ConsolidateValidCrossChainMessage(gt *testing.T) {
 	runFppAndChallengerTests(gt, system, tests)
 }
 
+func TestInteropFaultProofs_PreForkActivation(gt *testing.T) {
+	t := helpers.NewDefaultTesting(gt)
+	system := dsl.NewInteropDSL(t, dsl.SetInteropForkScheduledButInactive())
+
+	system.AddL2Block(system.Actors.ChainA)
+	system.AddL2Block(system.Actors.ChainB)
+
+	// Submit batch data for each chain in separate L1 blocks so tests can have one chain safe and one unsafe
+	system.SubmitBatchData(func(opts *dsl.SubmitBatchDataOpts) {
+		opts.SetChains(system.Actors.ChainA)
+	})
+	system.SubmitBatchData(func(opts *dsl.SubmitBatchDataOpts) {
+		opts.SetChains(system.Actors.ChainB)
+	})
+
+	actors := system.Actors
+
+	endTimestamp := actors.ChainA.RollupCfg.Genesis.L2Time + actors.ChainA.RollupCfg.BlockTime
+	startTimestamp := endTimestamp - 1
+	require.False(t, actors.ChainA.RollupCfg.IsInterop(endTimestamp), "Interop should not be active")
+
+	start := system.Outputs.SuperRoot(startTimestamp)
+	end := system.Outputs.SuperRoot(endTimestamp)
+
+	step1Expected := system.Outputs.TransitionState(startTimestamp, 1,
+		system.Outputs.OptimisticBlockAtTimestamp(actors.ChainA, endTimestamp),
+	).Marshal()
+
+	step2Expected := system.Outputs.TransitionState(startTimestamp, 2,
+		system.Outputs.OptimisticBlockAtTimestamp(actors.ChainA, endTimestamp),
+		system.Outputs.OptimisticBlockAtTimestamp(actors.ChainB, endTimestamp),
+	).Marshal()
+
+	firstPaddingStep := system.Outputs.TransitionState(startTimestamp, 3,
+		system.Outputs.OptimisticBlockAtTimestamp(actors.ChainA, endTimestamp),
+		system.Outputs.OptimisticBlockAtTimestamp(actors.ChainB, endTimestamp),
+	).Marshal()
+
+	lastPaddingStep := system.Outputs.TransitionState(startTimestamp, consolidateStep,
+		system.Outputs.OptimisticBlockAtTimestamp(actors.ChainA, endTimestamp),
+		system.Outputs.OptimisticBlockAtTimestamp(actors.ChainB, endTimestamp),
+	).Marshal()
+
+	tests := []*transitionTest{
+		{
+			name:               "FirstChainOptimisticBlock",
+			agreedClaim:        start.Marshal(),
+			disputedClaim:      step1Expected,
+			disputedTraceIndex: 0,
+			expectValid:        true,
+		},
+		{
+			name:               "SecondChainOptimisticBlock",
+			agreedClaim:        step1Expected,
+			disputedClaim:      step2Expected,
+			disputedTraceIndex: 1,
+			expectValid:        true,
+		},
+		{
+			name:               "FirstPaddingStep",
+			agreedClaim:        step2Expected,
+			disputedClaim:      firstPaddingStep,
+			disputedTraceIndex: 2,
+			expectValid:        true,
+		},
+		{
+			name:               "Consolidate",
+			agreedClaim:        lastPaddingStep,
+			disputedClaim:      end.Marshal(),
+			disputedTraceIndex: consolidateStep,
+			expectValid:        true,
+		},
+	}
+
+	runFppAndChallengerTests(gt, system, tests)
+}
+
 func TestInteropFaultProofs(gt *testing.T) {
 	t := helpers.NewDefaultTesting(gt)
 	system := dsl.NewInteropDSL(t)
