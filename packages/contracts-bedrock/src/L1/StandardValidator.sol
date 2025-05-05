@@ -23,6 +23,7 @@ import { ISemver } from "interfaces/universal/ISemver.sol";
 import { IResourceMetering } from "interfaces/L1/IResourceMetering.sol";
 import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
 import { IPreimageOracle } from "interfaces/cannon/IPreimageOracle.sol";
+import { IBigStepper } from "interfaces/dispute/IBigStepper.sol";
 
 contract StandardValidator {
     ISuperchainConfig public superchainConfig;
@@ -41,6 +42,20 @@ contract StandardValidator {
     address public anchorStateRegistryImpl;
     address public delayedWETHImpl;
     address public mipsImpl;
+
+    // Version strings as state variables
+    string public systemConfigVersion;
+    string public optimismPortalVersion;
+    string public l1CrossDomainMessengerVersion;
+    string public l1ERC721BridgeVersion;
+    string public l1StandardBridgeVersion;
+    string public mipsVersion;
+    string public optimismMintableERC20FactoryVersion;
+    string public disputeGameFactoryVersion;
+    string public anchorStateRegistryVersion;
+    string public delayedWETHVersion;
+    string public permissionedDisputeGameVersion;
+    string public preimageOracleVersion;
 
     struct Implementations {
         address l1ERC721BridgeImpl;
@@ -85,54 +100,21 @@ contract StandardValidator {
         anchorStateRegistryImpl = _implementations.anchorStateRegistryImpl;
         delayedWETHImpl = _implementations.delayedWETHImpl;
         mipsImpl = _implementations.mipsImpl;
-    }
 
-    function systemConfigVersion() public pure returns (string memory) {
-        return "2.5.0";
-    }
+        systemConfigVersion = ISemver(_implementations.systemConfigImpl).version();
+        optimismPortalVersion = ISemver(_implementations.optimismPortalImpl).version();
+        l1CrossDomainMessengerVersion = ISemver(_implementations.l1CrossDomainMessengerImpl).version();
+        l1ERC721BridgeVersion = ISemver(_implementations.l1ERC721BridgeImpl).version();
+        l1StandardBridgeVersion = ISemver(_implementations.l1StandardBridgeImpl).version();
+        mipsVersion = ISemver(_implementations.mipsImpl).version();
+        optimismMintableERC20FactoryVersion = ISemver(_implementations.optimismMintableERC20FactoryImpl).version();
+        disputeGameFactoryVersion = ISemver(_implementations.disputeGameFactoryImpl).version();
+        anchorStateRegistryVersion = ISemver(_implementations.anchorStateRegistryImpl).version();
+        delayedWETHVersion = ISemver(_implementations.delayedWETHImpl).version();
+        preimageOracleVersion = ISemver(address(IBigStepper(_implementations.mipsImpl).oracle())).version();
 
-    function optimismPortalVersion() public pure returns (string memory) {
-        return "3.14.0";
-    }
-
-    function l1CrossDomainMessengerVersion() public pure returns (string memory) {
-        return "2.6.0";
-    }
-
-    function l1ERC721BridgeVersion() public pure returns (string memory) {
-        return "2.4.0";
-    }
-
-    function l1StandardBridgeVersion() public pure returns (string memory) {
-        return "2.3.0";
-    }
-
-    function mipsVersion() public pure returns (string memory) {
-        return "1.0.0";
-    }
-
-    function optimismMintableERC20FactoryVersion() public pure returns (string memory) {
-        return "1.10.1";
-    }
-
-    function disputeGameFactoryVersion() public pure returns (string memory) {
-        return "1.0.1";
-    }
-
-    function anchorStateRegistryVersion() public pure returns (string memory) {
-        return "2.2.2";
-    }
-
-    function delayedWETHVersion() public pure returns (string memory) {
-        return "1.3.0";
-    }
-
-    function permissionedDisputeGameVersion() public pure returns (string memory) {
-        return "1.4.1";
-    }
-
-    function preimageOracleVersion() public pure returns (string memory) {
-        return "1.1.4";
+        // permissionedDisputeGameVersion = ISemver(_implementations.permissionedDisputeGameImpl).version();
+        // permissionlessDisputeGameVersion = ISemver(_implementations.permissionlessDisputeGameImpl).version();
     }
 
     function assertValidSuperchainConfig(string memory _errors) internal view returns (string memory) {
@@ -156,7 +138,7 @@ contract StandardValidator {
         returns (string memory)
     {
         ISemver _semver = ISemver(address(_sysCfg));
-        _errors = internalRequire(stringEq(_semver.version(), systemConfigVersion()), "SYSCON-10", _errors);
+        _errors = internalRequire(stringEq(_semver.version(), systemConfigVersion), "SYSCON-10", _errors);
         _errors = internalRequire(_sysCfg.gasLimit() <= uint64(200_000_000), "SYSCON-20", _errors);
         _errors = internalRequire(_sysCfg.scalar() >> 248 == 1, "SYSCON-30", _errors);
         _errors =
@@ -185,7 +167,7 @@ contract StandardValidator {
         returns (string memory)
     {
         IL1CrossDomainMessenger _messenger = IL1CrossDomainMessenger(_sysCfg.l1CrossDomainMessenger());
-        _errors = internalRequire(stringEq(_messenger.version(), l1CrossDomainMessengerVersion()), "L1xDM-10", _errors);
+        _errors = internalRequire(stringEq(_messenger.version(), l1CrossDomainMessengerVersion), "L1xDM-10", _errors);
         _errors = internalRequire(
             _admin.getProxyImplementation(address(_messenger)) == l1CrossDomainMessengerImpl, "L1xDM-20", _errors
         );
@@ -214,7 +196,7 @@ contract StandardValidator {
         returns (string memory)
     {
         IL1StandardBridge _bridge = IL1StandardBridge(payable(_sysCfg.l1StandardBridge()));
-        _errors = internalRequire(stringEq(_bridge.version(), l1StandardBridgeVersion()), "L1SB-10", _errors);
+        _errors = internalRequire(stringEq(_bridge.version(), l1StandardBridgeVersion), "L1SB-10", _errors);
         _errors =
             internalRequire(_admin.getProxyImplementation(address(_bridge)) == l1StandardBridgeImpl, "L1SB-20", _errors);
 
@@ -239,7 +221,7 @@ contract StandardValidator {
     {
         IOptimismMintableERC20Factory _factory = IOptimismMintableERC20Factory(_sysCfg.optimismMintableERC20Factory());
         _errors =
-            internalRequire(stringEq(_factory.version(), optimismMintableERC20FactoryVersion()), "MERC20F-10", _errors);
+            internalRequire(stringEq(_factory.version(), optimismMintableERC20FactoryVersion), "MERC20F-10", _errors);
         _errors = internalRequire(
             _admin.getProxyImplementation(address(_factory)) == optimismMintableERC20FactoryImpl, "MERC20F-20", _errors
         );
@@ -260,7 +242,7 @@ contract StandardValidator {
         returns (string memory)
     {
         IL1ERC721Bridge _bridge = IL1ERC721Bridge(_sysCfg.l1ERC721Bridge());
-        _errors = internalRequire(stringEq(_bridge.version(), l1ERC721BridgeVersion()), "L721B-10", _errors);
+        _errors = internalRequire(stringEq(_bridge.version(), l1ERC721BridgeVersion), "L721B-10", _errors);
         _errors =
             internalRequire(_admin.getProxyImplementation(address(_bridge)) == l1ERC721BridgeImpl, "L721B-20", _errors);
 
@@ -283,7 +265,7 @@ contract StandardValidator {
         returns (string memory)
     {
         IOptimismPortal2 _portal = IOptimismPortal2(payable(_sysCfg.optimismPortal()));
-        _errors = internalRequire(stringEq(_portal.version(), optimismPortalVersion()), "PORTAL-10", _errors);
+        _errors = internalRequire(stringEq(_portal.version(), optimismPortalVersion), "PORTAL-10", _errors);
         _errors =
             internalRequire(_admin.getProxyImplementation(address(_portal)) == optimismPortalImpl, "PORTAL-20", _errors);
 
@@ -304,7 +286,7 @@ contract StandardValidator {
         returns (string memory)
     {
         IDisputeGameFactory _factory = IDisputeGameFactory(_sysCfg.disputeGameFactory());
-        _errors = internalRequire(stringEq(_factory.version(), disputeGameFactoryVersion()), "DF-10", _errors);
+        _errors = internalRequire(stringEq(_factory.version(), disputeGameFactoryVersion), "DF-10", _errors);
         _errors = internalRequire(
             _admin.getProxyImplementation(address(_factory)) == disputeGameFactoryImpl, "DF-20", _errors
         );
@@ -396,7 +378,7 @@ contract StandardValidator {
         bool validGameVM = address(_game.vm()) == address(mipsImpl);
 
         _errors = internalRequire(
-            stringEq(_game.version(), permissionedDisputeGameVersion()), string.concat(_errorPrefix, "-20"), _errors
+            stringEq(_game.version(), permissionedDisputeGameVersion), string.concat(_errorPrefix, "-20"), _errors
         );
         IAnchorStateRegistry _asr = _game.anchorStateRegistry();
         _errors = internalRequire(
@@ -442,7 +424,7 @@ contract StandardValidator {
     {
         _errorPrefix = string.concat(_errorPrefix, "-DWETH");
         _errors = internalRequire(
-            stringEq(_weth.version(), delayedWETHVersion()), string.concat(_errorPrefix, "-10"), _errors
+            stringEq(_weth.version(), delayedWETHVersion), string.concat(_errorPrefix, "-10"), _errors
         );
         _errors = internalRequire(
             _admin.getProxyImplementation(address(_weth)) == delayedWETHImpl,
@@ -470,7 +452,7 @@ contract StandardValidator {
     {
         _errorPrefix = string.concat(_errorPrefix, "-ANCHORP");
         _errors = internalRequire(
-            stringEq(_asr.version(), anchorStateRegistryVersion()), string.concat(_errorPrefix, "-10"), _errors
+            stringEq(_asr.version(), anchorStateRegistryVersion), string.concat(_errorPrefix, "-10"), _errors
         );
         _errors = internalRequire(
             address(_asr.disputeGameFactory()) == address(_dgf), string.concat(_errorPrefix, "-30"), _errors
@@ -500,7 +482,7 @@ contract StandardValidator {
         _errorPrefix = string.concat(_errorPrefix, "-PIMGO");
         // The preimage oracle's address is correct if the MIPS address is correct.
         _errors = internalRequire(
-            stringEq(_oracle.version(), preimageOracleVersion()), string.concat(_errorPrefix, "-10"), _errors
+            stringEq(_oracle.version(), preimageOracleVersion), string.concat(_errorPrefix, "-10"), _errors
         );
         _errors = internalRequire(_oracle.challengePeriod() == 86400, string.concat(_errorPrefix, "-20"), _errors);
         _errors = internalRequire(_oracle.minProposalSize() == 126000, string.concat(_errorPrefix, "-30"), _errors);
