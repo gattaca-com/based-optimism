@@ -136,7 +136,7 @@ contract DeployConfig is Script {
         faultGameMaxClockDuration = stdJson.readUint(_json, "$.faultGameMaxClockDuration");
         faultGameGenesisBlock = stdJson.readUint(_json, "$.faultGameGenesisBlock");
         faultGameGenesisOutputRoot = stdJson.readBytes32(_json, "$.faultGameGenesisOutputRoot");
-        faultGameWithdrawalDelay = stdJson.readUint(_json, "$.faultGameWithdrawalDelay");
+        faultGameWithdrawalDelay = 604_800;
 
         preimageOracleMinProposalSize = stdJson.readUint(_json, "$.preimageOracleMinProposalSize");
         preimageOracleChallengePeriod = stdJson.readUint(_json, "$.preimageOracleChallengePeriod");
