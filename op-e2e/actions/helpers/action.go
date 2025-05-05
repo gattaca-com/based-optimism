@@ -2,8 +2,10 @@ package helpers
 
 import (
 	"context"
+	"fmt"
 
 	op_e2e "github.com/ethereum-optimism/optimism/op-e2e"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/ethereum-optimism/optimism/op-e2e/e2eutils"
 )
@@ -77,12 +79,13 @@ func (st *defaultTesting) Ctx() context.Context {
 	return st.ctx
 }
 
-// InvalidAction indicates the failure is due to action incompatibility, does not stop the test.
+// InvalidAction indicates the failure is due to action incompatibility.
 // The format and args behave the same as fmt.Sprintf, testing.T.Errorf, etc.
 func (st *defaultTesting) InvalidAction(format string, args ...any) {
 	st.TestingBase.Helper() // report the error on the call-site to make debugging clear, not here.
-	st.Errorf("invalid action err: "+format, args...)
+	assert.Fail(st, fmt.Sprintf("invalid action err: "+format, args...))
 	st.state = ActionInvalid
+	st.FailNow()
 }
 
 // Reset prepares the testing util for the next action, changing the context and state back to OK.
