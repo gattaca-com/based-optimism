@@ -219,9 +219,9 @@ func (m *InstrumentedState) syscallGetRandom(a0, a1 uint64) (v0, v1 uint64) {
 	memVal := m.state.Memory.GetWord(effAddr)
 
 	// Generate some "random" data by hashing the current step
-	data := make([]byte, 8)
-	binary.BigEndian.PutUint64(data, m.state.Step)
-	randomData := crypto.Keccak256Hash(data)
+	stepBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(stepBytes, m.state.Step)
+	randomData := crypto.Keccak256Hash(stepBytes)
 	randomWord := arch.ByteOrderWord.Word(randomData[0:arch.WordSizeBytes])
 
 	// Calculate number of bytes to write
