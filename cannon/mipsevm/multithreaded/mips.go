@@ -163,9 +163,8 @@ func (m *InstrumentedState) handleSyscall() error {
 	case arch.SysGetRandom:
 		if m.features.SupportWorkingSysGetRandom {
 			v0, v1 = m.syscallGetRandom(a0, a1)
-		} else {
-			// noop
 		}
+		// Otherwise, ignored (noop)
 	case arch.SysMunmap:
 	case arch.SysGetAffinity:
 	case arch.SysMadvise:

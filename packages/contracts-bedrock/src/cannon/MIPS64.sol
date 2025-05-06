@@ -563,9 +563,8 @@ contract MIPS64 is ISemver {
             } else if (syscall_no == sys.SYS_GETRANDOM) {
                 if (st.featuresForVersion(STATE_VERSION).supportWorkingSysGetRandom) {
                     (v0, v1, state.memRoot) = syscallGetRandom(state, a0, a1);
-                } else {
-                    // ignored
                 }
+                // Otherwise, ignored (noop)
             } else if (syscall_no == sys.SYS_MUNMAP) {
                 // ignored
             } else if (syscall_no == sys.SYS_GETAFFINITY) {
