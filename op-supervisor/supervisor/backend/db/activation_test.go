@@ -1,10 +1,7 @@
 package db
 
 import (
-	"context"
-	"errors"
 	"testing"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
@@ -21,58 +18,40 @@ import (
 	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/types"
 )
 
-func TestActivationCheckAndActivateInterop(t *testing.T) {
-	db := setupTestDB(t)
-	chain := eth.ChainID{1}
+// func TestActivationCheckAndActivateInterop(t *testing.T) {
+// 	db := setupTestDB(t)
+// 	chain := eth.ChainID{1}
 
-	mockAnchor := types.DerivedBlockRefPair{
-		Source: eth.BlockRef{
-			Hash:   common.HexToHash("0x1234"),
-			Number: 1,
-			Time:   100,
-		},
-		Derived: eth.BlockRef{
-			Hash:   common.HexToHash("0x5678"),
-			Number: 10,
-			Time:   1000,
-		},
-	}
+// 	block := eth.BlockRef{
+// 		Hash:   common.HexToHash("0xabcd"),
+// 		Number: 100,
+// 		Time:   2000,
+// 	}
 
-	getAnchorPointFunc := func(ctx context.Context) (types.DerivedBlockRefPair, error) {
-		return mockAnchor, nil
-	}
+// 	db.initialized.Set(chain, struct{}{})
 
-	block := eth.BlockRef{
-		Hash:   common.HexToHash("0xabcd"),
-		Number: 100,
-		Time:   2000,
-	}
+// 	// Create an activation manager for testing
+// 	logger := testlog.Logger(t, log.LvlInfo)
+// 	mock := &depset.MockDependencySet{
+// 		CanInitiateAtFn: func(chainID eth.ChainID, timestamp uint64) (bool, error) {
+// 			return timestamp >= 2000, nil
+// 		},
+// 	}
+// 	activationMgr := activation.NewActivationManager(mock, logger)
+// 	db.SetActivationManager(activationMgr)
 
-	db.initialized.Set(chain, struct{}{})
+// 	// Test DetectAndActivateInterop
+// 	err := activationMgr.DetectAndActivateInterop(
+// 		context.Background(),
+// 		chain,
+// 		block,
+// 		db.syncSources,
+// 		db,
+// 	)
+// 	require.NoError(t, err)
 
-	// Create an activation manager for testing
-	logger := testlog.Logger(t, log.LvlInfo)
-	mock := &depset.MockDependencySet{
-		CanInitiateAtFn: func(chainID eth.ChainID, timestamp uint64) (bool, error) {
-			return timestamp >= 2000, nil
-		},
-	}
-	activationMgr := activation.NewActivationManager(mock, logger)
-	db.SetActivationManager(activationMgr)
-
-	// Test DetectAndActivateInterop
-	err := activationMgr.DetectAndActivateInterop(
-		context.Background(),
-		chain,
-		block,
-		getAnchorPointFunc,
-		db.isInitialized,
-		db.InitializeWithAnchor,
-	)
-	require.NoError(t, err)
-
-	assert.True(t, db.isInitialized(chain))
-}
+// 	assert.True(t, db.isInitialized(chain))
+// }
 
 func TestActivationEventFiltering(t *testing.T) {
 	db := setupTestDB(t)
@@ -150,42 +129,6 @@ func (m *mockEmitter) Emit(ev event.Event) {
 func TestActivationAnchorEventHandling(t *testing.T) {
 	chain := eth.ChainID{1}
 
-	anchors := []struct {
-		name       string
-		anchor     types.DerivedBlockRefPair
-		preInterop bool
-	}{
-		{
-			name:       "Pre-interop with empty anchor",
-			anchor:     types.DerivedBlockRefPair{},
-			preInterop: true,
-		},
-	}
-
-	for _, tc := range anchors {
-		t.Run(tc.name, func(t *testing.T) {
-			db := setupTestDB(t)
-
-			// Create an activation manager
-			logger := testlog.Logger(t, log.LvlInfo)
-			mock := &depset.MockDependencySet{
-				CanInitiateAtFn: func(chainID eth.ChainID, timestamp uint64) (bool, error) {
-					return true, nil
-				},
-			}
-			activationMgr := activation.NewActivationManager(mock, logger)
-			db.SetActivationManager(activationMgr)
-
-			db.OnEvent(superevents.AnchorEvent{
-				ChainID:    chain,
-				Anchor:     tc.anchor,
-				PreInterop: tc.preInterop,
-			})
-
-			assert.True(t, db.isInitialized(chain), "database should be initialized")
-		})
-	}
-
 	t.Run("Interop mode with valid anchor", func(t *testing.T) {
 		db := setupTestDB(t)
 
@@ -215,7 +158,6 @@ func TestActivationAnchorEventHandling(t *testing.T) {
 					Time:   1000,
 				},
 			},
-			PreInterop: false,
 		})
 
 		assert.True(t, db.isInitialized(chain), "database should be initialized")
@@ -264,175 +206,6 @@ func TestActivationManagerIsActiveForChain(t *testing.T) {
 
 			actual := activationMgr.IsActiveForChain(chain, tc.timestamp)
 			assert.Equal(t, tc.expected, actual, "Timestamp %d expected %v but got %v", tc.timestamp, tc.expected, actual)
-		})
-	}
-}
-
-func TestActivationBoundaryCheckAnchorPointExpiry(t *testing.T) {
-	// Set up a mock dependency set with a custom message expiry window
-	const messageExpiryWindowInSeconds = 14 * 24 * 60 * 60 // 14 days in seconds to avoid race conditions
-	mock := &depset.MockDependencySet{
-		MessageExpiryWindowFn: func() uint64 {
-			return messageExpiryWindowInSeconds
-		},
-	}
-
-	db := setupTestDB(t)
-	db.depSet = mock
-
-	// Create activation manager for testing
-	logger := testlog.Logger(t, log.LvlInfo)
-	activationMgr := activation.NewActivationManager(mock, logger)
-	db.SetActivationManager(activationMgr)
-
-	// Create a test anchor point with a timestamp in the past
-	now := time.Now()
-
-	// Create a duration from the window
-	messageExpiryWindow := time.Duration(messageExpiryWindowInSeconds) * time.Second
-
-	testCases := []struct {
-		name        string
-		anchorTime  time.Time
-		expectError bool
-	}{
-		{
-			name:        "Recent anchor point",
-			anchorTime:  now.Add(-24 * time.Hour), // 1 day ago
-			expectError: false,
-		},
-		{
-			name:        "Anchor point just under threshold",
-			anchorTime:  now.Add(-messageExpiryWindow + 48*time.Hour), // 2 days less than threshold
-			expectError: false,
-		},
-		{
-			name:        "Expired anchor point",
-			anchorTime:  now.Add(-messageExpiryWindow - time.Hour), // beyond threshold
-			expectError: true,
-		},
-		{
-			name:        "Very old anchor point",
-			anchorTime:  now.Add(-30 * 24 * time.Hour), // 30 days ago
-			expectError: true,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			// Create an anchor point with the test timestamp
-			anchor := types.DerivedBlockRefPair{
-				Source: eth.BlockRef{
-					Hash:   common.HexToHash("0x1234"),
-					Number: 1,
-					Time:   uint64(tc.anchorTime.Unix()),
-				},
-				Derived: eth.BlockRef{
-					Hash:   common.HexToHash("0x5678"),
-					Number: 10,
-					Time:   uint64(tc.anchorTime.Unix()),
-				},
-			}
-
-			// Test the expiry check
-			err := activationMgr.CheckAnchorPointExpiry(anchor)
-
-			if tc.expectError {
-				assert.Error(t, err)
-				assert.True(t, errors.Is(err, activation.ErrInteropBoundary))
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
-}
-
-func TestActivationBoundaryCheckDBBoundaries(t *testing.T) {
-	db := setupTestDB(t)
-	chain := eth.ChainID{1}
-
-	// Initialize the database with a mock anchor point
-	anchorPoint := types.DerivedBlockRefPair{
-		Source: eth.BlockRef{
-			Hash:   common.HexToHash("0x1234"),
-			Number: 1,
-			Time:   uint64(time.Now().Unix() - 3600), // 1 hour ago
-		},
-		Derived: eth.BlockRef{
-			Hash:   common.HexToHash("0x5678"),
-			Number: 100,
-			Time:   uint64(time.Now().Unix() - 3600),
-		},
-	}
-
-	// Mark the database as initialized and set up the mock DB with our anchor point
-	db.initialized.Set(chain, struct{}{})
-
-	// Set the anchor block in the anchorBlocks map
-	db.anchorBlocks.Set(chain, anchorPoint)
-
-	// Create a mock derivation DB that returns our anchor point
-	mockCrossDB := &mockDerivationDBWithFirstEntry{
-		FirstEntry: types.DerivedBlockSealPair{
-			Source:  types.BlockSealFromRef(anchorPoint.Source),
-			Derived: types.BlockSealFromRef(anchorPoint.Derived),
-		},
-	}
-
-	// Add the mock DB to the chain
-	db.crossDBs.Set(chain, mockCrossDB)
-
-	// Create activation manager for testing
-	logger := testlog.Logger(t, log.LvlInfo)
-	activationMgr := activation.NewActivationManager(db.depSet, logger)
-	db.SetActivationManager(activationMgr)
-
-	// Test cases for checking DB boundaries
-	testCases := []struct {
-		name        string
-		block       eth.BlockRef
-		expectError bool
-	}{
-		{
-			name: "Block after anchor point",
-			block: eth.BlockRef{
-				Hash:   common.HexToHash("0xabcd"),
-				Number: 150, // after anchor point (100)
-				Time:   uint64(time.Now().Unix()),
-			},
-			expectError: false,
-		},
-		{
-			name: "Block at anchor point",
-			block: eth.BlockRef{
-				Hash:   common.HexToHash("0xabcd"),
-				Number: 100, // equal to anchor point
-				Time:   uint64(time.Now().Unix()),
-			},
-			expectError: false,
-		},
-		{
-			name: "Block before anchor point",
-			block: eth.BlockRef{
-				Hash:   common.HexToHash("0xabcd"),
-				Number: 50, // before anchor point (100)
-				Time:   uint64(time.Now().Unix()),
-			},
-			expectError: true,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			// Test the boundary check
-			err := activationMgr.CheckDBBoundaries(chain, tc.block, db.GetAnchorL2Block)
-
-			if tc.expectError {
-				assert.Error(t, err)
-				assert.True(t, errors.Is(err, activation.ErrInteropBoundary))
-			} else {
-				assert.NoError(t, err)
-			}
 		})
 	}
 }

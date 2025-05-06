@@ -120,9 +120,8 @@ func (ev LocalDerivedOriginUpdateEvent) String() string {
 }
 
 type AnchorEvent struct {
-	ChainID    eth.ChainID
-	Anchor     types.DerivedBlockRefPair
-	PreInterop bool
+	ChainID eth.ChainID
+	Anchor  types.DerivedBlockRefPair
 }
 
 func (ev AnchorEvent) String() string {

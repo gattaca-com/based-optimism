@@ -121,14 +121,9 @@ func TestActivationTimestampChecks(t *testing.T) {
 	}
 
 	for ts, expectedVal := range testCases {
-		blockRef := eth.BlockRef{Time: ts}
 		active := am.IsActiveForChain(chainID, ts)
-		shouldProcess := am.ShouldProcessEvent(chainID, blockRef)
-
 		require.Equal(t, expectedVal, active,
 			"IsActiveForChain at timestamp %d (activation+%d)", ts, int(ts)-int(baseTime))
-		require.Equal(t, expectedVal, shouldProcess,
-			"ShouldProcessEvent at timestamp %d (activation+%d)", ts, int(ts)-int(baseTime))
 	}
 }
 
@@ -159,73 +154,16 @@ func TestActivationTimestampChecksEdgeCases(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			blockRef := eth.BlockRef{Time: tc.timestamp}
 			active := am.IsActiveForChain(chainID, tc.timestamp)
-			shouldProcess := am.ShouldProcessEvent(chainID, blockRef)
 
 			require.Equal(t, tc.expected, active,
 				"IsActiveForChain at timestamp %d", tc.timestamp)
-			require.Equal(t, tc.expected, shouldProcess,
-				"ShouldProcessEvent at timestamp %d", tc.timestamp)
 		})
 	}
 
 	unknownChain := eth.ChainID{99}
 	active := am.IsActiveForChain(unknownChain, activationTime+1)
-	blockRef := eth.BlockRef{Time: activationTime + 1}
-	shouldProcess := am.ShouldProcessEvent(unknownChain, blockRef)
-
 	require.False(t, active, "Unknown chain should not be active")
-	require.False(t, shouldProcess, "Events for unknown chain should not be processed")
-}
-
-func TestActivationManagerIsActive(t *testing.T) {
-	baseTime := uint64(time.Now().Unix())
-	mockDepSet := &mockDependencySet{
-		activationTime: baseTime,
-		messageExpiry:  3600,
-	}
-
-	chainA := eth.ChainID{1}
-	chainB := eth.ChainID{2}
-	chainC := eth.ChainID{3}
-
-	mockDepSet.AddChain(chainA, baseTime-5)
-	mockDepSet.AddChain(chainB, baseTime+10)
-	mockDepSet.AddChain(chainC, baseTime+20)
-
-	logger := testlog.Logger(t, log.LvlInfo)
-	am := NewActivationManager(mockDepSet, logger)
-
-	require.True(t, am.IsActive(), "IsActive should return true if any chain is active")
-
-	require.True(t, am.IsActiveAt(baseTime),
-		"IsActiveAt(baseTime) should be true because chainA is active")
-
-	require.True(t, am.IsActiveAt(baseTime+15),
-		"IsActiveAt(baseTime+15) should be true because chainA and chainB are active")
-
-	require.True(t, am.IsActiveAt(baseTime+25),
-		"IsActiveAt(baseTime+25) should be true because all chains are active")
-
-	inactiveMockDepSet := &mockDependencySet{
-		activationTime: baseTime + 100,
-		messageExpiry:  3600,
-	}
-
-	inactiveMockDepSet.AddChain(chainA, baseTime+100)
-	inactiveMockDepSet.AddChain(chainB, baseTime+100)
-
-	inactiveAM := NewActivationManager(inactiveMockDepSet, logger)
-
-	require.False(t, inactiveAM.IsActive(),
-		"IsActive should return false when no chains are active")
-
-	require.False(t, inactiveAM.IsActiveAt(baseTime),
-		"IsActiveAt(baseTime) should be false when no chains are active at that time")
-
-	require.True(t, inactiveAM.IsActiveAt(baseTime+101),
-		"IsActiveAt(baseTime+101) should be true when chains activate at baseTime+100")
 }
 
 func TestActivationBlockFiltering(t *testing.T) {
@@ -249,12 +187,6 @@ func TestActivationBlockFiltering(t *testing.T) {
 	postActivationBlock := eth.BlockRef{
 		Time: activationTime + 600,
 	}
-
-	shouldProcessPre := am.ShouldProcessEvent(chainID, preActivationBlock)
-	require.False(t, shouldProcessPre, "Pre-activation blocks should be filtered out")
-
-	shouldProcessPost := am.ShouldProcessEvent(chainID, postActivationBlock)
-	require.True(t, shouldProcessPost, "Post-activation blocks should be processed")
 
 	isActiveForPreActivation := am.IsActiveForChain(chainID, preActivationBlock.Time)
 	require.False(t, isActiveForPreActivation, "Chain should not be active at pre-activation time")
@@ -307,15 +239,10 @@ func TestActivationBoundary(t *testing.T) {
 	require.True(t, isActiveJustAfterA, "Chain A should be active just after the activation time")
 	require.True(t, isActiveJustAfterB, "Chain B should be active just after the activation time")
 
-	shouldProcessAtA := am.ShouldProcessEvent(chainA, blockAtActivationA)
-	shouldProcessAtB := am.ShouldProcessEvent(chainB, blockAtActivationB)
-	shouldProcessAfterA := am.ShouldProcessEvent(chainA, blockJustAfterA)
-	shouldProcessAfterB := am.ShouldProcessEvent(chainB, blockJustAfterB)
-
-	require.False(t, shouldProcessAtA, "Blocks exactly at activation should not be processed for Chain A")
-	require.False(t, shouldProcessAtB, "Blocks exactly at activation should not be processed for Chain B")
-	require.True(t, shouldProcessAfterA, "Blocks just after activation should be processed for Chain A")
-	require.True(t, shouldProcessAfterB, "Blocks just after activation should be processed for Chain B")
+	require.False(t, am.IsActiveForChain(chainA, blockAtActivationA.Time))
+	require.False(t, am.IsActiveForChain(chainB, blockAtActivationB.Time))
+	require.True(t, am.IsActiveForChain(chainA, blockJustAfterA.Time))
+	require.True(t, am.IsActiveForChain(chainB, blockJustAfterB.Time))
 }
 
 func TestActivationBoundaryMultipleChainsSameActivationTime(t *testing.T) {
@@ -351,18 +278,6 @@ func TestActivationBoundaryMultipleChainsSameActivationTime(t *testing.T) {
 	require.True(t, am.IsActiveForChain(chainA, afterActivation.Time))
 	require.True(t, am.IsActiveForChain(chainB, afterActivation.Time))
 	require.True(t, am.IsActiveForChain(chainC, afterActivation.Time))
-
-	require.False(t, am.ShouldProcessEvent(chainA, beforeActivation))
-	require.False(t, am.ShouldProcessEvent(chainB, beforeActivation))
-	require.False(t, am.ShouldProcessEvent(chainC, beforeActivation))
-
-	require.False(t, am.ShouldProcessEvent(chainA, atActivation))
-	require.False(t, am.ShouldProcessEvent(chainB, atActivation))
-	require.False(t, am.ShouldProcessEvent(chainC, atActivation))
-
-	require.True(t, am.ShouldProcessEvent(chainA, afterActivation))
-	require.True(t, am.ShouldProcessEvent(chainB, afterActivation))
-	require.True(t, am.ShouldProcessEvent(chainC, afterActivation))
 }
 
 func TestActivationBoundaryMultipleChainsDifferentActivationTimes(t *testing.T) {
@@ -392,23 +307,11 @@ func TestActivationBoundaryMultipleChainsDifferentActivationTimes(t *testing.T) 
 	require.False(t, am.IsActiveForChain(chainB, t1.Time))
 	require.False(t, am.IsActiveForChain(chainC, t1.Time))
 
-	require.True(t, am.ShouldProcessEvent(chainA, t1))
-	require.False(t, am.ShouldProcessEvent(chainB, t1))
-	require.False(t, am.ShouldProcessEvent(chainC, t1))
-
 	require.True(t, am.IsActiveForChain(chainA, t2.Time))
 	require.True(t, am.IsActiveForChain(chainB, t2.Time))
 	require.False(t, am.IsActiveForChain(chainC, t2.Time))
 
-	require.True(t, am.ShouldProcessEvent(chainA, t2))
-	require.True(t, am.ShouldProcessEvent(chainB, t2))
-	require.False(t, am.ShouldProcessEvent(chainC, t2))
-
 	require.True(t, am.IsActiveForChain(chainA, t3.Time))
 	require.True(t, am.IsActiveForChain(chainB, t3.Time))
 	require.True(t, am.IsActiveForChain(chainC, t3.Time))
-
-	require.True(t, am.ShouldProcessEvent(chainA, t3))
-	require.True(t, am.ShouldProcessEvent(chainB, t3))
-	require.True(t, am.ShouldProcessEvent(chainC, t3))
 }

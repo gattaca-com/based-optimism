@@ -193,9 +193,8 @@ func TestBackendLifetime(t *testing.T) {
 
 	// Set up the mock event for initialization
 	b.emitter.Emit(superevents.AnchorEvent{
-		ChainID:    chainA,
-		Anchor:     anchorPair,
-		PreInterop: false,
+		ChainID: chainA,
+		Anchor:  anchorPair,
 	})
 	require.NoError(t, ex.Drain())
 
