@@ -37,7 +37,7 @@ import (
 // 			return timestamp >= 2000, nil
 // 		},
 // 	}
-// 	activationMgr := activation.NewActivationManager(mock, logger)
+// 	activationMgr := activation.NewCheckFn(mock, logger)
 // 	db.SetActivationManager(activationMgr)
 
 // 	// Test DetectAndActivateInterop
@@ -73,7 +73,6 @@ func TestActivationEventFiltering(t *testing.T) {
 	db.anchorBlocks.Set(chain, mockAnchor)
 
 	// Create an activation manager that considers blocks inactive
-	logger := testlog.Logger(t, log.LvlInfo)
 	mock := &depset.MockDependencySet{
 		CanInitiateAtFn: func(chainID eth.ChainID, timestamp uint64) (bool, error) {
 			return false, nil // All blocks are inactive
@@ -82,8 +81,7 @@ func TestActivationEventFiltering(t *testing.T) {
 			return 14 * 24 * 60 * 60 // 14 days in seconds
 		},
 	}
-	activationMgr := activation.NewActivationManager(mock, logger)
-	db.SetActivationManager(activationMgr)
+	db.activationCheckFn = activation.NewCheckFn(mock, testlog.Logger(t, log.LvlInfo))
 
 	// Add a mock emitter to prevent nil pointer panic
 	db.emitter = &mockEmitter{}
@@ -132,15 +130,12 @@ func TestActivationAnchorEventHandling(t *testing.T) {
 	t.Run("Interop mode with valid anchor", func(t *testing.T) {
 		db := setupTestDB(t)
 
-		// Create an activation manager
-		logger := testlog.Logger(t, log.LvlInfo)
 		mock := &depset.MockDependencySet{
 			CanInitiateAtFn: func(chainID eth.ChainID, timestamp uint64) (bool, error) {
 				return true, nil
 			},
 		}
-		activationMgr := activation.NewActivationManager(mock, logger)
-		db.SetActivationManager(activationMgr)
+		db.activationCheckFn = activation.NewCheckFn(mock, db.logger)
 
 		db.initialized.Set(chain, struct{}{})
 
@@ -169,8 +164,8 @@ func TestActivationManagerIsActiveForChain(t *testing.T) {
 	chain := eth.ChainID{1}
 
 	// Test with nil depSet
-	activationMgr := activation.NewActivationManager(nil, logger)
-	assert.False(t, activationMgr.IsActiveForChain(chain, 1234), "With nil depSet, should default to false")
+	activationCheckFn := activation.NewCheckFn(nil, logger)
+	assert.False(t, activationCheckFn(chain, 1234), "With nil depSet, should default to false")
 
 	activationTime := uint64(1000)
 
@@ -201,10 +196,8 @@ func TestActivationManagerIsActiveForChain(t *testing.T) {
 					return timestamp > activationTime, nil
 				},
 			}
-
-			activationMgr := activation.NewActivationManager(mock, logger)
-
-			actual := activationMgr.IsActiveForChain(chain, tc.timestamp)
+			activationCheckFn := activation.NewCheckFn(mock, logger)
+			actual := activationCheckFn(chain, tc.timestamp)
 			assert.Equal(t, tc.expected, actual, "Timestamp %d expected %v but got %v", tc.timestamp, tc.expected, actual)
 		})
 	}

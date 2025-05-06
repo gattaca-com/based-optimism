@@ -53,7 +53,7 @@ func (t *resetTracker) beginBisectionReset(z eth.BlockID) {
 		t.endReset()
 		return
 	}
-	if t.managed.activationMgr.IsActiveForChain(t.managed.chainID, block.Time) {
+	if t.managed.activationCheckFn(t.managed.chainID, block.Time) {
 		t.managed.log.Info("interop is active, using RequestReset")
 		if err := t.managed.Node.RequestReset(context.Background()); err != nil {
 			t.managed.log.Error("failed to request reset", "err", err)
