@@ -386,7 +386,7 @@ contract StandardValidator {
         ISystemConfig _sysCfg,
         IPermissionedDisputeGame _game,
         IDisputeGameFactory _factory,
-        bytes32,
+        bytes32 _absolutePrestate,
         uint256 _l2ChainID,
         IProxyAdmin _admin,
         GameType _gameType,
@@ -403,10 +403,9 @@ contract StandardValidator {
             GameType.unwrap(_game.gameType()) == GameType.unwrap(_gameType), string.concat(_errorPrefix, "-30"), _errors
         );
 
-        // TODO: Fix this properly
-        // _errors = internalRequire(
-        //     Claim.unwrap(_game.absolutePrestate()) == _absolutePrestate, string.concat(_errorPrefix, "-40"), _errors
-        // );
+        _errors = internalRequire(
+            Claim.unwrap(_game.absolutePrestate()) == _absolutePrestate, string.concat(_errorPrefix, "-40"), _errors
+        );
         _errors = internalRequire(validGameVM, string.concat(_errorPrefix, "-50"), _errors);
         _errors = internalRequire(_game.l2ChainId() == _l2ChainID, string.concat(_errorPrefix, "-60"), _errors);
         _errors = internalRequire(_game.l2BlockNumber() == 0, string.concat(_errorPrefix, "-70"), _errors);
