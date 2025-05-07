@@ -1,7 +1,6 @@
 package helpers
 
 import (
-	"fmt"
 	"math/rand"
 
 	"github.com/ethereum-optimism/optimism/op-chain-ops/genesis"
@@ -70,7 +69,7 @@ func NewL2FaultProofEnv[c any](t helpers.Testing, testCfg *TestCfg[c], tp *e2eut
 		case Isthmus:
 			dp.DeployConfig.ActivateForkAtGenesis(rollup.Isthmus)
 		default:
-			panic(fmt.Sprintf("unhandled HF:%v", testCfg.Hardfork))
+			t.Fatalf("unhandled HF:%v", testCfg.Hardfork)
 		}
 
 		for _, override := range deployConfigOverrides {
