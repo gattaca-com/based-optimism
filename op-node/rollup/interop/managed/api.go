@@ -56,6 +56,10 @@ func (ib *InteropAPI) BlockRefByNumber(ctx context.Context, num uint64) (eth.Blo
 	return ib.backend.BlockRefByNumber(ctx, num)
 }
 
+func (ib *InteropAPI) BlockRefByLabel(ctx context.Context, label eth.BlockLabel) (eth.BlockRef, error) {
+	return ib.backend.BlockRefByLabel(ctx, label)
+}
+
 func (ib *InteropAPI) ChainID(ctx context.Context) (eth.ChainID, error) {
 	return ib.backend.ChainID(ctx)
 }
