@@ -234,14 +234,14 @@ contract L1ERC721Bridge_Pause_Test is L1ERC721Bridge_TestInit {
     /// @dev Checks that the `paused` state of the bridge matches the `paused` state of the
     ///      `superchainConfig` after it's been changed.
     function test_pause_matchesSuperchainConfig_succeeds() external {
-        assertFalse(l1StandardBridge.paused());
-        assertEq(l1StandardBridge.paused(), systemConfig.paused());
+        assertFalse(l1ERC721Bridge.paused());
+        assertEq(l1ERC721Bridge.paused(), systemConfig.paused());
 
         vm.prank(superchainConfig.guardian());
         superchainConfig.pause(address(0));
 
-        assertTrue(l1StandardBridge.paused());
-        assertEq(l1StandardBridge.paused(), systemConfig.paused());
+        assertTrue(l1ERC721Bridge.paused());
+        assertEq(l1ERC721Bridge.paused(), systemConfig.paused());
     }
 }
 
@@ -326,8 +326,8 @@ contract L1ERC721Bridge_FinalizeBridgeERC721_Test is L1ERC721Bridge_TestInit {
 
     /// @notice Ensures that the `bridgeERC721` function reverts when the bridge is paused.
     function test_finalizeBridgeERC721_paused_reverts() external {
-        /// @dev Sets up the test by pausing the bridge, giving ether to the bridge and mocking
-        ///      the calls to the xDomainMessageSender so that it returns the correct value.
+        /// Sets up the test by pausing the bridge, giving ether to the bridge and mocking the
+        /// calls to the xDomainMessageSender so that it returns the correct value.
         vm.startPrank(systemConfig.superchainConfig().guardian());
         systemConfig.superchainConfig().pause(address(0));
         vm.stopPrank();
