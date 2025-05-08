@@ -35,10 +35,6 @@ type DeployOPChainInput2 struct {
 	OperatorFeeConstant uint64
 }
 
-func (input *DeployOPChainInput2) InputSet() bool {
-	return true
-}
-
 func (input *DeployOPChainInput2) StartingAnchorRoot() []byte {
 	return PermissionedGameStartingAnchorRoot
 }
@@ -60,10 +56,6 @@ type DeployOPChainOutput2 struct {
 	PermissionedDisputeGame            common.Address
 	DelayedWETHPermissionedGameProxy   common.Address
 	DelayedWETHPermissionlessGameProxy common.Address
-}
-
-func (output *DeployOPChainOutput2) CheckOutput(input common.Address) error {
-	return nil
 }
 
 type DeployOPChainScript2 script.DeployScriptWithOutput[DeployOPChainInput2, DeployOPChainOutput2]
