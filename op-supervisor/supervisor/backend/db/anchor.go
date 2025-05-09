@@ -24,27 +24,101 @@ func (db *ChainsDB) IsInitialized(id eth.ChainID) bool {
 }
 
 func (db *ChainsDB) InitializeWithAnchor(id eth.ChainID, anchor types.DerivedBlockRefPair) {
-	db.initFromAnchor(id, anchor)
-}
-
-// InitializePreActivation initializes the chain database in pre-activation mode
-// by using the given block as both the source and derived block in a synthetic anchor
-func (db *ChainsDB) InitializePreActivation(id eth.ChainID, block eth.BlockRef) {
-	if db.isInitialized(id) {
-		db.logger.Debug("chain already initialized, skipping pre-activation init")
+	// If in pre-activation mode, exit pre-activation and use the real anchor point
+	if db.IsInPreActivationMode(id) {
+		db.logger.Info("transitioning from pre-activation to activation mode", "chain", id, "anchor", anchor)
+		err := db.ExitPreActivationMode(id, anchor)
+		if err != nil {
+			db.logger.Error("failed to exit pre-activation mode", "chain", id, "err", err)
+			// Continue with normal initialization anyway
+		}
 		return
 	}
 
-	db.logger.Info("initializing chain database in pre-activation mode", "chain", id, "block", block)
+	db.initFromAnchor(id, anchor)
+}
 
-	// Create a synthetic "self-derived" anchor point
-	anchor := types.DerivedBlockRefPair{
-		Source:  block,
-		Derived: block,
+// UpdatePreActivationHead updates the in-memory tracked head for a chain pre-activation
+func (db *ChainsDB) UpdatePreActivationHead(id eth.ChainID, block eth.BlockRef) {
+	// Only update if in pre-activation mode
+	inPreActivation, ok := db.preActivationMode.Get(id)
+	if !ok || !inPreActivation {
+		db.logger.Debug("not updating head for chain not in pre-activation mode", "chain", id)
+		return
 	}
 
-	// Initialize using the synthetic anchor
+	// Update the tracked head
+	db.logger.Info("updating pre-activation head", "chain", id, "block", block)
+	db.preActivationHeads.Set(id, block)
+
+	// Mark as initialized for API consistency with normal mode
+	if !db.isInitialized(id) {
+		db.initialized.Set(id, struct{}{})
+	}
+}
+
+// GetPreActivationHead returns the currently tracked head for a chain in pre-activation mode
+func (db *ChainsDB) GetPreActivationHead(id eth.ChainID) (eth.BlockRef, bool) {
+	// Check if we're in pre-activation mode
+	inPreActivation, ok := db.preActivationMode.Get(id)
+	if !ok || !inPreActivation {
+		return eth.BlockRef{}, false
+	}
+
+	// Return the tracked head if available
+	head, ok := db.preActivationHeads.Get(id)
+	return head, ok
+}
+
+// IsInPreActivationMode checks if a chain is currently in pre-activation mode
+func (db *ChainsDB) IsInPreActivationMode(id eth.ChainID) bool {
+	inPreActivation, ok := db.preActivationMode.Get(id)
+	return ok && inPreActivation
+}
+
+// ExitPreActivationMode transitions a chain from pre-activation to normal mode
+// This should be called when interop activation is detected
+func (db *ChainsDB) ExitPreActivationMode(id eth.ChainID, anchor types.DerivedBlockRefPair) error {
+	// Check if we're in pre-activation mode
+	inPreActivation, ok := db.preActivationMode.Get(id)
+	if !ok || !inPreActivation {
+		return fmt.Errorf("chain %s is not in pre-activation mode", id)
+	}
+
+	db.logger.Info("exiting pre-activation mode", "chain", id, "anchor", anchor)
+
+	// Clear pre-activation state
+	db.preActivationMode.Delete(id)
+	db.preActivationHeads.Delete(id)
+
+	// Reset initialization state
+	db.initialized.Delete(id)
+
+	// Initialize using the anchor point
 	db.initFromAnchor(id, anchor)
+
+	return nil
+}
+
+// InitializePreActivation sets up pre-activation tracking for a chain
+func (db *ChainsDB) InitializePreActivation(id eth.ChainID, block eth.BlockRef) {
+	// Check if we're already in pre-activation mode instead of just initialized
+	inPreActivation, ok := db.preActivationMode.Get(id)
+	if ok && inPreActivation {
+		db.logger.Debug("chain already in pre-activation mode")
+		return
+	}
+
+	db.logger.Info("setting up pre-activation tracking", "chain", id, "block", block)
+
+	// Set pre-activation mode
+	db.preActivationMode.Set(id, true)
+
+	// Set initial head
+	db.preActivationHeads.Set(id, block)
+
+	// Mark as initialized for API consistency
+	db.initialized.Set(id, struct{}{})
 }
 
 func (db *ChainsDB) initFromAnchor(id eth.ChainID, anchor types.DerivedBlockRefPair) {
