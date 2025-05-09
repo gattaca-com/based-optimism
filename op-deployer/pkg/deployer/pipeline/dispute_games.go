@@ -90,8 +90,12 @@ func deployDisputeGame(
 		}
 		vmAddr = out.AlphabetVM
 	case state.VMTypeCannon, state.VMTypeCannonNext:
-		out, err := opcm.DeployMIPS(env.L1ScriptHost, opcm.DeployMIPSInput{
-			MipsVersion:    game.VMType.MipsVersion(),
+		deployMIPSScript, err := opcm.NewDeployMIPSScript(env.L1ScriptHost)
+		if err != nil {
+			return fmt.Errorf("failed to load DeployMIPS script: %w", err)
+		}
+		out, err := deployMIPSScript.Run(opcm.DeployMIPSInput{
+			MipsVersion:    new(big.Int).SetUint64(game.VMType.MipsVersion()),
 			PreimageOracle: oracleAddr,
 		})
 		if err != nil {

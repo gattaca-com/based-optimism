@@ -1,38 +1,36 @@
 package opcm
 
 import (
+	"math/big"
 	"testing"
 
-	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/broadcaster"
-	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/standard"
-	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/testutil"
-	"github.com/ethereum-optimism/optimism/op-deployer/pkg/env"
-	"github.com/ethereum-optimism/optimism/op-service/testlog"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/standard"
 )
 
-func TestDeployMIPS(t *testing.T) {
-	t.Parallel()
+func TestNewDeployMIPSScript(t *testing.T) {
+	t.Run("should not fail with current version of DeployMIPS contract", func(t *testing.T) {
+		// First we grab a test host
+		host1 := createTestHost(t)
 
-	_, artifacts := testutil.LocalArtifacts(t)
+		// Then we load the script
+		//
+		// This would raise an error if the Go types didn't match the ABI
+		deployScript, err := NewDeployMIPSScript(host1)
+		require.NoError(t, err)
 
-	host, err := env.DefaultScriptHost(
-		broadcaster.NoopBroadcaster(),
-		testlog.Logger(t, log.LevelInfo),
-		common.Address{'D'},
-		artifacts,
-	)
-	require.NoError(t, err)
+		// Then we deploy
+		mipsVersion := int64(standard.MIPSVersion)
+		output, err := deployScript.Run(DeployMIPSInput{
+			PreimageOracle: common.Address{'P'},
+			MipsVersion:    big.NewInt(mipsVersion),
+		})
 
-	input := DeployMIPSInput{
-		MipsVersion:    uint64(standard.MIPSVersion),
-		PreimageOracle: common.Address{0xab},
-	}
-
-	output, err := DeployMIPS(host, input)
-	require.NoError(t, err)
-
-	require.NotEmpty(t, output.MipsSingleton)
+		// And do some simple asserts
+		require.NoError(t, err)
+		require.NotNil(t, output)
+		require.NotEqual(t, common.Address{}, output.MipsSingleton, "MIPS singleton address should not be zero")
+	})
 }

@@ -1,23 +1,24 @@
 package opcm
 
 import (
-	"github.com/ethereum/go-ethereum/common"
+	"math/big"
 
 	"github.com/ethereum-optimism/optimism/op-chain-ops/script"
+	"github.com/ethereum/go-ethereum/common"
 )
 
 type DeployMIPSInput struct {
-	MipsVersion    uint64
 	PreimageOracle common.Address
+	MipsVersion    *big.Int
 }
 
 type DeployMIPSOutput struct {
 	MipsSingleton common.Address
 }
 
-func DeployMIPS(
-	host *script.Host,
-	input DeployMIPSInput,
-) (DeployMIPSOutput, error) {
-	return RunScriptSingle[DeployMIPSInput, DeployMIPSOutput](host, input, "DeployMIPS.s.sol", "DeployMIPS")
+type DeployMIPSScript script.DeployScriptWithOutput[DeployMIPSInput, DeployMIPSOutput]
+
+// NewDeployMIPSScript loads and validates the DeployMIPS script contract
+func NewDeployMIPSScript(host *script.Host) (DeployMIPSScript, error) {
+	return script.NewDeployScriptWithOutputFromFile[DeployMIPSInput, DeployMIPSOutput](host, "DeployMIPS.s.sol", "DeployMIPS")
 }
