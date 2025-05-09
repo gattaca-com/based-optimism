@@ -160,8 +160,11 @@ func Proxy(ctx context.Context, cfg ProxyConfig) (opcm.DeployProxyOutput, error)
 		return dpo, fmt.Errorf("failed to create script host: %w", err)
 	}
 
-	dpo, err = opcm.DeployProxy(
-		l1Host,
+	deployProxyScript, err := opcm.NewDeployProxyScript(l1Host)
+	if err != nil {
+		return dpo, fmt.Errorf("failed to load DeployProxy script: %w", err)
+	}
+	dpo, err = deployProxyScript.Run(
 		opcm.DeployProxyInput{
 			Owner: cfg.Owner,
 		},

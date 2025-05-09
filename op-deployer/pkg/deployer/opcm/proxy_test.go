@@ -3,34 +3,29 @@ package opcm
 import (
 	"testing"
 
-	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/broadcaster"
-	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/testutil"
-	"github.com/ethereum-optimism/optimism/op-deployer/pkg/env"
-	"github.com/ethereum-optimism/optimism/op-service/testlog"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/stretchr/testify/require"
 )
 
-func TestDeployProxy(t *testing.T) {
-	t.Parallel()
+func TestNewDeployProxyScript(t *testing.T) {
+	t.Run("should not fail with current version of DeployProxy contract", func(t *testing.T) {
+		// First we grab a test host
+		host1 := createTestHost(t)
 
-	_, artifacts := testutil.LocalArtifacts(t)
+		// Then we load the script
+		//
+		// This would raise an error if the Go types didn't match the ABI
+		deployProxy, err := NewDeployProxyScript(host1)
+		require.NoError(t, err)
 
-	host, err := env.DefaultScriptHost(
-		broadcaster.NoopBroadcaster(),
-		testlog.Logger(t, log.LevelInfo),
-		common.Address{'D'},
-		artifacts,
-	)
-	require.NoError(t, err)
+		// Then we deploy
+		output, err := deployProxy.Run(DeployProxyInput{
+			Owner: common.Address{'O'},
+		})
 
-	input := DeployProxyInput{
-		Owner: common.Address{0xab},
-	}
-
-	output, err := DeployProxy(host, input)
-	require.NoError(t, err)
-
-	require.NotEmpty(t, output.Proxy)
+		// And do some simple asserts
+		require.NoError(t, err)
+		require.NotNil(t, output)
+		require.NotEqual(t, output.Proxy, common.Address{})
+	})
 }

@@ -1,26 +1,21 @@
 package opcm
 
 import (
-	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/ethereum-optimism/optimism/op-chain-ops/script"
+	"github.com/ethereum/go-ethereum/common"
 )
 
 type DeployProxyInput struct {
 	Owner common.Address
 }
 
-func (input *DeployProxyInput) InputSet() bool {
-	return true
-}
-
 type DeployProxyOutput struct {
 	Proxy common.Address
 }
 
-func DeployProxy(
-	host *script.Host,
-	input DeployProxyInput,
-) (DeployProxyOutput, error) {
-	return RunScriptSingle[DeployProxyInput, DeployProxyOutput](host, input, "DeployProxy.s.sol", "DeployProxy")
+type DeployProxyScript script.DeployScriptWithOutput[DeployProxyInput, DeployProxyOutput]
+
+// NewDeployProxyScript loads and validates the DeployProxy script contract
+func NewDeployProxyScript(host *script.Host) (DeployProxyScript, error) {
+	return script.NewDeployScriptWithOutputFromFile[DeployProxyInput, DeployProxyOutput](host, "DeployProxy.s.sol", "DeployProxy")
 }

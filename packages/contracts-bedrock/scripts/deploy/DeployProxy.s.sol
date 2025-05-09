@@ -1,84 +1,59 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.15;
+pragma solidity 0.8.15;
 
 // Forge
 import { Script } from "forge-std/Script.sol";
 
-// Scripts
-import { BaseDeployIO } from "scripts/deploy/BaseDeployIO.sol";
+// Libraries
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 
 // Interfaces
 import { IProxy } from "interfaces/universal/IProxy.sol";
 
-/// @title DeployProxyInput
-contract DeployProxyInput is BaseDeployIO {
-    // Specify the owner of the proxy that is being deployed
-    address internal _owner;
-
-    function set(bytes4 _sel, address _value) public {
-        if (_sel == this.owner.selector) {
-            require(_value != address(0), "DeployProxy: owner cannot be empty");
-            _owner = _value;
-        } else {
-            revert("DeployProxy: unknown selector");
-        }
-    }
-
-    function owner() public view returns (address) {
-        require(_owner != address(0), "DeployProxy: owner not set");
-        return _owner;
-    }
-}
-
-/// @title DeployProxyOutput
-contract DeployProxyOutput is BaseDeployIO {
-    IProxy internal _proxy;
-
-    function set(bytes4 _sel, address _value) public {
-        if (_sel == this.proxy.selector) {
-            require(_value != address(0), "DeployProxy: proxy cannot be zero address");
-            _proxy = IProxy(payable(_value));
-        } else {
-            revert("DeployProxy: unknown selector");
-        }
-    }
-
-    function proxy() public view returns (IProxy) {
-        DeployUtils.assertValidContractAddress(address(_proxy));
-        return _proxy;
-    }
-}
-
 /// @title DeployProxy
 contract DeployProxy is Script {
-    function run(DeployProxyInput _mi, DeployProxyOutput _mo) public {
-        deployProxySingleton(_mi, _mo);
-        checkOutput(_mi, _mo);
+    struct Input {
+        address owner;
     }
 
-    function deployProxySingleton(DeployProxyInput _mi, DeployProxyOutput _mo) internal {
-        address owner = _mi.owner();
+    struct Output {
+        IProxy proxy;
+    }
+
+    function run(Input memory _input) public returns (Output memory output_) {
+        assertValidInput(_input);
+
+        deployProxySingleton(_input, output_);
+
+        assertValidOutput(_input, output_);
+    }
+
+    function deployProxySingleton(Input memory _input, Output memory _output) internal {
         vm.broadcast(msg.sender);
         IProxy proxy = IProxy(
             DeployUtils.create1({
                 _name: "Proxy",
-                _args: DeployUtils.encodeConstructor(abi.encodeCall(IProxy.__constructor__, (owner)))
+                _args: DeployUtils.encodeConstructor(abi.encodeCall(IProxy.__constructor__, (_input.owner)))
             })
         );
 
         vm.label(address(proxy), "Proxy");
-        _mo.set(_mo.proxy.selector, address(proxy));
+        _output.proxy = proxy;
     }
 
-    function checkOutput(DeployProxyInput _mi, DeployProxyOutput _mo) public {
-        DeployUtils.assertValidContractAddress(address(_mo.proxy()));
-        IProxy prox = _mo.proxy();
-        vm.prank(_mi.owner());
-        address proxyOwner = prox.admin();
+    function assertValidInput(Input memory _input) internal pure {
+        require(_input.owner != address(0), "DeployProxy: owner not set");
+    }
+
+    function assertValidOutput(Input memory _input, Output memory _output) internal {
+        IProxy proxy = _output.proxy;
+        DeployUtils.assertValidContractAddress(address(proxy));
+
+        vm.prank(_input.owner);
+        address proxyAdmin = proxy.admin();
 
         require(
-            proxyOwner == _mi.owner(), "DeployProxy: owner of proxy does not match the owner specified in the input"
+            proxyAdmin == _input.owner, "DeployProxy: owner of proxy does not match the owner specified in the input"
         );
     }
 }
