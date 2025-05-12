@@ -3,6 +3,7 @@ package sysext
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/ethereum/go-ethereum/rpc"
 
@@ -22,12 +23,14 @@ const (
 	FeatureInterop = "interop"
 )
 
-func (orch *Orchestrator) rpcClient(t devtest.T, service *descriptors.Service, protocol string) client.RPC {
+func (orch *Orchestrator) rpcClient(t devtest.T, service *descriptors.Service, protocol string, path string) client.RPC {
 	t.Helper()
 
 	endpoint, header, err := orch.findProtocolService(service, protocol)
 	t.Require().NoError(err)
-
+	endpoint, err = url.JoinPath(endpoint, path)
+	t.Require().NoError(err)
+	fmt.Println(">>>", endpoint)
 	opts := []client.RPCOption{}
 	if !orch.useEagerRPCClients {
 		opts = append(opts, client.WithLazyDial())
