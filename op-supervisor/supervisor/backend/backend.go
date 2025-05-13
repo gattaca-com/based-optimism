@@ -178,14 +178,11 @@ func NewSupervisorBackend(ctx context.Context, logger log.Logger,
 	return super, nil
 }
 
-// OnEvent processes events from the event system.
-// When interop is active each event will emit a new event.
-// When interop is not active the event notify the db.
 func (su *SupervisorBackend) OnEvent(ev event.Event) bool {
 	switch x := ev.(type) {
 	case superevents.LocalUnsafeReceivedEvent:
 		if !su.activationCheck.Check(x.ChainID, x.NewLocalUnsafe.Time) {
-			su.chainDBs.UpdatePreActivationLocalUnsafe(x.ChainID, x.NewLocalUnsafe)
+			su.chainDBs.UpdatePreActivationUnsafe(x.ChainID, x.NewLocalUnsafe)
 			return true
 		}
 
@@ -196,7 +193,7 @@ func (su *SupervisorBackend) OnEvent(ev event.Event) bool {
 
 	case superevents.LocalUnsafeUpdateEvent:
 		if !su.activationCheck.Check(x.ChainID, x.NewLocalUnsafe.Time) {
-			su.chainDBs.UpdatePreActivationLocalUnsafe(x.ChainID, x.NewLocalUnsafe)
+			su.chainDBs.UpdatePreActivationUnsafe(x.ChainID, x.NewLocalUnsafe)
 			return true
 		}
 
@@ -206,6 +203,7 @@ func (su *SupervisorBackend) OnEvent(ev event.Event) bool {
 
 	case superevents.CrossUnsafeUpdateEvent:
 		if !su.activationCheck.Check(x.ChainID, x.NewCrossUnsafe.Timestamp) {
+			su.chainDBs.UpdatePreActivationUnsafe(x.ChainID, x.NewCrossUnsafe.MustWithParent(eth.BlockID{}))
 			return true
 		}
 		su.emitter.Emit(superevents.UpdateCrossUnsafeRequestEvent{
@@ -214,11 +212,10 @@ func (su *SupervisorBackend) OnEvent(ev event.Event) bool {
 
 	case superevents.LocalSafeUpdateEvent:
 		if !su.activationCheck.Check(x.ChainID, x.NewLocalSafe.Derived.Timestamp) {
-			su.chainDBs.UpdatePreActivationLocalSafe(x.ChainID, x.NewLocalSafe.Source, x.NewLocalSafe.Derived)
+			su.chainDBs.UpdatePreActivationSafe(x.ChainID, x.NewLocalSafe.Derived.MustWithParent(eth.BlockID{}))
 			return true
 		}
 
-		// If a new safe block is in interop range then we should ensure it's activated
 		if err := su.detectAndActivateInterop(x.ChainID, x.NewLocalSafe); err != nil {
 			return false
 		}

@@ -71,10 +71,10 @@ func (db *ChainsDB) InitializePreActivation(id eth.ChainID, block eth.BlockRef) 
 	db.initialized.Set(id, struct{}{})
 }
 
-// UpdatePreActivationLocalUnsafe updates the LocalUnsafe head in pre-activation mode
+// UpdatePreActivationUnsafe updates the LocalUnsafe head in pre-activation mode
 // If the new block number is higher than the current LocalUnsafe, this also updates CrossUnsafe
 // If the chain is not already in pre-activation mode, it will be initialized
-func (db *ChainsDB) UpdatePreActivationLocalUnsafe(id eth.ChainID, block eth.BlockRef) {
+func (db *ChainsDB) UpdatePreActivationUnsafe(id eth.ChainID, block eth.BlockRef) {
 	// Get the current status or initialize if not already in pre-activation mode
 	nodeStatus, ok := db.preActivationStatus.Get(id)
 	if !ok {
@@ -104,24 +104,15 @@ func (db *ChainsDB) UpdatePreActivationLocalUnsafe(id eth.ChainID, block eth.Blo
 	db.preActivationStatus.Set(id, nodeStatus)
 }
 
-// UpdatePreActivationLocalSafe updates the LocalSafe head in pre-activation mode
+// UpdatePreActivationSafe updates the LocalSafe head in pre-activation mode
 // If the new block number is higher than the current LocalSafe, this also updates CrossSafe and Finalized
 // If the new block number is higher than the current LocalUnsafe, it also updates LocalUnsafe and CrossUnsafe
 // If the chain is not already in pre-activation mode, it will be initialized
-func (db *ChainsDB) UpdatePreActivationLocalSafe(id eth.ChainID, sourceBlockSeal types.BlockSeal, derivedBlockSeal types.BlockSeal) {
-	// Get the current status or initialize if not already in pre-activation mode
+func (db *ChainsDB) UpdatePreActivationSafe(id eth.ChainID, derivedBlockRef eth.BlockRef) {
+	derivedBlockSeal := types.BlockSealFromRef(derivedBlockRef)
 	nodeStatus, ok := db.preActivationStatus.Get(id)
 	if !ok {
 		db.logger.Debug("chain not in pre-activation mode yet, initializing", "chain", id)
-		// Create a new status with the derived block as both unsafe and safe
-		// Create a BlockRef from the BlockSeal for LocalUnsafe
-		derivedBlockRef := eth.BlockRef{
-			Hash:       derivedBlockSeal.Hash,
-			Number:     derivedBlockSeal.Number,
-			Time:       derivedBlockSeal.Timestamp,
-			ParentHash: common.Hash{}, // We don't have parent hash in BlockSeal
-		}
-
 		nodeStatus = &status.NodeSyncStatus{
 			LocalUnsafe: derivedBlockRef,
 			LocalSafe:   derivedBlockSeal,
@@ -134,36 +125,23 @@ func (db *ChainsDB) UpdatePreActivationLocalSafe(id eth.ChainID, sourceBlockSeal
 		return
 	}
 
-	// Only update LocalSafe if the new block is newer
+	// Update Safe blocks if the new block is later
 	currentLocalSafe := nodeStatus.LocalSafe
 	if derivedBlockSeal.Number > currentLocalSafe.Number {
 		db.logger.Debug("updating pre-activation LocalSafe and CrossSafe",
 			"chain", id,
 			"current", currentLocalSafe.Number,
 			"new", derivedBlockSeal.Number)
-
-		// Update LocalSafe, CrossSafe and Finalized with the new derived block
 		nodeStatus.LocalSafe = derivedBlockSeal
 		nodeStatus.CrossSafe = derivedBlockSeal
-		nodeStatus.Finalized = derivedBlockSeal
 	}
 
-	// Also update LocalUnsafe and CrossUnsafe if the derived block is newer
+	// Also update Unsafe if the derived block is newer
 	if derivedBlockSeal.Number > nodeStatus.LocalUnsafe.Number {
 		db.logger.Debug("updating pre-activation LocalUnsafe from LocalSafe",
 			"chain", id,
 			"current", nodeStatus.LocalUnsafe.Number,
 			"new", derivedBlockSeal.Number)
-
-		// Create a BlockRef from the BlockSeal for LocalUnsafe
-		derivedBlockRef := eth.BlockRef{
-			Hash:       derivedBlockSeal.Hash,
-			Number:     derivedBlockSeal.Number,
-			Time:       derivedBlockSeal.Timestamp,
-			ParentHash: common.Hash{}, // We don't have parent hash in BlockSeal
-		}
-
-		// Update LocalUnsafe and CrossUnsafe as well
 		nodeStatus.LocalUnsafe = derivedBlockRef
 		nodeStatus.CrossUnsafe = derivedBlockSeal
 	}

@@ -211,7 +211,7 @@ func TestPreActivationUpdateMethods(t *testing.T) {
 		Time:       210,
 		ParentHash: initialBlock.Hash,
 	}
-	db.UpdatePreActivationLocalUnsafe(chainID, newerUnsafeBlock)
+	db.UpdatePreActivationUnsafe(chainID, newerUnsafeBlock)
 
 	// Verify the status was updated
 	status, ok := db.GetPreActivationStatus(chainID)
@@ -230,7 +230,7 @@ func TestPreActivationUpdateMethods(t *testing.T) {
 		Time:       190,
 		ParentHash: common.Hash{},
 	}
-	db.UpdatePreActivationLocalUnsafe(chainID, olderUnsafeBlock)
+	db.UpdatePreActivationUnsafe(chainID, olderUnsafeBlock)
 
 	// Verify status remains unchanged
 	status, ok = db.GetPreActivationStatus(chainID)
@@ -250,7 +250,7 @@ func TestPreActivationUpdateMethods(t *testing.T) {
 		Number:    102,
 		Timestamp: 220,
 	}
-	db.UpdatePreActivationLocalSafe(chainID, l1BlockSeal, newerSafeBlockSeal)
+	db.UpdatePreActivationSafe(chainID, newerSafeBlockSeal)
 
 	// Verify the status was updated
 	status, ok = db.GetPreActivationStatus(chainID)
@@ -282,7 +282,7 @@ func TestPreActivationUpdateMethods(t *testing.T) {
 		Number:    101,
 		Timestamp: 210,
 	}
-	db.UpdatePreActivationLocalSafe(chainID, olderL1BlockSeal, olderSafeBlockSeal)
+	db.UpdatePreActivationSafe(chainID, olderSafeBlockSeal)
 
 	// Verify status remains unchanged for LocalSafe
 	status, ok = db.GetPreActivationStatus(chainID)
@@ -297,7 +297,7 @@ func TestPreActivationUpdateMethods(t *testing.T) {
 		Time:       230,
 		ParentHash: newerSafeBlockSeal.Hash,
 	}
-	db.UpdatePreActivationLocalUnsafe(chainID, evenNewerUnsafeBlock)
+	db.UpdatePreActivationUnsafe(chainID, evenNewerUnsafeBlock)
 
 	// Verify the status was updated
 	status, ok = db.GetPreActivationStatus(chainID)
@@ -324,7 +324,7 @@ func TestPreActivationAutoInitialization(t *testing.T) {
 	// Chain shouldn't be in pre-activation mode yet
 	require.False(t, db.IsInPreActivationMode(chainID), "Chain shouldn't be in pre-activation mode initially")
 
-	// Test that calling UpdatePreActivationLocalUnsafe automatically initializes pre-activation mode
+	// Test that calling UpdatePreActivationUnsafe automatically initializes pre-activation mode
 	firstBlock := eth.BlockRef{
 		Hash:       common.Hash{1, 2, 3},
 		Number:     100,
@@ -333,11 +333,11 @@ func TestPreActivationAutoInitialization(t *testing.T) {
 	}
 
 	// Update should initialize pre-activation mode
-	db.UpdatePreActivationLocalUnsafe(chainID, firstBlock)
+	db.UpdatePreActivationUnsafe(chainID, firstBlock)
 
 	// Now it should be in pre-activation mode
-	require.True(t, db.IsInPreActivationMode(chainID), "Chain should be in pre-activation mode after UpdatePreActivationLocalUnsafe")
-	require.True(t, db.IsInitialized(chainID), "Chain should be initialized after UpdatePreActivationLocalUnsafe")
+	require.True(t, db.IsInPreActivationMode(chainID), "Chain should be in pre-activation mode after UpdatePreActivationUnsafe")
+	require.True(t, db.IsInitialized(chainID), "Chain should be initialized after UpdatePreActivationUnsafe")
 
 	// Verify that the status was correctly initialized
 	status, ok := db.GetPreActivationStatus(chainID)
@@ -365,7 +365,7 @@ func TestPreActivationAutoInitialization(t *testing.T) {
 	// Chain shouldn't be in pre-activation mode yet
 	require.False(t, db.IsInPreActivationMode(chainID2), "Chain 2 shouldn't be in pre-activation mode initially")
 
-	// Test that calling UpdatePreActivationLocalSafe automatically initializes pre-activation mode
+	// Test that calling UpdatePreActivationSafe automatically initializes pre-activation mode
 	safeBlockSeal := types.BlockSeal{
 		Hash:      common.Hash{4, 5, 6},
 		Number:    102,
@@ -378,11 +378,11 @@ func TestPreActivationAutoInitialization(t *testing.T) {
 	}
 
 	// Update should initialize pre-activation mode
-	db.UpdatePreActivationLocalSafe(chainID2, sourceSeal, safeBlockSeal)
+	db.UpdatePreActivationSafe(chainID2, safeBlockSeal)
 
 	// Now it should be in pre-activation mode
-	require.True(t, db.IsInPreActivationMode(chainID2), "Chain 2 should be in pre-activation mode after UpdatePreActivationLocalSafe")
-	require.True(t, db.IsInitialized(chainID2), "Chain 2 should be initialized after UpdatePreActivationLocalSafe")
+	require.True(t, db.IsInPreActivationMode(chainID2), "Chain 2 should be in pre-activation mode after UpdatePreActivationSafe")
+	require.True(t, db.IsInitialized(chainID2), "Chain 2 should be initialized after UpdatePreActivationSafe")
 
 	// Verify that the status was correctly initialized
 	status2, ok := db.GetPreActivationStatus(chainID2)
