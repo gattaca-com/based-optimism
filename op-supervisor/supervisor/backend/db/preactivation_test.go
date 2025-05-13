@@ -15,11 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Create hash consistent with test hashes
-func createTestHash(i int) common.Hash {
-	return common.Hash{byte(i)}
-}
-
 // NoopMetrics for the logs DB
 type NoopMetrics struct{}
 
@@ -105,7 +100,7 @@ func TestPreActivationMode(t *testing.T) {
 	require.True(t, db.IsInitialized(chainID))
 
 	// Check that we can get the pre-activation status
-	nodeStatus, ok := db.GetPreActivationStatus(chainID)
+	_, ok = db.GetPreActivationStatus(chainID)
 	require.True(t, ok)
 
 	// Verify the head can be accessed from the NodeSyncStatus
@@ -158,7 +153,7 @@ func TestPreActivationMode(t *testing.T) {
 	db.InitializePreActivation(chainID, newBlockRef)
 
 	// Verify the head was updated
-	nodeStatus, ok = db.GetPreActivationStatus(chainID)
+	nodeStatus, ok := db.GetPreActivationStatus(chainID)
 	require.True(t, ok)
 	require.Equal(t, newBlockRef, nodeStatus.LocalUnsafe)
 
