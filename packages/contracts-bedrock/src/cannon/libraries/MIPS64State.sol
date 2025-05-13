@@ -15,6 +15,7 @@ library MIPS64State {
     struct Features {
         bool supportNoopSysEventFd2;
         bool supportDclzDclo;
+        bool supportNoopMprotect;
         bool supportWorkingSysGetRandom;
     }
 
@@ -28,6 +29,7 @@ library MIPS64State {
         if (_version >= 7) {
             features_.supportNoopSysEventFd2 = true;
             features_.supportDclzDclo = true;
+            features_.supportNoopMprotect = true;
         }
         if (_version >= 8) {
             features_.supportWorkingSysGetRandom = true;
