@@ -18,6 +18,7 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-service/locks"
 	"github.com/ethereum-optimism/optimism/op-service/sources"
+	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/backend/activation"
 	"github.com/ethereum-optimism/optimism/op-supervisor/config"
 	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/backend/cross"
 	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/backend/db"
@@ -196,6 +197,13 @@ func (su *SupervisorBackend) OnEvent(ev event.Event) bool {
 		su.emitter.Emit(superevents.UpdateCrossSafeRequestEvent{
 			ChainID: x.ChainID,
 		})
+	case superevents.InteropActivationEvent:
+		// Forward the event to the ChainsDB to handle the database reset
+		su.emitter.Emit(x)
+		su.logger.Info("Detected interop activation, forwarding to database handler", 
+			"chain", x.ChainID, 
+			"activationBlock", x.ActivationBlock,
+			"previousBlock", x.PreviousBlock)
 	default:
 		return false
 	}
@@ -234,6 +242,11 @@ func (su *SupervisorBackend) initResources(ctx context.Context, cfg *config.Conf
 	for _, chainID := range chains {
 		logProcessor := processors.NewLogProcessor(chainID, su.chainDBs, su.depSet)
 		chainProcessor := processors.NewChainProcessor(su.sysContext, su.logger, chainID, logProcessor, su.chainDBs)
+		
+		// Set up activation checking
+		activationCheck := activation.NewCheck(su.depSet, su.logger.New("component", "activation-check", "chain", chainID))
+		chainProcessor.SetActivationCheck(activationCheck)
+		
 		su.eventSys.Register(fmt.Sprintf("events-%s", chainID), chainProcessor)
 		su.chainProcessors.Set(chainID, chainProcessor)
 	}
