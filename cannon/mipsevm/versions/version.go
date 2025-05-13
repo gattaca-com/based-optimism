@@ -23,9 +23,9 @@ const (
 	VersionMultiThreaded_v2
 	// VersionMultiThreaded64_v3 includes futex handling simplification
 	VersionMultiThreaded64_v3
-	// VersionMultiThreaded64_v4 includes support for new syscall eventfd2 and dclo/dclz instructions
+	// VersionMultiThreaded64_v4 adds support for new noop syscalls eventfd2 and mprotect, and dclo/dclz instructions
 	VersionMultiThreaded64_v4
-	// VersionMultiThreaded64_v5 adds support for a working (non no-op) getrandom syscall
+	// VersionMultiThreaded64_v5 adds support for a working (non-noop) getrandom syscall
 	VersionMultiThreaded64_v5
 )
 
