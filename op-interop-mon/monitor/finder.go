@@ -1,0 +1,153 @@
+package monitor
+
+import (
+	"context"
+	"math/big"
+
+	"github.com/ethereum-optimism/optimism/op-service/eth"
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/rpc"
+)
+
+// ReceiptsToJobs is a function that turns any executing messages from a slice of receipts
+// into a slice of WatchJobs which can be added to the Watcher's inbox
+type ReceiptsToJobs func(receipts []*types.Receipt) []WatchJob
+
+// FinderClient is a client that can be used to find new blocks and their receipts
+// it is satisfied by the ethclient.Client type
+type FinderClient interface {
+	BlockReceipts(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) ([]*types.Receipt, error)
+	SubscribeNewHead(ctx context.Context, ch chan<- *types.Header) (ethereum.Subscription, error)
+}
+
+var _ FinderClient = &ethclient.Client{}
+
+// Finders are responsible for finding new WatchJobs from a chain for the Watcher to track
+type Finder interface {
+	Start(ctx context.Context) error
+	Jobs() <-chan []WatchJob
+	Stop() error
+}
+
+// RPCFinder connects to an Ethereum chain and extracts receipts in order to create WatchJobs
+type RPCFinder struct {
+	client  FinderClient
+	chainID eth.ChainID
+
+	sub     ethereum.Subscription
+	subErr  <-chan error
+	inbox   chan *types.Header
+	toCases ReceiptsToJobs
+	outbox  chan []WatchJob
+	closed  chan struct{}
+
+	log log.Logger
+}
+
+func NewFinder(chainID eth.ChainID, client FinderClient, toCases ReceiptsToJobs, log log.Logger) *RPCFinder {
+	return &RPCFinder{
+		chainID: chainID,
+		client:  client,
+		log:     log,
+		toCases: toCases,
+		inbox:   make(chan *types.Header, 1000),
+		outbox:  make(chan []WatchJob, 1000),
+		closed:  make(chan struct{}),
+	}
+}
+
+// GetBlockReceipts retrieves all receipts for a given block number
+func (t *RPCFinder) GetBlockReceipts(ctx context.Context, blockNumber *big.Int) (types.Receipts, error) {
+	receipts, err := t.client.BlockReceipts(ctx,
+		rpc.BlockNumberOrHashWithNumber(
+			rpc.BlockNumber(blockNumber.Uint64())))
+	if err != nil {
+		return nil, err
+	}
+	return receipts, nil
+}
+
+// SubscribeToNewBlocks subscribes to new blocks and processes their receipts
+func (t *RPCFinder) SubscribeToNewBlocks(ctx context.Context) error {
+	sub, err := t.client.SubscribeNewHead(ctx, t.inbox)
+	if err != nil {
+		t.log.Error("failed to subscribe to new blocks", "error", err)
+		return err
+	}
+	if sub != nil {
+		t.sub = sub
+		t.subErr = sub.Err()
+	} else {
+		t.log.Warn("nil subscription returned from SubscribeNewHead")
+	}
+	return nil
+}
+
+func (t *RPCFinder) Start(ctx context.Context) error {
+	if err := t.SubscribeToNewBlocks(ctx); err != nil {
+		return err
+	}
+	go t.Run(ctx)
+	return nil
+}
+
+func (t *RPCFinder) Run(ctx context.Context) {
+	for {
+		select {
+		// if the finder is closed, close the inbox and outbox and end the loop
+		case <-t.closed:
+			t.log.Info("finder closed")
+			close(t.inbox)
+			close(t.outbox)
+			return
+		// if the subscription errors, close the finder and initiate Stop
+		case err := <-t.subErr:
+			t.log.Error("subscription error, closing finder", "error", err)
+			t.Stop()
+		// if the inbox has a new header, process the block and send the jobs to the outbox
+		case header := <-t.inbox:
+			jobs, err := t.ProcessBlock(ctx, header)
+			if err != nil {
+				t.log.Error("error processing block", "error", err)
+				continue
+			}
+			t.outbox <- jobs
+			t.log.Info("sent jobs to outbox", "count", len(jobs))
+		}
+	}
+}
+
+// ProcessBlock retrieves a block of receipts, converts them to jobs, and returns the jobs to be tracked
+func (t *RPCFinder) ProcessBlock(ctx context.Context, header *types.Header) (cases []WatchJob, err error) {
+	receipts, err := t.GetBlockReceipts(ctx, header.Number)
+	if err != nil {
+		return nil, err
+	}
+	ret := t.toCases(receipts)
+	return ret, nil
+}
+
+func (t *RPCFinder) Jobs() <-chan []WatchJob {
+	return t.outbox
+}
+
+// TODO: add wait group to make Stop return sync
+func (t *RPCFinder) Stop() error {
+	if t.sub != nil {
+		t.sub.Unsubscribe()
+	}
+	close(t.closed)
+	return nil
+}
+
+func (t *RPCFinder) Stopped() bool {
+	select {
+	case <-t.closed:
+		return true
+	default:
+		return false
+	}
+}
