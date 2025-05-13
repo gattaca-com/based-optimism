@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
@@ -16,6 +17,7 @@ import (
 	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/backend/db/fromda"
 	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/backend/db/logs"
 	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/backend/depset"
+	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/backend/status"
 	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/backend/superevents"
 	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/types"
 )
@@ -142,6 +144,12 @@ type ChainsDB struct {
 	emitter event.Emitter
 
 	m Metrics
+
+	// Pre-activation tracking fields
+
+	// preActivationStatus tracks the sync status of each chain before activation
+	// If a chain is in the map, it's in pre-activation mode
+	preActivationStatus locks.RWMap[eth.ChainID, *status.NodeSyncStatus]
 }
 
 var _ event.AttachEmitter = (*ChainsDB)(nil)
@@ -157,6 +165,25 @@ func NewChainsDB(l log.Logger, depSet depset.DependencySet, m Metrics) *ChainsDB
 		m:               m,
 		activationCheck: activation.NewCheck(depSet, l),
 	}
+
+	// Pre-initialize chains in pre-activation mode if appropriate
+	for _, chainID := range depSet.Chains() {
+		canActivate, err := depSet.CanInitiateAt(chainID, uint64(time.Now().Unix()))
+		if err != nil {
+			l.Warn("Failed to check activation status for chain", "chain", chainID, "err", err)
+			continue
+		}
+
+		if !canActivate {
+			// Chain is in pre-activation mode
+			l.Info("Setting chain to pre-activation mode", "chain", chainID)
+
+			// Initialize with an empty NodeSyncStatus
+			db.preActivationStatus.Set(chainID, new(status.NodeSyncStatus))
+		}
+	}
+
+	return db
 }
 
 func (db *ChainsDB) AttachEmitter(em event.Emitter) {

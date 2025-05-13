@@ -53,9 +53,9 @@ const (
 )
 
 type ManagedNode struct {
-	log               log.Logger
-	Node              SyncControl
-	chainID           eth.ChainID
+	log             log.Logger
+	Node            SyncControl
+	chainID         eth.ChainID
 	activationCheck *activation.Check
 
 	backend backend
@@ -84,13 +84,13 @@ var _ event.Deriver = (*ManagedNode)(nil)
 func NewManagedNode(log log.Logger, id eth.ChainID, node SyncControl, backend backend, activationCheck *activation.Check, noSubscribe bool) *ManagedNode {
 	ctx, cancel := context.WithCancel(context.Background())
 	m := &ManagedNode{
-		log:               log.New("chain", id),
-		backend:           backend,
-		Node:              node,
-		chainID:           id,
+		log:             log.New("chain", id),
+		backend:         backend,
+		Node:            node,
+		chainID:         id,
 		activationCheck: activationCheck,
-		ctx:               ctx,
-		cancel:            cancel,
+		ctx:             ctx,
+		cancel:          cancel,
 	}
 	m.resetTracker = &resetTracker{
 		managed:     m,

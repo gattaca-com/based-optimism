@@ -178,12 +178,17 @@ func NewSupervisorBackend(ctx context.Context, logger log.Logger,
 	return super, nil
 }
 
+// OnEvent processes events from the event system.
+// When interop is active each event will emit a new event.
+// When interop is not active the event notify the db.
 func (su *SupervisorBackend) OnEvent(ev event.Event) bool {
 	switch x := ev.(type) {
 	case superevents.LocalUnsafeReceivedEvent:
 		if !su.activationCheck.Check(x.ChainID, x.NewLocalUnsafe.Time) {
+			su.chainDBs.UpdatePreActivationLocalUnsafe(x.ChainID, x.NewLocalUnsafe)
 			return true
 		}
+
 		su.emitter.Emit(superevents.ChainProcessEvent{
 			ChainID: x.ChainID,
 			Target:  x.NewLocalUnsafe.Number,
@@ -191,8 +196,10 @@ func (su *SupervisorBackend) OnEvent(ev event.Event) bool {
 
 	case superevents.LocalUnsafeUpdateEvent:
 		if !su.activationCheck.Check(x.ChainID, x.NewLocalUnsafe.Time) {
+			su.chainDBs.UpdatePreActivationLocalUnsafe(x.ChainID, x.NewLocalUnsafe)
 			return true
 		}
+
 		su.emitter.Emit(superevents.UpdateCrossUnsafeRequestEvent{
 			ChainID: x.ChainID,
 		})
@@ -207,14 +214,19 @@ func (su *SupervisorBackend) OnEvent(ev event.Event) bool {
 
 	case superevents.LocalSafeUpdateEvent:
 		if !su.activationCheck.Check(x.ChainID, x.NewLocalSafe.Derived.Timestamp) {
+			su.chainDBs.UpdatePreActivationLocalSafe(x.ChainID, x.NewLocalSafe.Source, x.NewLocalSafe.Derived)
 			return true
 		}
+
+		// If a new safe block is in interop range then we should ensure it's activated
 		if err := su.detectAndActivateInterop(x.ChainID, x.NewLocalSafe); err != nil {
 			return false
 		}
+
 		su.emitter.Emit(superevents.UpdateCrossSafeRequestEvent{
 			ChainID: x.ChainID,
 		})
+
 	case superevents.CrossSafeUpdateEvent:
 		if !su.activationCheck.Check(x.ChainID, x.NewCrossSafe.Derived.Timestamp) {
 			return true
@@ -222,6 +234,13 @@ func (su *SupervisorBackend) OnEvent(ev event.Event) bool {
 		su.emitter.Emit(superevents.UpdateCrossSafeRequestEvent{
 			ChainID: x.ChainID,
 		})
+
+	case superevents.FinalizedL2UpdateEvent:
+		if !su.activationCheck.Check(x.ChainID, x.FinalizedL2.Timestamp) {
+			su.chainDBs.UpdatePreActivationFinalized(x.ChainID, x.FinalizedL2)
+		}
+		return true
+
 	default:
 		return false
 	}

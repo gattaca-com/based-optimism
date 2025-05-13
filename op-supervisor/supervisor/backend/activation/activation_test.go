@@ -234,3 +234,37 @@ func TestActivationBoundaryMultipleChainsDifferentActivationTimes(t *testing.T) 
 	require.True(t, activationCheck.Check(chainB, t3.Time))
 	require.True(t, activationCheck.Check(chainC, t3.Time))
 }
+
+func TestCheckBehavior(t *testing.T) {
+	logger := testlog.Logger(t, log.LvlDebug)
+
+	chainID := eth.ChainID{1}
+
+	// Create a test dependency set with history min time in the future
+	historyMinTime := uint64(1000)
+	depSet, err := depset.NewStaticConfigDependencySet(
+		map[eth.ChainID]*depset.StaticConfigDependency{
+			chainID: {
+				ChainIndex:     0,
+				ActivationTime: 2000, // Not used by Check method
+				HistoryMinTime: historyMinTime,
+			},
+		},
+	)
+	require.NoError(t, err)
+
+	// Create the activation checker
+	check := NewCheck(depSet, logger)
+
+	// Test with timestamps before history min time
+	require.False(t, check.Check(chainID, 0), "Should return false for timestamp 0")
+	require.False(t, check.Check(chainID, 500), "Should return false for timestamp before history min time")
+	require.False(t, check.Check(chainID, 999), "Should return false for timestamp just before history min time")
+
+	// Test with timestamp at history min time
+	require.False(t, check.Check(chainID, 1000), "Should return false for timestamp at history min time")
+
+	// Test with timestamps after history min time
+	require.True(t, check.Check(chainID, 1001), "Should return true for timestamp just after history min time")
+	require.True(t, check.Check(chainID, 2000), "Should return true for timestamp well after history min time")
+}
