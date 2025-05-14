@@ -36,7 +36,7 @@ func (m *mockFinderClient) SubscribeNewHead(ctx context.Context, ch chan<- *ethT
 	return nil, m.err
 }
 
-func mockReceiptsToCases(receipts []*ethTypes.Receipt) []WatchJob {
+func mockReceiptsToCases(receipts []*ethTypes.Receipt) []Job {
 	return nil
 }
 
@@ -68,7 +68,7 @@ func TestRPCFinder_ProcessBlock(t *testing.T) {
 			Type: ethTypes.AccessListTxType,
 		},
 	}
-	expectedJobs := []WatchJob{
+	expectedJobs := []Job{
 		{status: []jobStatus{jobStatusUnknown}},
 		{status: []jobStatus{jobStatusUnknown}},
 	}
@@ -76,7 +76,7 @@ func TestRPCFinder_ProcessBlock(t *testing.T) {
 		return expectedReceipts, nil
 	}
 	called := false
-	receiptsToJobs := func(receipts []*ethTypes.Receipt) []WatchJob {
+	receiptsToJobs := func(receipts []*ethTypes.Receipt) []Job {
 		require.Equal(t, expectedReceipts, receipts)
 		called = true
 		return expectedJobs

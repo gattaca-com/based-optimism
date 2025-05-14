@@ -12,9 +12,9 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
-// ReceiptsToJobs is a function that turns any executing messages from a slice of receipts
-// into a slice of WatchJobs which can be added to the Watcher's inbox
-type ReceiptsToJobs func(receipts []*types.Receipt) []WatchJob
+// JobFilter is a function that turns any executing messages from a slice of receipts
+// into a slice of jobs which can be added to the Maintainer's inbox
+type JobFilter func(receipts []*types.Receipt) []Job
 
 // FinderClient is a client that can be used to find new blocks and their receipts
 // it is satisfied by the ethclient.Client type
@@ -25,14 +25,14 @@ type FinderClient interface {
 
 var _ FinderClient = &ethclient.Client{}
 
-// Finders are responsible for finding new WatchJobs from a chain for the Watcher to track
+// Finders are responsible for finding new jobs from a chain for the Maintainer to track
 type Finder interface {
 	Start(ctx context.Context) error
-	Jobs() <-chan []WatchJob
+	Jobs() <-chan []Job
 	Stop() error
 }
 
-// RPCFinder connects to an Ethereum chain and extracts receipts in order to create WatchJobs
+// RPCFinder connects to an Ethereum chain and extracts receipts in order to create jobs
 type RPCFinder struct {
 	client  FinderClient
 	chainID eth.ChainID
@@ -40,21 +40,21 @@ type RPCFinder struct {
 	sub     ethereum.Subscription
 	subErr  <-chan error
 	inbox   chan *types.Header
-	toCases ReceiptsToJobs
-	outbox  chan []WatchJob
+	toCases JobFilter
+	outbox  chan []Job
 	closed  chan struct{}
 
 	log log.Logger
 }
 
-func NewFinder(chainID eth.ChainID, client FinderClient, toCases ReceiptsToJobs, log log.Logger) *RPCFinder {
+func NewFinder(chainID eth.ChainID, client FinderClient, toCases JobFilter, log log.Logger) *RPCFinder {
 	return &RPCFinder{
 		chainID: chainID,
 		client:  client,
 		log:     log,
 		toCases: toCases,
 		inbox:   make(chan *types.Header, 1000),
-		outbox:  make(chan []WatchJob, 1000),
+		outbox:  make(chan []Job, 1000),
 		closed:  make(chan struct{}),
 	}
 }
@@ -121,7 +121,7 @@ func (t *RPCFinder) Run(ctx context.Context) {
 }
 
 // ProcessBlock retrieves a block of receipts, converts them to jobs, and returns the jobs to be tracked
-func (t *RPCFinder) ProcessBlock(ctx context.Context, header *types.Header) (cases []WatchJob, err error) {
+func (t *RPCFinder) ProcessBlock(ctx context.Context, header *types.Header) (cases []Job, err error) {
 	receipts, err := t.GetBlockReceipts(ctx, header.Number)
 	if err != nil {
 		return nil, err
@@ -130,7 +130,7 @@ func (t *RPCFinder) ProcessBlock(ctx context.Context, header *types.Header) (cas
 	return ret, nil
 }
 
-func (t *RPCFinder) Jobs() <-chan []WatchJob {
+func (t *RPCFinder) Jobs() <-chan []Job {
 	return t.outbox
 }
 

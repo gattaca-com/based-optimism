@@ -17,7 +17,7 @@ const (
 	jobStatusMissing
 )
 
-type WatchJob struct {
+type Job struct {
 	firstSeen time.Time
 	lastSeen  time.Time
 

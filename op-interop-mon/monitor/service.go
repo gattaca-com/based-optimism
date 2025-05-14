@@ -32,9 +32,9 @@ type InteropMonitorService struct {
 
 	InteropMonitorConfig
 
-	clients map[eth.ChainID]*ethclient.Client
-	watcher *Watcher
-	finders []Finder
+	clients    map[eth.ChainID]*ethclient.Client
+	maintainer *Maintainer
+	finders    []Finder
 
 	Version string
 
@@ -61,7 +61,7 @@ func (ms *InteropMonitorService) initFromCLIConfig(ctx context.Context, version 
 
 	ms.PollInterval = cfg.PollInterval
 
-	ms.watcher = NewWatcher(ms.Log, ms.Metrics)
+	ms.maintainer = NewMaintainer(ms.Log, ms.Metrics)
 
 	for _, l2Rpc := range cfg.L2Rpcs {
 		if err := ms.dialAndRegister(ctx, l2Rpc); err != nil {
@@ -95,17 +95,17 @@ func (ms *InteropMonitorService) dialAndRegister(ctx context.Context, l2Rpc stri
 	}
 	chainID := eth.ChainIDFromBig(chainIDBig)
 	ms.clients[chainID] = client
-	tmpReceiptsToJobs := func(receipts []*types.Receipt) []WatchJob {
-		jobs := []WatchJob{}
+	tmpReceiptsToJobs := func(receipts []*types.Receipt) []Job {
+		jobs := []Job{}
 		for range receipts {
-			jobs = append(jobs, WatchJob{})
+			jobs = append(jobs, Job{})
 		}
 		return jobs
 	}
 	finder := NewFinder(chainID, client, tmpReceiptsToJobs, ms.Log)
 	ms.finders = append(ms.finders, finder)
-	ms.watcher.AddClient(chainID, client)
-	ms.watcher.AddFinder(chainID, finder)
+	ms.maintainer.AddClient(chainID, client)
+	ms.maintainer.AddFinder(chainID, finder)
 	return nil
 }
 
@@ -174,9 +174,9 @@ func (ms *InteropMonitorService) initRPCServer(cfg *CLIConfig) error {
 }
 
 func (ms *InteropMonitorService) Start(ctx context.Context) error {
-	err := ms.watcher.Start()
+	err := ms.maintainer.Start()
 	if err != nil {
-		return fmt.Errorf("failed to start watcher: %w", err)
+		return fmt.Errorf("failed to start maintainer: %w", err)
 	}
 	for _, finder := range ms.finders {
 		if err := finder.Start(ctx); err != nil {
@@ -210,10 +210,10 @@ func (ms *InteropMonitorService) Stop(ctx context.Context) error {
 		}
 	}
 
-	ms.Log.Info("stopping watcher")
-	if err := ms.watcher.Stop(); err != nil {
-		result = errors.Join(result, fmt.Errorf("failed to stop watcher: %w", err))
-		ms.Log.Error("failed to stop watcher", "error", err)
+	ms.Log.Info("stopping maintainer")
+	if err := ms.maintainer.Stop(); err != nil {
+		result = errors.Join(result, fmt.Errorf("failed to stop maintainer: %w", err))
+		ms.Log.Error("failed to stop maintainer", "error", err)
 	}
 
 	ms.Log.Info("stopping rpc server")
@@ -247,6 +247,6 @@ func (ms *InteropMonitorService) Stop(ctx context.Context) error {
 
 var _ cliapp.Lifecycle = (*InteropMonitorService)(nil)
 
-func (ms *InteropMonitorService) Watcher() *Watcher {
-	return ms.watcher
+func (ms *InteropMonitorService) Maintainer() *Maintainer {
+	return ms.maintainer
 }
