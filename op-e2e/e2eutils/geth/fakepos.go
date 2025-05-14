@@ -26,6 +26,19 @@ type Beacon interface {
 	StoreBlobsBundle(slot uint64, bundle *engine.BlobsBundleV1) error
 }
 
+// FakePoSRequest is a start or stop request to the fakePoS module, with a done channel to receive the response
+type FakePoSRequest struct {
+	Type FakePoSRequestType
+	Done chan FakePoSRequestDone
+}
+type FakePoSRequestType int
+type FakePoSRequestDone struct{}
+
+const (
+	FakePoSStart FakePoSRequestType = iota
+	FakePoSStop
+)
+
 // fakePoS is a testing-only utility to attach to Geth,
 // to build a fake proof-of-stake L1 chain with fixed block time and basic lagging safe/finalized blocks.
 type fakePoS struct {
@@ -43,6 +56,7 @@ type fakePoS struct {
 	sub       ethereum.Subscription
 
 	beacon Beacon
+	ctrl   chan FakePoSRequest
 }
 
 func (f *fakePoS) FakeBeaconBlockRoot(time uint64) common.Hash {
@@ -56,12 +70,42 @@ func (f *fakePoS) Start() error {
 		advancing.Start()
 	}
 	withdrawalsRNG := rand.New(rand.NewSource(450368975843)) // avoid generating the same address as any test
+	paused := false
+	var response chan FakePoSRequestDone
+	finalizeResponse := func() {
+		if response != nil {
+			close(response)
+			response = nil
+		}
+	}
+	handledRequest := true
 	f.sub = event.NewSubscription(func(quit <-chan struct{}) error {
 		// poll every half a second: enough to catch up with any block time when ticks are missed
 		t := f.clock.NewTicker(time.Second / 2)
 		for {
+			if handledRequest {
+				finalizeResponse()
+			}
 			select {
+			case req := <-f.ctrl:
+				response = req.Done
+				handledRequest = false
+				switch req.Type {
+				case FakePoSStop:
+					f.log.Warn("fakePoS received stop command")
+					paused = true
+				case FakePoSStart:
+					f.log.Warn("fakePoS received start command")
+					paused = false
+				}
 			case now := <-t.Ch():
+				if !handledRequest {
+					handledRequest = true
+				}
+				if paused {
+					f.log.Warn("fakePoS paused, skipping polling for new blocks")
+					continue
+				}
 				chain := f.eth.BlockChain()
 				head := chain.CurrentBlock()
 				finalized := chain.CurrentFinalBlock()
@@ -138,6 +182,7 @@ func (f *fakePoS) Start() error {
 					// no-op
 				case <-quit:
 					tim.Stop()
+					finalizeResponse()
 					return nil
 				}
 				var envelope *engine.ExecutionPayloadEnvelope
@@ -204,6 +249,7 @@ func (f *fakePoS) Start() error {
 				// but it's nice to mock something consistent with the CL specs.
 				f.withdrawalsIndex += uint64(len(withdrawals))
 			case <-quit:
+				finalizeResponse()
 				return nil
 			}
 		}

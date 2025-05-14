@@ -25,7 +25,7 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/clock"
 )
 
-func InitL1(blockTime uint64, finalizedDistance uint64, genesis *core.Genesis, c clock.Clock, blobPoolDir string, beaconSrv Beacon, opts ...GethOption) (*GethInstance, error) {
+func InitL1(blockTime uint64, finalizedDistance uint64, genesis *core.Genesis, c clock.Clock, blobPoolDir string, beaconSrv Beacon, ctrl chan FakePoSRequest, opts ...GethOption) (*GethInstance, error) {
 	ethConfig := &ethconfig.Config{
 		NetworkId: genesis.Config.ChainID.Uint64(),
 		Genesis:   genesis,
@@ -69,6 +69,7 @@ func InitL1(blockTime uint64, finalizedDistance uint64, genesis *core.Genesis, c
 		safeDistance:      4,
 		engineAPI:         catalyst.NewConsensusAPI(gethInstance.Backend),
 		beacon:            beaconSrv,
+		ctrl:              ctrl,
 	})
 
 	return gethInstance, nil

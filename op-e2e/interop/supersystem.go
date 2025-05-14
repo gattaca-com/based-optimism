@@ -221,7 +221,8 @@ func (s *interopE2ESystem) prepareL1() (*fakebeacon.FakeBeacon, *geth.GethInstan
 		s.worldOutput.L1.Genesis,
 		l1Clock,
 		filepath.Join(blobPath, "l1_el"),
-		bcn)
+		bcn,
+		nil)
 
 	require.NoError(s.t, err)
 	require.NoError(s.t, l1Geth.Node.Start())

@@ -1,7 +1,9 @@
 package sysgo
 
 import (
+	"errors"
 	"path/filepath"
+	"time"
 
 	"github.com/ethereum-optimism/optimism/op-devstack/shim"
 	"github.com/ethereum-optimism/optimism/op-devstack/stack"
@@ -40,6 +42,7 @@ type L1CLNode struct {
 	id             stack.L1CLNodeID
 	beaconHTTPAddr string
 	beacon         *fakebeacon.FakeBeacon
+	ctrl           chan geth.FakePoSRequest
 }
 
 func (n *L1CLNode) hydrate(system stack.ExtensibleSystem) {
@@ -51,6 +54,34 @@ func (n *L1CLNode) hydrate(system stack.ExtensibleSystem) {
 	})
 	l1Net := system.L1Network(stack.L1NetworkID(n.id.ChainID))
 	l1Net.(stack.ExtensibleL1Network).AddL1CLNode(frontend)
+}
+
+func (n *L1CLNode) FakePoSStart() error {
+	done := make(chan geth.FakePoSRequestDone)
+	n.ctrl <- geth.FakePoSRequest{
+		Type: geth.FakePoSStart,
+		Done: done,
+	}
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		return errors.New("fakePoS start request timed out")
+	}
+	return nil
+}
+
+func (n *L1CLNode) FakePoSStop() error {
+	done := make(chan geth.FakePoSRequestDone)
+	n.ctrl <- geth.FakePoSRequest{
+		Type: geth.FakePoSStop,
+		Done: done,
+	}
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		return errors.New("fakePoS stop request timed out")
+	}
+	return nil
 }
 
 func WithL1Nodes(l1ELID stack.L1ELNodeID, l1CLID stack.L1CLNodeID) stack.Option[*Orchestrator] {
@@ -78,13 +109,15 @@ func WithL1Nodes(l1ELID stack.L1ELNodeID, l1CLID stack.L1CLNodeID) stack.Option[
 		beaconApiAddr := bcn.BeaconAddr()
 		require.NotEmpty(beaconApiAddr, "beacon API listener must be up")
 
+		ctrl := make(chan geth.FakePoSRequest)
 		l1Geth, err := geth.InitL1(
 			blockTimeL1,
 			l1FinalizedDistance,
 			l1Net.genesis,
 			l1Clock,
 			filepath.Join(blobPath, "l1_el"),
-			bcn)
+			bcn,
+			ctrl)
 		require.NoError(err)
 		require.NoError(l1Geth.Node.Start())
 		orch.p.Cleanup(func() {
@@ -104,6 +137,7 @@ func WithL1Nodes(l1ELID stack.L1ELNodeID, l1CLID stack.L1CLNodeID) stack.Option[
 			id:             l1CLID,
 			beaconHTTPAddr: beaconApiAddr,
 			beacon:         bcn,
+			ctrl:           ctrl,
 		}
 		require.True(orch.l1CLs.SetIfMissing(l1CLID, l1CLNode), "must not already exist")
 	})
