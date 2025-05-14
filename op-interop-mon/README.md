@@ -11,7 +11,9 @@ and boilerplate structure was pulled from the adjacent `op-dripper`.
 The service consists of several key components working together:
 
 - A main service (`InteropMonitorService`) that coordinates everything
+- A set of RPC Clients specified from command line, and given to each sub-component
 - Multiple `Finder` instances that scan chains for relevant transactions
+- Multiple `Updater` instances that take jobs for their chain and update them
 - A `Maintainer` that processes and tracks the state of cross-chain messages
 - Metrics reporting for monitoring and alerting
 
@@ -29,7 +31,6 @@ The `Maintainer` is responsible for tracking the status of cross-chain messages 
 
 ### Updaters
 Updaters are chain specific processors that take jobs and update them. They can be used to batch requests and run in parallel.
-Currently the only updater is the Maintainer itself, which is a bottleneck. Sub-processors should be implemented
 
 ## Finders
 Finders scan individual chains for relevant cross-chain transactions. Each Finder:

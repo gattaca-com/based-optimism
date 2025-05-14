@@ -1,0 +1,150 @@
+package monitor
+
+import (
+	"context"
+	"errors"
+	"time"
+
+	"github.com/ethereum-optimism/optimism/op-service/eth"
+	supervisortypes "github.com/ethereum-optimism/optimism/op-supervisor/supervisor/types"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/rpc"
+)
+
+var logNotFoundErr = errors.New("log not found")
+
+type UpdaterClient interface {
+	BlockReceipts(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) ([]*types.Receipt, error)
+}
+
+var _ UpdaterClient = &ethclient.Client{}
+
+// Updaters are responsible for updating jobs from a chain for the Maintainer to track
+type Updater interface {
+	Start(ctx context.Context) error
+	Enqueue(job Job)
+	Stop() error
+}
+
+// RPCFinder connects to an Ethereum chain and extracts receipts in order to create jobs
+type RPCUpdater struct {
+	client  UpdaterClient
+	chainID eth.ChainID
+
+	inbox    chan Job
+	callback func(Job)
+	closed   chan struct{}
+
+	log log.Logger
+}
+
+func NewUpdater(chainID eth.ChainID, client UpdaterClient, log log.Logger, callback func(Job)) *RPCUpdater {
+	return &RPCUpdater{
+		chainID:  chainID,
+		client:   client,
+		log:      log,
+		inbox:    make(chan Job, 1000),
+		callback: callback,
+		closed:   make(chan struct{}),
+	}
+}
+
+func (t *RPCUpdater) Start(ctx context.Context) error {
+	go t.Run(ctx)
+	return nil
+}
+
+func (t *RPCUpdater) Run(ctx context.Context) {
+	for {
+		select {
+		// if the finder is closed, close the inbox and outbox and end the loop
+		case <-t.closed:
+			t.log.Info("updater closed")
+			close(t.inbox)
+			return
+		// if the inbox has a new job, process the job and send the jobs to the outbox
+		case job := <-t.inbox:
+			u := t.UpdateJob(job)
+			t.callback(u)
+			t.log.Debug("updated job", "job", job)
+		}
+	}
+}
+
+func (t *RPCUpdater) UpdateJob(job Job) (newJob Job) {
+	newJob = t.UpdateJobStatus(job)
+	newJob = t.UpdateJobLastSeen(newJob)
+	return
+}
+
+func (t *RPCUpdater) UpdateJobLastSeen(job Job) (newJob Job) {
+	newJob = job
+	newJob.lastSeen = time.Now()
+	return
+}
+
+func (t *RPCUpdater) UpdateJobStatus(job Job) (newJob Job) {
+	newJob = job
+	receipts, err := t.client.BlockReceipts(context.Background(),
+		rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(job.initiating.BlockNumber)))
+	if err != nil {
+		t.log.Error("error getting block receipts", "error", err)
+		newJob.UpdateStatus(jobStatusUnknown)
+		return
+	}
+	log, err := t.findLogEvent(receipts, job)
+	if err == logNotFoundErr {
+		t.log.Error("log not found", "error", err)
+		newJob.UpdateStatus(jobStatusInvalid)
+		return
+	} else if err != nil {
+		t.log.Error("error finding log event", "error", err)
+		newJob.UpdateStatus(jobStatusUnknown)
+		return
+	}
+	// now to confirm the log event matches
+	actualHash := crypto.Keccak256Hash(supervisortypes.LogToMessagePayload(log))
+	if actualHash != job.executingPayload {
+		t.log.Error("log hash mismatch", "expected", job.executingPayload, "got", actualHash)
+		newJob.UpdateStatus(jobStatusInvalid)
+		return
+	}
+	newJob.UpdateStatus(jobStatusValid)
+	return
+}
+
+func (t *RPCUpdater) findLogEvent(receipts []*types.Receipt, job Job) (*types.Log, error) {
+	for _, receipt := range receipts {
+		for _, log := range receipt.Logs {
+			if log.Index == uint(job.initiating.LogIndex) {
+				return log, nil
+			}
+		}
+	}
+	return nil, logNotFoundErr
+}
+
+func (t *RPCUpdater) Enqueue(job Job) {
+	if t.Stopped() {
+		return
+	}
+	t.inbox <- job
+}
+
+// TODO: add wait group to make Stop return sync
+func (t *RPCUpdater) Stop() error {
+	close(t.closed)
+	return nil
+}
+
+func (t *RPCUpdater) Stopped() bool {
+	select {
+	case <-t.closed:
+		return true
+	default:
+		return false
+	}
+}

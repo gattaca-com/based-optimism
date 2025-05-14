@@ -22,11 +22,11 @@ type receiptClient interface {
 }
 
 type Maintainer struct {
-	clients locks.RWMap[eth.ChainID, receiptClient]
-	finders locks.RWMap[eth.ChainID, Finder]
-
-	inbox  chan Job
-	closed chan struct{}
+	clients  locks.RWMap[eth.ChainID, receiptClient]
+	finders  locks.RWMap[eth.ChainID, Finder]
+	updaters locks.RWMap[eth.ChainID, Updater]
+	inbox    chan Job
+	closed   chan struct{}
 
 	log log.Logger
 	m   metrics.Metricer
@@ -46,6 +46,10 @@ func (w *Maintainer) AddClient(chainID eth.ChainID, client receiptClient) {
 
 func (w *Maintainer) AddFinder(chainID eth.ChainID, finder Finder) {
 	w.finders.Set(chainID, finder)
+}
+
+func (w *Maintainer) AddUpdater(chainID eth.ChainID, updater Updater) {
+	w.updaters.Set(chainID, updater)
 }
 
 func (w *Maintainer) Start() error {
@@ -83,6 +87,22 @@ func (w *Maintainer) DrainFinders() {
 	}
 }
 
+func (w *Maintainer) Enqueue(c Job) {
+	if w.Stopped() {
+		return
+	}
+	w.inbox <- c
+}
+
+func (w *Maintainer) Stopped() bool {
+	select {
+	case <-w.closed:
+		return true
+	default:
+		return false
+	}
+}
+
 // Run is the main loop for the maintainer
 func (w *Maintainer) Run() {
 	for {
@@ -100,23 +120,14 @@ func (w *Maintainer) Run() {
 // It will check if the case is valid, invalid, or missing
 // It will then update the case status and send it back into the inbox
 func (w *Maintainer) ProcessJob(c Job) {
+	// the referenced Chain ID is the one who can update the job
 	refChainID := c.initiating.ChainID
-
-	refClient, ok := w.clients.Get(refChainID)
+	updater, ok := w.updaters.Get(refChainID)
 	if !ok {
-		w.log.Error("ref client not found", "chainID", refChainID)
+		w.log.Error("updater not found", "chainID", refChainID)
 		return
 	}
-	receipts, err := refClient.BlockReceipts(context.Background(),
-		rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(c.initiating.BlockNumber)))
-	if err != nil {
-		w.log.Error("failed to get receipt", "error", err)
-		return
-	}
-	w.log.Info("got receipts", "receipts", receipts)
-	w.log.Info("case", "case", c)
-	w.log.Info("I am only partially implemented, so I don't do anything intelligent yet")
-	w.inbox <- c
+	updater.Enqueue(c)
 }
 
 // TODO: add wait group to make Stop return sync

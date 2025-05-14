@@ -15,7 +15,6 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/oppprof"
 	oprpc "github.com/ethereum-optimism/optimism/op-service/rpc"
 
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 )
@@ -35,6 +34,7 @@ type InteropMonitorService struct {
 	clients    map[eth.ChainID]*ethclient.Client
 	maintainer *Maintainer
 	finders    []Finder
+	updaters   []Updater
 
 	Version string
 
@@ -95,17 +95,14 @@ func (ms *InteropMonitorService) dialAndRegister(ctx context.Context, l2Rpc stri
 	}
 	chainID := eth.ChainIDFromBig(chainIDBig)
 	ms.clients[chainID] = client
-	tmpReceiptsToJobs := func(receipts []*types.Receipt) []Job {
-		jobs := []Job{}
-		for range receipts {
-			jobs = append(jobs, Job{})
-		}
-		return jobs
-	}
-	finder := NewFinder(chainID, client, tmpReceiptsToJobs, ms.Log)
+
+	finder := NewFinder(chainID, client, BlockReceiptsToJobs, ms.Log)
+	updater := NewUpdater(chainID, client, ms.Log, ms.maintainer.Enqueue)
 	ms.finders = append(ms.finders, finder)
+	ms.updaters = append(ms.updaters, updater)
 	ms.maintainer.AddClient(chainID, client)
 	ms.maintainer.AddFinder(chainID, finder)
+	ms.maintainer.AddUpdater(chainID, updater)
 	return nil
 }
 
@@ -178,6 +175,11 @@ func (ms *InteropMonitorService) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to start maintainer: %w", err)
 	}
+	for _, updater := range ms.updaters {
+		if err := updater.Start(ctx); err != nil {
+			return fmt.Errorf("failed to start updater: %w", err)
+		}
+	}
 	for _, finder := range ms.finders {
 		if err := finder.Start(ctx); err != nil {
 			return fmt.Errorf("failed to start finder: %w", err)
@@ -207,6 +209,13 @@ func (ms *InteropMonitorService) Stop(ctx context.Context) error {
 		if err := finder.Stop(); err != nil {
 			ms.Log.Error("failed to stop finder", "error", err)
 			result = errors.Join(result, fmt.Errorf("failed to stop finder: %w", err))
+		}
+	}
+
+	ms.Log.Info("stopping updaters")
+	for _, updater := range ms.updaters {
+		if err := updater.Stop(); err != nil {
+			ms.Log.Error("failed to stop updater", "error", err)
 		}
 	}
 

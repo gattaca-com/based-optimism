@@ -16,6 +16,21 @@ import (
 // into a slice of jobs which can be added to the Maintainer's inbox
 type JobFilter func(receipts []*types.Receipt) []Job
 
+// BlockReceiptsToJobs converts a slice of receipts to a slice of jobs
+func BlockReceiptsToJobs(receipts []*types.Receipt) []Job {
+	jobs := make([]Job, 0, len(receipts))
+	for _, receipt := range receipts {
+		for _, log := range receipt.Logs {
+			job, err := JobFromExecutingMessageLog(log)
+			if err != nil {
+				continue
+			}
+			jobs = append(jobs, job)
+		}
+	}
+	return jobs
+}
+
 // FinderClient is a client that can be used to find new blocks and their receipts
 // it is satisfied by the ethclient.Client type
 type FinderClient interface {
@@ -37,12 +52,12 @@ type RPCFinder struct {
 	client  FinderClient
 	chainID eth.ChainID
 
-	sub     ethereum.Subscription
-	subErr  <-chan error
-	inbox   chan *types.Header
-	toCases JobFilter
-	outbox  chan []Job
-	closed  chan struct{}
+	sub    ethereum.Subscription
+	subErr <-chan error
+	inbox  chan *types.Header
+	toJobs JobFilter
+	outbox chan []Job
+	closed chan struct{}
 
 	log log.Logger
 }
@@ -52,7 +67,7 @@ func NewFinder(chainID eth.ChainID, client FinderClient, toCases JobFilter, log 
 		chainID: chainID,
 		client:  client,
 		log:     log,
-		toCases: toCases,
+		toJobs:  toCases,
 		inbox:   make(chan *types.Header, 1000),
 		outbox:  make(chan []Job, 1000),
 		closed:  make(chan struct{}),
@@ -126,7 +141,7 @@ func (t *RPCFinder) ProcessBlock(ctx context.Context, header *types.Header) (cas
 	if err != nil {
 		return nil, err
 	}
-	ret := t.toCases(receipts)
+	ret := t.toJobs(receipts)
 	return ret, nil
 }
 
