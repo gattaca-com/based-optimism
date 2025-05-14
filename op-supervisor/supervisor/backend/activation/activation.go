@@ -34,5 +34,6 @@ func (c *Check) Check(chain eth.ChainID, timestamp uint64) bool {
 		c.logger.Debug("Error checking interop activation", "chain", chain, "timestamp", timestamp, "err", err)
 		return false
 	}
+	// Check completed
 	return canInitiate
 }

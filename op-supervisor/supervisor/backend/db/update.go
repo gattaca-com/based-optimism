@@ -135,13 +135,17 @@ func (db *ChainsDB) initializedUpdateLocalSafe(chain eth.ChainID, source eth.Blo
 }
 
 func (db *ChainsDB) UpdateCrossUnsafe(chain eth.ChainID, crossUnsafe types.BlockSeal) error {
+	// Update cross-unsafe value
 	v, ok := db.crossUnsafe.Get(chain)
 	if !ok {
+		// Cross-unsafe tracker not found for chain
 		return fmt.Errorf("cannot UpdateCrossUnsafe: %w: %s", types.ErrUnknownChain, chain)
 	}
 	if !db.IsInitialized(chain) {
+		// Database not initialized, can't update
 		return fmt.Errorf("cannot UpdateCrossUnsafe on uninitialized database: %w", types.ErrUninitialized)
 	}
+	// Database is initialized, update the value
 	v.Set(crossUnsafe)
 	db.logger.Info("Updated cross-unsafe", "chain", chain, "crossUnsafe", crossUnsafe)
 	db.emitter.Emit(superevents.CrossUnsafeUpdateEvent{

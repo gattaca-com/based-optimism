@@ -124,6 +124,7 @@ func (ds *StaticConfigDependencySet) CanInitiateAt(chainID eth.ChainID, initTime
 	if !ok {
 		return false, nil
 	}
+	// Check if the timestamp is later than the minimum history time
 	return initTimestamp > dep.HistoryMinTime, nil
 }
 

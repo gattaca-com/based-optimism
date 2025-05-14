@@ -239,30 +239,21 @@ func TestPreActivationUpdateMethods(t *testing.T) {
 	require.Equal(t, newerUnsafeBlock.Hash, status.CrossUnsafe.Hash, "CrossUnsafe should not be changed to an older block")
 
 	// Test 3: Update with a newer LocalSafe block
-	// Create source and derived blocks for the safe update
-	l1BlockSeal := types.BlockSeal{
-		Hash:      common.Hash{9, 8, 7},
-		Number:    50,
-		Timestamp: 180,
+	// Create a newer safe block reference
+	newerSafeBlockRef := eth.BlockRef{
+		Hash:       common.Hash{4, 5, 6},
+		Number:     102,
+		Time:       220,
+		ParentHash: common.Hash{}, // We don't have this in the test
 	}
-	newerSafeBlockSeal := types.BlockSeal{
-		Hash:      common.Hash{4, 5, 6},
-		Number:    102,
-		Timestamp: 220,
-	}
-	db.UpdatePreActivationSafe(chainID, newerSafeBlockSeal)
+	newerSafeBlockSeal := types.BlockSealFromRef(newerSafeBlockRef)
+	db.UpdatePreActivationSafe(chainID, newerSafeBlockRef)
 
 	// Verify the status was updated
 	status, ok = db.GetPreActivationStatus(chainID)
 	require.True(t, ok)
 
-	// Create an equivalent BlockRef for comparison with LocalUnsafe
-	newerSafeBlockRef := eth.BlockRef{
-		Hash:       newerSafeBlockSeal.Hash,
-		Number:     newerSafeBlockSeal.Number,
-		Time:       newerSafeBlockSeal.Timestamp,
-		ParentHash: common.Hash{}, // We don't have this in the test
-	}
+	// BlockRef has already been created above
 
 	// Both LocalUnsafe and LocalSafe should be updated
 	require.Equal(t, newerSafeBlockRef, status.LocalUnsafe, "LocalUnsafe should be updated from newer LocalSafe")
@@ -272,30 +263,26 @@ func TestPreActivationUpdateMethods(t *testing.T) {
 	require.Equal(t, newerSafeBlockSeal.Hash, status.Finalized.Hash, "Finalized should be updated with the newer block")
 
 	// Test 4: Update with an older LocalSafe block (should be ignored)
-	olderL1BlockSeal := types.BlockSeal{
-		Hash:      common.Hash{7, 6, 5},
-		Number:    40,
-		Timestamp: 170,
+	olderSafeBlockRef := eth.BlockRef{
+		Hash:       common.Hash{2, 2, 2},
+		Number:     101,
+		Time:       210,
+		ParentHash: common.Hash{}, // We don't have this in the test
 	}
-	olderSafeBlockSeal := types.BlockSeal{
-		Hash:      common.Hash{2, 2, 2},
-		Number:    101,
-		Timestamp: 210,
-	}
-	db.UpdatePreActivationSafe(chainID, olderSafeBlockSeal)
+	db.UpdatePreActivationSafe(chainID, olderSafeBlockRef)
 
 	// Verify status remains unchanged for LocalSafe
 	status, ok = db.GetPreActivationStatus(chainID)
 	require.True(t, ok)
-	require.Equal(t, newerSafeBlockSeal.Hash, status.LocalSafe.Hash, "LocalSafe should not be changed to an older block")
-	require.Equal(t, newerSafeBlockSeal.Hash, status.CrossSafe.Hash, "CrossSafe should not be changed to an older block")
+	require.Equal(t, newerSafeBlockRef.Hash, status.LocalSafe.Hash, "LocalSafe should not be changed to an older block")
+	require.Equal(t, newerSafeBlockRef.Hash, status.CrossSafe.Hash, "CrossSafe should not be changed to an older block")
 
 	// Test 5: Update with a new LocalUnsafe that's newer than LocalSafe
 	evenNewerUnsafeBlock := eth.BlockRef{
 		Hash:       common.Hash{7, 8, 9},
 		Number:     103,
 		Time:       230,
-		ParentHash: newerSafeBlockSeal.Hash,
+		ParentHash: newerSafeBlockRef.Hash,
 	}
 	db.UpdatePreActivationUnsafe(chainID, evenNewerUnsafeBlock)
 
@@ -366,19 +353,16 @@ func TestPreActivationAutoInitialization(t *testing.T) {
 	require.False(t, db.IsInPreActivationMode(chainID2), "Chain 2 shouldn't be in pre-activation mode initially")
 
 	// Test that calling UpdatePreActivationSafe automatically initializes pre-activation mode
-	safeBlockSeal := types.BlockSeal{
-		Hash:      common.Hash{4, 5, 6},
-		Number:    102,
-		Timestamp: 220,
+	safeBlockRef := eth.BlockRef{
+		Hash:       common.Hash{4, 5, 6},
+		Number:     102,
+		Time:       220,
+		ParentHash: common.Hash{}, // We don't have this in the test
 	}
-	sourceSeal := types.BlockSeal{
-		Hash:      common.Hash{9, 8, 7},
-		Number:    50,
-		Timestamp: 180,
-	}
+	safeBlockSeal := types.BlockSealFromRef(safeBlockRef)
 
 	// Update should initialize pre-activation mode
-	db.UpdatePreActivationSafe(chainID2, safeBlockSeal)
+	db.UpdatePreActivationSafe(chainID2, safeBlockRef)
 
 	// Now it should be in pre-activation mode
 	require.True(t, db.IsInPreActivationMode(chainID2), "Chain 2 should be in pre-activation mode after UpdatePreActivationSafe")
@@ -424,14 +408,16 @@ func TestPreActivationFinalized(t *testing.T) {
 	require.Equal(t, initialBlock.Number, status.Finalized.Number)
 
 	// Create a newer finalized block
-	newerFinalized := types.BlockSeal{
-		Hash:      common.Hash{4, 5, 6},
-		Number:    105,
-		Timestamp: 250,
+	newerFinalizedRef := eth.BlockRef{
+		Hash:       common.Hash{4, 5, 6},
+		Number:     105,
+		Time:       250,
+		ParentHash: common.Hash{}, // We don't have this in the test
 	}
+	newerFinalized := types.BlockSealFromRef(newerFinalizedRef)
 
 	// Update the finalized block
-	db.UpdatePreActivationFinalized(chainID, newerFinalized)
+	db.UpdatePreActivationFinalized(chainID, newerFinalizedRef)
 
 	// Verify the status was updated
 	status, ok = db.GetPreActivationStatus(chainID)
@@ -444,13 +430,14 @@ func TestPreActivationFinalized(t *testing.T) {
 	require.Equal(t, initialBlock.Hash, status.LocalSafe.Hash)
 
 	// Test with older finalized block (should be ignored)
-	olderFinalized := types.BlockSeal{
-		Hash:      common.Hash{7, 8, 9},
-		Number:    99,
-		Timestamp: 190,
+	olderFinalizedRef := eth.BlockRef{
+		Hash:       common.Hash{7, 8, 9},
+		Number:     99,
+		Time:       190,
+		ParentHash: common.Hash{}, // We don't have this in the test
 	}
 
-	db.UpdatePreActivationFinalized(chainID, olderFinalized)
+	db.UpdatePreActivationFinalized(chainID, olderFinalizedRef)
 
 	// Verify the status was not updated (still has newerFinalized)
 	status, ok = db.GetPreActivationStatus(chainID)
@@ -480,13 +467,15 @@ func TestPreActivationFinalized(t *testing.T) {
 	require.False(t, db.IsInPreActivationMode(chainID2))
 
 	// Initialize with finalized block
-	finalizedBlock := types.BlockSeal{
-		Hash:      common.Hash{10, 11, 12},
-		Number:    200,
-		Timestamp: 300,
+	finalizedBlockRef := eth.BlockRef{
+		Hash:       common.Hash{10, 11, 12},
+		Number:     200,
+		Time:       300,
+		ParentHash: common.Hash{}, // We don't have this in the test
 	}
+	finalizedBlock := types.BlockSealFromRef(finalizedBlockRef)
 
-	db.UpdatePreActivationFinalized(chainID2, finalizedBlock)
+	db.UpdatePreActivationFinalized(chainID2, finalizedBlockRef)
 
 	// Chain should now be in pre-activation mode
 	require.True(t, db.IsInPreActivationMode(chainID2))

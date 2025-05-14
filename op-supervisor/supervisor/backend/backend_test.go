@@ -150,6 +150,8 @@ func TestBackendLifetime(t *testing.T) {
 		anchorPoint: anchorPair,
 	}
 	b.syncSources.Set(chainA, fakeSrc)
+	isPreActivation := b.chainDBs.IsInPreActivationMode(chainA)
+	t.Logf("Chain %s is in pre-activation mode before anchor event: %v", chainA, isPreActivation)
 
 	// Set up the mock event for initialization
 	b.emitter.Emit(superevents.AnchorEvent{
@@ -157,6 +159,9 @@ func TestBackendLifetime(t *testing.T) {
 		Anchor:  anchorPair,
 	})
 	require.NoError(t, ex.Drain())
+
+	isPreActivation = b.chainDBs.IsInPreActivationMode(chainA)
+	t.Logf("Chain %s is in pre-activation mode after anchor event: %v", chainA, isPreActivation)
 
 	// After initialization, we can emit the LocalUnsafeReceivedEvent
 	b.emitter.Emit(superevents.LocalUnsafeReceivedEvent{
@@ -166,6 +171,12 @@ func TestBackendLifetime(t *testing.T) {
 	// Make the processing happen, so we can rely on the new chain information,
 	// and not run into errors for future data that isn't mocked at this time.
 	require.NoError(t, ex.Drain())
+
+	// DEBUG: Check if the chain is in pre-activation mode
+	isPreActivation = b.chainDBs.IsInPreActivationMode(chainA)
+	t.Logf("Chain %s is in pre-activation mode after sending blockY: %v", chainA, isPreActivation)
+
+	// Now check cross unsafe
 	v, err := b.CrossUnsafe(context.Background(), chainA)
 	require.NoError(t, err, "have a functioning cross unsafe value now post anchor")
 	require.Equal(t, blockY.ID(), v)

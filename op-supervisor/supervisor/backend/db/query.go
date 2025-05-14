@@ -284,13 +284,16 @@ func (db *ChainsDB) LocalUnsafe(chainID eth.ChainID) (types.BlockSeal, error) {
 }
 
 func (db *ChainsDB) CrossUnsafe(chainID eth.ChainID) (types.BlockSeal, error) {
+	// Get cross-unsafe value
 	// Check if in pre-activation mode
 	if db.IsInPreActivationMode(chainID) {
+		// In pre-activation mode, get status from pre-activation state
 		status, ok := db.GetPreActivationStatus(chainID)
 		if !ok {
+			// Status not found, future operation
 			return types.BlockSeal{}, types.ErrFuture
 		}
-
+		// Status found, return cross-unsafe value
 		// Return the CrossUnsafe block seal
 		return status.CrossUnsafe, nil
 	}

@@ -181,9 +181,28 @@ func NewSupervisorBackend(ctx context.Context, logger log.Logger,
 func (su *SupervisorBackend) OnEvent(ev event.Event) bool {
 	switch x := ev.(type) {
 	case superevents.LocalUnsafeReceivedEvent:
+		// Process a new local unsafe block event
+
+		blockSeal := types.BlockSealFromRef(x.NewLocalUnsafe)
+
 		if !su.activationCheck.Check(x.ChainID, x.NewLocalUnsafe.Time) {
+			// In pre-activation mode, update the pre-activation state
 			su.chainDBs.UpdatePreActivationUnsafe(x.ChainID, x.NewLocalUnsafe)
 			return true
+		}
+		// In normal mode, activate interop if needed and update cross-unsafe
+
+		// Check if we need to activate interop
+		if err := su.detectAndActivateInterop(x.ChainID, types.DerivedBlockSealPair{
+			Source:  blockSeal,
+			Derived: blockSeal,
+		}); err != nil {
+			return false
+		}
+
+		// Update cross-unsafe to match local-unsafe
+		if err := su.chainDBs.UpdateCrossUnsafe(x.ChainID, blockSeal); err != nil {
+			su.logger.Error("Failed to update cross-unsafe from local-unsafe", "chainID", x.ChainID, "block", x.NewLocalUnsafe, "err", err)
 		}
 
 		su.emitter.Emit(superevents.ChainProcessEvent{
@@ -202,6 +221,7 @@ func (su *SupervisorBackend) OnEvent(ev event.Event) bool {
 		})
 
 	case superevents.CrossUnsafeUpdateEvent:
+		// Process a cross unsafe update event
 		if !su.activationCheck.Check(x.ChainID, x.NewCrossUnsafe.Timestamp) {
 			su.chainDBs.UpdatePreActivationUnsafe(x.ChainID, x.NewCrossUnsafe.MustWithParent(eth.BlockID{}))
 			return true
@@ -216,6 +236,7 @@ func (su *SupervisorBackend) OnEvent(ev event.Event) bool {
 			return true
 		}
 
+		// Check if we need to activate interop
 		if err := su.detectAndActivateInterop(x.ChainID, x.NewLocalSafe); err != nil {
 			return false
 		}
@@ -234,7 +255,7 @@ func (su *SupervisorBackend) OnEvent(ev event.Event) bool {
 
 	case superevents.FinalizedL2UpdateEvent:
 		if !su.activationCheck.Check(x.ChainID, x.FinalizedL2.Timestamp) {
-			su.chainDBs.UpdatePreActivationFinalized(x.ChainID, x.FinalizedL2)
+			su.chainDBs.UpdatePreActivationFinalized(x.ChainID, x.FinalizedL2.MustWithParent(eth.BlockID{}))
 		}
 		return true
 
@@ -642,8 +663,10 @@ func (su *SupervisorBackend) LocalUnsafe(ctx context.Context, chainID eth.ChainI
 }
 
 func (su *SupervisorBackend) CrossUnsafe(ctx context.Context, chainID eth.ChainID) (eth.BlockID, error) {
+	// Get the cross-unsafe value for a chain
 	v, err := su.chainDBs.CrossUnsafe(chainID)
 	if err != nil {
+		// Error handled by caller
 		return eth.BlockID{}, err
 	}
 	return v.ID(), nil
@@ -823,15 +846,24 @@ func (su *SupervisorBackend) InitializePreActivation(chainID eth.ChainID, block 
 // detectAndActivateInterop checks if a chain is ready to be initialized for interop
 // and if so, fetches the anchor point and initializes the databases.
 func (su *SupervisorBackend) detectAndActivateInterop(chain eth.ChainID, anchorCandidate types.DerivedBlockSealPair) error {
+	// Check if chain needs interop activation
 	// If the chain is already initialized or interop isn't active, do nothing.
 	if su.chainDBs.IsInitialized(chain) {
+		// Chain already initialized, nothing to do
 		return nil
 	}
 	// TODO(#13732): We want to ensure this is exactly the anchor block
 	if !su.activationCheck.Check(chain, anchorCandidate.Derived.Timestamp) {
+		// Chain not ready for interop activation yet
 		return nil
 	}
 
-	su.chainDBs.InitializeWithAnchor(chain, anchorCandidate.Refs())
+	// Initialize chain with anchor point
+
+	// su.chainDBs.InitializeWithAnchor(chain, anchorCandidate.Refs())
+	su.chainDBs.InitializeWithAnchor(chain, types.DerivedBlockRefPair{
+		Source:  anchorCandidate.Source.ForceWithParent(eth.BlockID{}),
+		Derived: anchorCandidate.Derived.ForceWithParent(eth.BlockID{}),
+	})
 	return nil
 }

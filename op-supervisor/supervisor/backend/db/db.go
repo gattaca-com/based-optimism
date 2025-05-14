@@ -193,14 +193,11 @@ func (db *ChainsDB) AttachEmitter(em event.Emitter) {
 func (db *ChainsDB) OnEvent(ev event.Event) bool {
 	switch x := ev.(type) {
 	case superevents.AnchorEvent:
-		// If we're not activated, we need to set up the pre-activation mode
-		if !db.activationCheck.Check(x.ChainID, x.Anchor.Derived.Time) {
-			db.UpdatePreActivationSafe(x.ChainID, x.Anchor.Derived)
-			return true
-		}
+		// Process anchor event
 
-		// Interop should be active now, so exit pre-activation mode and initialize with the real anchor
+		// If in pre-activation mode, any anchor event exits pre-activation
 		if db.IsInPreActivationMode(x.ChainID) {
+			// Exit pre-activation mode if in it
 			if err := db.ExitPreActivationMode(x.ChainID, x.Anchor); err != nil {
 				db.logger.Error("Failed to exit pre-activation mode", "chain", x.ChainID, "err", err)
 				return false
