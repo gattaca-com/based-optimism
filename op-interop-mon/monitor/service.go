@@ -98,8 +98,8 @@ func (ms *InteropMonitorService) dialAndRegister(ctx context.Context, l2Rpc stri
 	chainID := eth.ChainIDFromBig(chainIDBig)
 	ms.clients[chainID] = client
 
-	finder := NewFinder(chainID, client, BlockReceiptsToJobs, ms.maintainer.Enqueue, ms.Log)
-	updater := NewUpdater(chainID, client, ms.maintainer.Enqueue, ms.Log)
+	finder := NewFinder(chainID, client, BlockReceiptsToJobs, ms.maintainer.EnqueueNew, ms.Log)
+	updater := NewUpdater(chainID, client, ms.maintainer.EnqueueUpdate, ms.Log)
 	ms.finders = append(ms.finders, finder)
 	ms.updaters = append(ms.updaters, updater)
 	ms.maintainer.AddClient(chainID, client)

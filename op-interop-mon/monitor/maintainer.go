@@ -21,11 +21,12 @@ type receiptClient interface {
 }
 
 type Maintainer struct {
-	clients  locks.RWMap[eth.ChainID, receiptClient]
-	finders  locks.RWMap[eth.ChainID, Finder]
-	updaters locks.RWMap[eth.ChainID, Updater]
-	inbox    chan Job
-	closed   chan struct{}
+	clients     locks.RWMap[eth.ChainID, receiptClient]
+	finders     locks.RWMap[eth.ChainID, Finder]
+	updaters    locks.RWMap[eth.ChainID, Updater]
+	newInbox    chan Job
+	updateInbox chan Job
+	closed      chan struct{}
 
 	log log.Logger
 	m   metrics.Metricer
@@ -33,39 +34,47 @@ type Maintainer struct {
 
 func NewMaintainer(log log.Logger, m metrics.Metricer) *Maintainer {
 	return &Maintainer{
-		inbox: make(chan Job, 10_000),
-		log:   log,
-		m:     m,
+		newInbox:    make(chan Job, 10_000),
+		updateInbox: make(chan Job, 10_000),
+		log:         log,
+		m:           m,
 	}
 }
 
-func (w *Maintainer) AddClient(chainID eth.ChainID, client receiptClient) {
-	w.clients.Set(chainID, client)
+func (m *Maintainer) AddClient(chainID eth.ChainID, client receiptClient) {
+	m.clients.Set(chainID, client)
 }
 
-func (w *Maintainer) AddFinder(chainID eth.ChainID, finder Finder) {
-	w.finders.Set(chainID, finder)
+func (m *Maintainer) AddFinder(chainID eth.ChainID, finder Finder) {
+	m.finders.Set(chainID, finder)
 }
 
-func (w *Maintainer) AddUpdater(chainID eth.ChainID, updater Updater) {
-	w.updaters.Set(chainID, updater)
+func (m *Maintainer) AddUpdater(chainID eth.ChainID, updater Updater) {
+	m.updaters.Set(chainID, updater)
 }
 
-func (w *Maintainer) Start() error {
-	go w.Run()
+func (m *Maintainer) Start() error {
+	go m.Run()
 	return nil
 }
 
-func (w *Maintainer) Enqueue(c Job) {
-	if w.Stopped() {
+func (m *Maintainer) EnqueueNew(c Job) {
+	if m.Stopped() {
 		return
 	}
-	w.inbox <- c
+	m.newInbox <- c
 }
 
-func (w *Maintainer) Stopped() bool {
+func (m *Maintainer) EnqueueUpdate(c Job) {
+	if m.Stopped() {
+		return
+	}
+	m.updateInbox <- c
+}
+
+func (m *Maintainer) Stopped() bool {
 	select {
-	case <-w.closed:
+	case <-m.closed:
 		return true
 	default:
 		return false
@@ -73,34 +82,40 @@ func (w *Maintainer) Stopped() bool {
 }
 
 // Run is the main loop for the maintainer
-func (w *Maintainer) Run() {
+func (m *Maintainer) Run() {
 	for {
 		select {
-		case <-w.closed:
+		case <-m.closed:
 			return
-		case c := <-w.inbox:
+
+		case c := <-m.newInbox:
+			m.log.Trace("received new job", "job", c)
 			// TODO: send to a chain-specific processor so calls can be batched
-			w.ProcessJob(c)
+			m.ProcessJob(c)
+		case c := <-m.updateInbox:
+			m.log.Trace("received update job", "job", c)
+			// TODO: send to a chain-specific processor so calls can be batched
+			m.ProcessJob(c)
 		}
 	}
 }
 
 // ProcessJob processes a case
-// It will check if the case is valid, invalid, or missing
-// It will then update the case status and send it back into the inbox
-func (w *Maintainer) ProcessJob(c Job) {
-	// the referenced Chain ID is the one who can update the job
+// It mill check if the case is valid, invalid, or missing
+// It mill then update the case status and send it back into the inbox
+func (m *Maintainer) ProcessJob(c Job) {
+	// the referenced Chain ID is the one mho can update the job
 	refChainID := c.initiating.ChainID
-	updater, ok := w.updaters.Get(refChainID)
+	updater, ok := m.updaters.Get(refChainID)
 	if !ok {
-		w.log.Error("updater not found", "chainID", refChainID)
+		m.log.Error("updater not found", "chainID", refChainID)
 		return
 	}
 	updater.Enqueue(c)
 }
 
-// TODO: add wait group to make Stop return sync
-func (w *Maintainer) Stop() error {
-	close(w.closed)
+// TODO: add mait group to make Stop return sync
+func (m *Maintainer) Stop() error {
+	close(m.closed)
 	return nil
 }

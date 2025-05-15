@@ -16,6 +16,9 @@ import (
 
 var logNotFoundErr = errors.New("log not found")
 
+// TODO: make this configurable
+var updateInterval = 1 * time.Second
+
 type UpdaterClient interface {
 	BlockReceipts(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) ([]*types.Receipt, error)
 }
@@ -45,7 +48,7 @@ func NewUpdater(chainID eth.ChainID, client UpdaterClient, callback func(Job), l
 	return &RPCUpdater{
 		chainID:  chainID,
 		client:   client,
-		log:      log,
+		log:      log.New("component", "rpc_updater", "chain_id", chainID),
 		inbox:    make(chan Job, 1000),
 		callback: callback,
 		closed:   make(chan struct{}),
@@ -67,53 +70,53 @@ func (t *RPCUpdater) Run(ctx context.Context) {
 			return
 		// if the inbox has a new job, process the job and send the jobs to the outbox
 		case job := <-t.inbox:
-			u := t.UpdateJob(job)
-			t.callback(u)
-			t.log.Debug("updated job", "job", job)
+			err := t.UpdateJob(&job)
+			if err != nil {
+				t.log.Error("error updating job", "error", err)
+				continue
+			}
+			t.callback(job)
 		}
 	}
 }
 
-func (t *RPCUpdater) UpdateJob(job Job) (newJob Job) {
-	newJob = t.UpdateJobStatus(job)
-	newJob = t.UpdateJobLastSeen(newJob)
-	return
+func (t *RPCUpdater) UpdateJob(job *Job) error {
+	if time.Since(job.lastEvaluated) < updateInterval {
+		t.log.Trace("skipping job update", "job", job)
+		return nil
+	}
+	t.UpdateJobStatus(job)
+	job.UpdateLastEvaluated(time.Now())
+	t.log.Debug("updated job", "job", job.String())
+	return nil
 }
 
-func (t *RPCUpdater) UpdateJobLastSeen(job Job) (newJob Job) {
-	newJob = job
-	newJob.lastSeen = time.Now()
-	return
-}
-
-func (t *RPCUpdater) UpdateJobStatus(job Job) (newJob Job) {
-	newJob = job
+func (t *RPCUpdater) UpdateJobStatus(job *Job) {
 	receipts, err := t.client.BlockReceipts(context.Background(),
 		rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(job.initiating.BlockNumber)))
 	if err != nil {
 		t.log.Error("error getting block receipts", "error", err)
-		newJob.UpdateStatus(jobStatusUnknown)
+		job.UpdateStatus(jobStatusUnknown)
 		return
 	}
-	log, err := t.findLogEvent(receipts, job)
+	log, err := t.findLogEvent(receipts, *job)
 	if err == logNotFoundErr {
 		t.log.Error("log not found", "error", err)
-		newJob.UpdateStatus(jobStatusInvalid)
+		job.UpdateStatus(jobStatusInvalid)
 		return
 	} else if err != nil {
 		t.log.Error("error finding log event", "error", err)
-		newJob.UpdateStatus(jobStatusUnknown)
+		job.UpdateStatus(jobStatusUnknown)
 		return
 	}
 	// now to confirm the log event matches
 	actualHash := crypto.Keccak256Hash(supervisortypes.LogToMessagePayload(log))
 	if actualHash != job.executingPayload {
 		t.log.Error("log hash mismatch", "expected", job.executingPayload, "got", actualHash)
-		newJob.UpdateStatus(jobStatusInvalid)
+		job.UpdateStatus(jobStatusInvalid)
 		return
 	}
-	newJob.UpdateStatus(jobStatusValid)
-	return
+	job.UpdateStatus(jobStatusValid)
 }
 
 func (t *RPCUpdater) findLogEvent(receipts []*types.Receipt, job Job) (*types.Log, error) {
@@ -127,6 +130,7 @@ func (t *RPCUpdater) findLogEvent(receipts []*types.Receipt, job Job) (*types.Lo
 	return nil, logNotFoundErr
 }
 
+// todo: make this a priority queue
 func (t *RPCUpdater) Enqueue(job Job) {
 	if t.Stopped() {
 		return
