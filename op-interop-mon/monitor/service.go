@@ -48,7 +48,7 @@ type InteropMonitorService struct {
 func InteropMonitorServiceFromCLIConfig(ctx context.Context, version string, cfg *CLIConfig, log log.Logger) (*InteropMonitorService, error) {
 	var ms InteropMonitorService
 	if err := ms.initFromCLIConfig(ctx, version, cfg, log); err != nil {
-		return nil, errors.Join(err, ms.Stop(ctx))
+		return nil, errors.Join(err, ms.Start(ctx))
 	}
 	return &ms, nil
 }
@@ -81,6 +81,7 @@ func (ms *InteropMonitorService) initFromCLIConfig(ctx context.Context, version 
 
 	ms.Metrics.RecordInfo(ms.Version)
 	ms.Metrics.RecordUp()
+	fmt.Println("initialized from cli config")
 	return nil
 }
 
@@ -96,8 +97,8 @@ func (ms *InteropMonitorService) dialAndRegister(ctx context.Context, l2Rpc stri
 	chainID := eth.ChainIDFromBig(chainIDBig)
 	ms.clients[chainID] = client
 
-	finder := NewFinder(chainID, client, BlockReceiptsToJobs, ms.Log)
-	updater := NewUpdater(chainID, client, ms.Log, ms.maintainer.Enqueue)
+	finder := NewFinder(chainID, client, BlockReceiptsToJobs, ms.maintainer.Enqueue, ms.Log)
+	updater := NewUpdater(chainID, client, ms.maintainer.Enqueue, ms.Log)
 	ms.finders = append(ms.finders, finder)
 	ms.updaters = append(ms.updaters, updater)
 	ms.maintainer.AddClient(chainID, client)
