@@ -32,7 +32,7 @@ func MessageFromLog(l *ethTypes.Log) (*types.Message, error) {
 
 func DecodeExecutingMessageLog(l *ethTypes.Log, depSet depset.ChainIndexFromID) (*types.ExecutingMessage, error) {
 	msg, err := MessageFromLog(l)
-	if err != nil {
+	if err != nil || msg == nil {
 		return nil, err
 	}
 	logHash := types.PayloadHashToLogHash(msg.PayloadHash, msg.Identifier.Origin)
