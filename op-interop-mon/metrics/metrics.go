@@ -4,7 +4,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	opmetrics "github.com/ethereum-optimism/optimism/op-service/metrics"
-	txmetrics "github.com/ethereum-optimism/optimism/op-service/txmgr/metrics"
 )
 
 const Namespace = "op_interop_mon"
@@ -17,7 +16,6 @@ type Metricer interface {
 
 	opmetrics.RefMetricer
 	opmetrics.RPCMetricer
-	txmetrics.TxMetricer
 }
 
 type Metrics struct {
@@ -27,11 +25,9 @@ type Metrics struct {
 
 	opmetrics.RefMetrics
 	opmetrics.RPCMetrics
-	txmetrics.TxMetrics
 
-	info  prometheus.GaugeVec
-	drips prometheus.GaugeVec
-	up    prometheus.Gauge
+	info prometheus.GaugeVec
+	up   prometheus.Gauge
 }
 
 var _ Metricer = (*Metrics)(nil)
@@ -52,26 +48,18 @@ func NewMetrics(procName string) *Metrics {
 
 		RefMetrics: opmetrics.MakeRefMetrics(ns, factory),
 		RPCMetrics: opmetrics.MakeRPCMetrics(ns, factory),
-		TxMetrics:  txmetrics.MakeTxMetrics(ns, factory),
 
 		info: *factory.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: ns,
 			Name:      "info",
-			Help:      "Information about the dripper",
+			Help:      "Information about the monitor",
 		}, []string{
 			"version",
-		}),
-		drips: *factory.NewGaugeVec(prometheus.GaugeOpts{
-			Namespace: ns,
-			Name:      "drips",
-			Help:      "Drips executed",
-		}, []string{
-			"name",
 		}),
 		up: factory.NewGauge(prometheus.GaugeOpts{
 			Namespace: ns,
 			Name:      "up",
-			Help:      "1 if the op-dripper has finished starting up",
+			Help:      "1 if the op-interop-mon has finished starting up",
 		}),
 	}
 }

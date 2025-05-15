@@ -7,10 +7,10 @@ _LDFLAGSSTRING := "'" + trim(
     "-X main.Version=" + VERSION + " " + \
     "") + "'"
 
-BINARY := "./bin/op-dripper"
+BINARY := "./bin/op-interop-mon"
 
-# Build op-dripper binary
-op-dripper: (go_build BINARY "./cmd" "-ldflags" _LDFLAGSSTRING)
+# Build op-interop-mon binary
+op-interop-mon: (go_build BINARY "./cmd" "-ldflags" _LDFLAGSSTRING)
 
 # Clean build artifacts
 clean:
