@@ -303,15 +303,15 @@ func (ev RequestFinalizedUpdateEvent) String() string {
 	return "request-finalized-update"
 }
 
-// CrossUpdateRequestEvent triggers update events to be emitted, repeating the current state.
-type CrossUpdateRequestEvent struct {
-	CrossUnsafe bool
-	CrossSafe   bool
-}
-
-func (ev CrossUpdateRequestEvent) String() string {
-	return "cross-update-request"
-}
+//// CrossUpdateRequestEvent triggers update events to be emitted, repeating the current state.
+//type CrossUpdateRequestEvent struct {
+//	CrossUnsafe bool
+//	CrossSafe   bool
+//}
+//
+//func (ev CrossUpdateRequestEvent) String() string {
+//	return "cross-update-request"
+//}
 
 // InteropInvalidateBlockEvent is emitted when a block needs to be invalidated, and a replacement is needed.
 type InteropInvalidateBlockEvent struct {
@@ -553,19 +553,19 @@ func (d *EngDeriver) OnEvent(ev event.Event) bool {
 		d.emitter.Emit(TryUpdateEngineEvent{})
 	case RequestFinalizedUpdateEvent:
 		d.emitter.Emit(FinalizedUpdateEvent{Ref: d.ec.Finalized()})
-	case CrossUpdateRequestEvent:
-		if x.CrossUnsafe {
-			d.emitter.Emit(CrossUnsafeUpdateEvent{
-				CrossUnsafe: d.ec.CrossUnsafeL2Head(),
-				LocalUnsafe: d.ec.UnsafeL2Head(),
-			})
-		}
-		if x.CrossSafe {
-			d.emitter.Emit(CrossSafeUpdateEvent{
-				CrossSafe: d.ec.SafeL2Head(),
-				LocalSafe: d.ec.LocalSafeL2Head(),
-			})
-		}
+	//case CrossUpdateRequestEvent:
+	//	if x.CrossUnsafe {
+	//		d.emitter.Emit(CrossUnsafeUpdateEvent{
+	//			CrossUnsafe: d.ec.CrossUnsafeL2Head(),
+	//			LocalUnsafe: d.ec.UnsafeL2Head(),
+	//		})
+	//	}
+	//	if x.CrossSafe {
+	//		d.emitter.Emit(CrossSafeUpdateEvent{
+	//			CrossSafe: d.ec.SafeL2Head(),
+	//			LocalSafe: d.ec.LocalSafeL2Head(),
+	//		})
+	//	}
 	case InteropInvalidateBlockEvent:
 		d.emitter.Emit(BuildStartEvent{Attributes: x.Attributes})
 	case BuildStartEvent:

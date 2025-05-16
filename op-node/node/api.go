@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ethereum-optimism/optimism/op-node/p2p"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -30,11 +31,11 @@ type l2EthClient interface {
 type driverClient interface {
 	SyncStatus(ctx context.Context) (*eth.SyncStatus, error)
 	BlockRefWithStatus(ctx context.Context, num uint64) (eth.L2BlockRef, *eth.SyncStatus, error)
-	ResetDerivationPipeline(context.Context) error
+	//ResetDerivationPipeline(context.Context) error
 	StartSequencer(ctx context.Context, blockHash common.Hash) error
 	StopSequencer(context.Context) (common.Hash, error)
 	SequencerActive(context.Context) (bool, error)
-	OnUnsafeL2Payload(ctx context.Context, payload *eth.ExecutionPayloadEnvelope) error
+	//OnUnsafeL2Payload(ctx context.Context, payload *eth.ExecutionPayloadEnvelope) error
 	OverrideLeader(ctx context.Context) error
 	ConductorEnabled(ctx context.Context) (bool, error)
 	SetRecoverMode(ctx context.Context, mode bool) error
@@ -59,7 +60,8 @@ func NewAdminAPI(dr driverClient, log log.Logger) *adminAPI {
 }
 
 func (n *adminAPI) ResetDerivationPipeline(ctx context.Context) error {
-	return n.dr.ResetDerivationPipeline(ctx)
+	// TODO
+	s.emitter.Emit(rollup.ResetEvent{})
 }
 
 func (n *adminAPI) StartSequencer(ctx context.Context, blockHash common.Hash) error {
@@ -83,7 +85,13 @@ func (n *adminAPI) PostUnsafePayload(ctx context.Context, envelope *eth.Executio
 		return fmt.Errorf("payload has bad block hash: %s, actual block hash is: %s", payload.BlockHash.String(), actual.String())
 	}
 
-	return n.dr.OnUnsafeL2Payload(ctx, envelope)
+	// TODO
+	s.emitter.Emit(p2p.ReceivedBlockEvent{
+		From:     "",
+		Envelope: payload,
+	})
+
+	//return n.dr.OnUnsafeL2Payload(ctx, envelope)
 }
 
 // OverrideLeader disables sequencer conductor interactions and allow sequencer to run in non-HA mode during disaster recovery scenarios.
