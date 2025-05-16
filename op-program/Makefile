@@ -52,10 +52,12 @@ reproducible-prestate: check-custom-chains
 	@echo "Cannon64 Absolute prestate hash: "
 	@cat ./bin/prestate-proof-mt64.json | jq -r .pre
 	@echo "\n-------------------- Experimental Prestates --------------------\n"
-	@echo "CannonInterop Absolute prestate hash: "
-	@cat ./bin/prestate-proof-interop.json | jq -r .pre
 	@echo "\nCannon64Next Absolute prestate hash: "
 	@cat ./bin/prestate-proof-mt64Next.json | jq -r .pre
+	@echo "CannonInterop Absolute prestate hash: "
+	@cat ./bin/prestate-proof-interop.json | jq -r .pre
+	@echo "CannonInteropNext Absolute prestate hash: "
+	@cat ./bin/prestate-proof-interopNext.json | jq -r .pre
 	@echo
 .PHONY: reproducible-prestate
 
