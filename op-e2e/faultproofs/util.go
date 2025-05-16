@@ -143,12 +143,6 @@ func defaultVmTestOptions[T any]() vmTestOptions[T] {
 
 type VMTestOption[T any] func(*vmTestOptions[T])
 
-func WithNextVMOnly[T any]() VMTestOption[T] {
-	return func(o *vmTestOptions[T]) {
-		o.allocTypes = []config.AllocType{config.AllocTypeMTCannonNext}
-	}
-}
-
 func WithTestNamePrefix[T any](prefix string) VMTestOption[T] {
 	return func(o *vmTestOptions[T]) {
 		o.testNameModifier = func(vmName string, _ T) string {
