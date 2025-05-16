@@ -58,6 +58,9 @@ func Do0(ctx context.Context, maxAttempts int, strategy Strategy, op func() erro
 		return fmt.Errorf("need at least 1 attempt to run op, but have %d max attempts", maxAttempts)
 	}
 
+	t := time.NewTimer(0)
+	defer t.Stop()
+	<-t.C // Drain the channel so we can call t.Reset on the first iteration.
 	for i := 0; i < maxAttempts; i++ {
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -66,9 +69,14 @@ func Do0(ctx context.Context, maxAttempts int, strategy Strategy, op func() erro
 		if err == nil {
 			return nil
 		}
-		// Don't sleep when we are about to exit the loop & return ErrFailedPermanently
+		// Don't block when we are about to exit the loop & return ErrFailedPermanently
 		if i != maxAttempts-1 {
-			time.Sleep(strategy.Duration(i))
+			t.Reset(strategy.Duration(i))
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-t.C:
+			}
 		}
 	}
 	return &ErrFailedPermanently{

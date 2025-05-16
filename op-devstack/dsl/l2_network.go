@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/ethereum-optimism/optimism/devnet-sdk/devstack/dsl"
 	"github.com/ethereum-optimism/optimism/op-devstack/devtest"
 	"github.com/ethereum-optimism/optimism/op-devstack/stack"
 	"github.com/ethereum-optimism/optimism/op-devstack/stack/match"
@@ -73,7 +72,7 @@ func (n *L2Network) WaitForBlock() {
 
 func (n *L2Network) PublicRPC() *L2ELNode {
 	if proxyds := match.Proxyd.Match(n.Escape().L2ELNodes()); len(proxyds) > 0 {
-		return dsl.NewL2ELNode(proxyds[0])
+		return NewL2ELNode(proxyds[0])
 	}
 	// Fallback since sysgo doesn't have proxyd support at the moment, and may never get it.
 	return NewL2ELNode(n.inner.L2ELNode(match.FirstL2EL))

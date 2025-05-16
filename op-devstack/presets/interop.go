@@ -14,12 +14,24 @@ import (
 	"github.com/ethereum-optimism/optimism/op-node/rollup"
 )
 
+type InteropL2 struct {
+	L2Chain   *dsl.L2Network
+	L2Batcher *dsl.L2Batcher
+	L2EL      *dsl.L2ELNode
+	L2CL      *dsl.L2CLNode
+	Faucet    *dsl.Faucet
+	Funder    *dsl.Funder
+}
+
 type SimpleInterop struct {
 	Log          log.Logger
 	T            devtest.T
 	Supervisor   *dsl.Supervisor
 	Sequencer    *dsl.Sequencer
 	ControlPlane stack.ControlPlane
+
+	L2A *InteropL2
+	L2B *InteropL2
 
 	L1Network *dsl.L1Network
 
@@ -90,6 +102,22 @@ func NewSimpleInterop(t devtest.T) *SimpleInterop {
 	}
 	out.FunderA = dsl.NewFunder(out.Wallet, out.FaucetA, out.L2ELA)
 	out.FunderB = dsl.NewFunder(out.Wallet, out.FaucetB, out.L2ELB)
+	out.L2A = &InteropL2{
+		L2Chain:   out.L2ChainA,
+		L2Batcher: out.L2BatcherA,
+		L2EL:      out.L2ELA,
+		L2CL:      out.L2CLA,
+		Faucet:    out.FaucetA,
+		Funder:    out.FunderA,
+	}
+	out.L2B = &InteropL2{
+		L2Chain:   out.L2ChainB,
+		L2Batcher: out.L2BatcherB,
+		L2EL:      out.L2ELB,
+		L2CL:      out.L2CLB,
+		Faucet:    out.FaucetB,
+		Funder:    out.FunderB,
+	}
 	return out
 }
 
