@@ -1198,7 +1198,7 @@ jobs:
       - run:
           name: Prepare test environment (compile tests and cache results)
           working_directory: op-acceptance-tests
-          command: go test -run=^$ ./tests/...
+          command: DEVSTACK_ORCHESTRATOR="sysext" go test -run=^$ ./tests/...
       # Run the acceptance tests (if the devnet is running)
       - run:
           name: Run acceptance tests (gate=<<parameters.gate>>)
