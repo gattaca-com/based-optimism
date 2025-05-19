@@ -2303,9 +2303,10 @@ workflows:
   # Acceptance tests (pre-merge to develop)
   acceptance-tests-pr:
     when:
-      not:
-        equal: [<< pipeline.git.branch >>, "develop"]
-      - << pipeline.pull_request.id >> # ensures that this job only runs on a PR
+      - and:
+          - not:
+              equal: [<< pipeline.git.branch >>, "develop"]
+          - << pipeline.pull_request.id >> # ensures that this job only runs on a PR
     jobs:
       - op-acceptance-tests:
           # Acceptance Testing params
