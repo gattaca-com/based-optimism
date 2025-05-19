@@ -192,6 +192,8 @@ func (mc *MultiClient) fetchWithConsistencyCheck(
 		// If we're fetching a block instead of a header
 		if block, ok := primaryItem.(*types.Block); ok {
 			primaryHeader = block.Header()
+		} else {
+			return nil, fmt.Errorf("expected header or block, got %T", primaryItem)
 		}
 	}
 
@@ -219,7 +221,7 @@ func (mc *MultiClient) fetchWithConsistencyCheck(
 						primaryHash.Hex(), hash.Hex(), primaryHeader.Root.Hex())
 				} else {
 					// Both hash and state root differ
-					return hash, nil
+					return hash, fmt.Errorf("block hash divergence. PrimaryHeader = %+v, FollowerHeader = %+v", primaryHeader, followerHeader)
 				}
 			}
 		}
