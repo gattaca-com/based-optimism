@@ -459,6 +459,7 @@ func (d *EngDeriver) OnEvent(ev event.Event) bool {
 			"finalized", v.Finalized,
 		)
 	case PromoteUnsafeEvent:
+		d.preconfChannels.SendL2Block(&x.Ref)
 		// Backup unsafeHead when new block is not built on original unsafe head.
 		if d.ec.unsafeHead.Number >= x.Ref.Number {
 			d.ec.SetBackupUnsafeL2Head(d.ec.unsafeHead, false)
@@ -520,7 +521,6 @@ func (d *EngDeriver) OnEvent(ev event.Event) bool {
 			d.emitter.Emit(PromoteSafeEvent(x))
 		}
 	case PromoteSafeEvent:
-		d.preconfChannels.SendL2Block(&x.Ref)
 		d.log.Debug("Updating safe", "safe", x.Ref, "unsafe", d.ec.UnsafeL2Head())
 		d.ec.SetSafeHead(x.Ref)
 		// Finalizer can pick up this safe cross-block now
