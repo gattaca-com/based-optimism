@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/ethereum/go-ethereum/crypto"
 	"sync"
 	"time"
 
@@ -913,13 +914,13 @@ func JoinGossip(self peer.ID, ps *pubsub.PubSub, log log.Logger, cfg *rollup.Con
 	}
 
 	return &publisher{
-		log:       log,
-		cfg:       cfg,
-		p2pCancel: p2pCancel,
-		blocksV1:  blocksV1,
-		blocksV2:  blocksV2,
-		blocksV3:  blocksV3,
-		blocksV4:  blocksV4,
+		log:        log,
+		cfg:        cfg,
+		p2pCancel:  p2pCancel,
+		blocksV1:   blocksV1,
+		blocksV2:   blocksV2,
+		blocksV3:   blocksV3,
+		blocksV4:   blocksV4,
 		newFragV0:  newFragV0,
 		sealFragV0: sealFragV0,
 		envV0:      envV0,

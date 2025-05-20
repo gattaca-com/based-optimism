@@ -16,8 +16,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/holiman/uint256"
 )
@@ -70,32 +70,6 @@ func (ie InputError) Unwrap() error {
 func (ie InputError) Is(target error) bool {
 	_, ok := target.(InputError)
 	return ok // we implement Unwrap, so we do not have to check the inner type now
-}
-
-// Bytes65 is a 65-byte long byte string, and encoded with 0x-prefix in hex.
-// This can be used to represent encoded secp256k ethereum signatures.
-type Bytes65 [65]byte
-
-func (b *Bytes65) UnmarshalJSON(text []byte) error {
-	return hexutil.UnmarshalFixedJSON(reflect.TypeOf(b), text, b[:])
-}
-
-func (b *Bytes65) UnmarshalText(text []byte) error {
-	return hexutil.UnmarshalFixedText("Bytes65", text, b[:])
-}
-
-func (b Bytes65) MarshalText() ([]byte, error) {
-	return hexutil.Bytes(b[:]).MarshalText()
-}
-
-func (b Bytes65) String() string {
-	return hexutil.Encode(b[:])
-}
-
-// TerminalString implements log.TerminalStringer, formatting a string for console
-// output during logging.
-func (b Bytes65) TerminalString() string {
-	return fmt.Sprintf("0x%x..%x", b[:3], b[65-3:])
 }
 
 type Bytes32 [32]byte

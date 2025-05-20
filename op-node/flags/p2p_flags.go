@@ -410,13 +410,5 @@ func P2PFlags(envPrefix string) []cli.Flag {
 			Required: false,
 			EnvVars:  p2pEnv(envPrefix, "PING"),
 		},
-		&cli.StringFlag{
-			Name:     GatewayName,
-			Usage:    "Hex-encoded address for verifying p2p application messages from the Gateway.",
-			Required: false,
-			Value:    "",
-			EnvVars:  p2pEnv(envPrefix, "GATEWAY_ADDRESS"),
-			Category: P2PCategory,
-		},
 	}, opsigner.CLIFlags(envPrefix, P2PCategory)...)
 }

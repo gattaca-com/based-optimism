@@ -34,7 +34,7 @@ type L1EndpointSetup interface {
 }
 
 type RegistryEndpointSetup interface {
-	Setup(ctx context.Context, log log.Logger, rollupCfg *rollup.Config) (cl client.RPC, rpcCfg *sources.EthClientConfig, err error)
+	Setup(ctx context.Context, log log.Logger, rollupCfg *rollup.Config, metrics opmetrics.RPCMetricer) (cl client.RPC, rpcCfg *sources.EthClientConfig, err error)
 	Check() error
 }
 
@@ -215,10 +215,11 @@ func (cfg *RegistryEndpointConfig) Check() error {
 	return nil
 }
 
-func (cfg *RegistryEndpointConfig) Setup(ctx context.Context, log log.Logger, rollupCfg *rollup.Config) (client.RPC, *sources.EthClientConfig, error) {
+func (cfg *RegistryEndpointConfig) Setup(ctx context.Context, log log.Logger, rollupCfg *rollup.Config, metrics opmetrics.RPCMetricer) (client.RPC, *sources.EthClientConfig, error) {
 	opts := []client.RPCOption{
 		client.WithHttpPollInterval(cfg.HttpPollInterval),
 		client.WithDialAttempts(10),
+		client.WithRPCRecorder(metrics.NewRecorder("registry")),
 	}
 	if cfg.RateLimit != 0 {
 		opts = append(opts, client.WithRateLimit(cfg.RateLimit, cfg.BatchSize))
@@ -226,7 +227,7 @@ func (cfg *RegistryEndpointConfig) Setup(ctx context.Context, log log.Logger, ro
 
 	registryNode, err := client.NewRPC(ctx, log, cfg.RegistryNodeAddr, opts...)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to dial L1 address (%s): %w", cfg.RegistryNodeAddr, err)
+		return nil, nil, fmt.Errorf("failed to dial registry address (%s): %w", cfg.RegistryNodeAddr, err)
 	}
 
 	rpcCfg := sources.RegistryClientDefaultConfig(rollupCfg, sources.RPCKindAny)

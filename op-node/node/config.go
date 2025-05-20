@@ -7,8 +7,6 @@ import (
 	"math"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
-
 	altda "github.com/ethereum-optimism/optimism/op-alt-da"
 	"github.com/ethereum-optimism/optimism/op-node/flags"
 	"github.com/ethereum-optimism/optimism/op-node/p2p"

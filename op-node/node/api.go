@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -173,15 +172,13 @@ type basedAPI struct {
 	p2p            p2p.Node
 	registrySource *sources.RegistryClient
 	log            log.Logger
-	metrics        metrics.RPCMetricer
 }
 
-func NewBasedAPI(node p2p.Node, registrySource *sources.RegistryClient, log log.Logger, metrics metrics.RPCMetricer) *basedAPI {
+func NewBasedAPI(node p2p.Node, registrySource *sources.RegistryClient, log log.Logger) *basedAPI {
 	return &basedAPI{
 		p2p:            node,
 		registrySource: registrySource,
 		log:            log,
-		metrics:        metrics,
 	}
 }
 
@@ -211,9 +208,6 @@ func verifySignature(log log.Logger, signatureBytes []byte, messageBytes []byte,
 }
 
 func (n *basedAPI) NewFrag(ctx context.Context, signedFrag eth.SignedNewFrag) (string, error) {
-	recordDur := n.metrics.RecordRPCServerRequest("based_newFrag")
-	defer recordDur()
-
 	n.log.Info("NewFrag RPC request received")
 
 	root := signedFrag.Frag.Root()
@@ -237,9 +231,6 @@ func (n *basedAPI) NewFrag(ctx context.Context, signedFrag eth.SignedNewFrag) (s
 }
 
 func (n *basedAPI) SealFrag(ctx context.Context, signedSeal eth.SignedSeal) (string, error) {
-	recordDur := n.metrics.RecordRPCServerRequest("based_sealFrag")
-	defer recordDur()
-
 	n.log.Info("SealFrag RPC request received", "seal", signedSeal.Seal)
 
 	root := signedSeal.Seal.Root()
@@ -263,9 +254,6 @@ func (n *basedAPI) SealFrag(ctx context.Context, signedSeal eth.SignedSeal) (str
 }
 
 func (n *basedAPI) Env(ctx context.Context, signedEnv eth.SignedEnv) (string, error) {
-	recordDur := n.metrics.RecordRPCServerRequest("based_env")
-	defer recordDur()
-
 	n.log.Info("Env RPC request received", "env", signedEnv.Env)
 
 	root := signedEnv.Env.Root()
