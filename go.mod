@@ -281,7 +281,7 @@ require (
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
 
-replace github.com/ethereum/go-ethereum => github.com/gattaca-com/based-op-geth v1.101503.4-based-fix
+replace github.com/ethereum/go-ethereum => github.com/gattaca-com/based-op-geth v1.101503.4-based-1.0
 
 //replace github.com/ethereum/go-ethereum => ../op-geth
 
