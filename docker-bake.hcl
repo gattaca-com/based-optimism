@@ -99,6 +99,19 @@ target "op-node" {
   tags = [for tag in split(",", IMAGE_TAGS) : "${REGISTRY}/${REPOSITORY}/op-node:${tag}"]
 }
 
+target "based-op-node" {
+  dockerfile = "ops/docker/op-stack-go/Dockerfile"
+  context = "."
+  args = {
+    GIT_COMMIT = "${GIT_COMMIT}"
+    GIT_DATE = "${GIT_DATE}"
+    OP_NODE_VERSION = "${OP_NODE_VERSION}"
+  }
+  target = "op-node-target"
+  platforms = split(",", PLATFORMS)
+  tags = [for tag in split(",", IMAGE_TAGS) : "${REGISTRY}/${REPOSITORY}/based-op-node:${tag}"]
+}
+
 target "op-batcher" {
   dockerfile = "ops/docker/op-stack-go/Dockerfile"
   context = "."

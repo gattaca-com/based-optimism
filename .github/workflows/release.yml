@@ -67,7 +67,7 @@ jobs:
           docker buildx bake \
             -f docker-bake.hcl \
             --push \
-            op-node
+            based-op-node
 
   create-manifest:
     needs: build-and-push
