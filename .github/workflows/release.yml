@@ -83,38 +83,39 @@ jobs:
             --push \
             op-deployer
 
-  create-manifest:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    env:
-      IMAGE_REG: ghcr.io/gattaca-com/based-optimism
 
-    steps:
-      - name: Log in to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+    create-manifest:
+      needs: build-and-push
+      runs-on: ubuntu-latest
+      strategy:
+        matrix:
+          image:
+            - based-op-node
+            - based-op-deployer
 
-      - name: Create & Push Multi-Arch Manifests
-        run: |
-          ghcr="ghcr.io/gattaca-com/based-optimism"
-          tag="${{ github.ref_name }}"
+      env:
+        IMAGE_REG: ghcr.io/${{ github.repository }}
 
-          # Use buildx imagetools to create multi-arch manifest
-          docker buildx imagetools create \
-            --tag $ghcr/based-op-node:$tag \
-            $ghcr/based-op-node:$tag-amd64 \
-            $ghcr/based-op-node:$tag-arm64 \
-            $ghcr/based-op-deployer:$tag-amd64 \
-            $ghcr/based-op-deployer:$tag-arm64 \
+      steps:
+        - uses: docker/login-action@v3
+          with:
+            registry: ghcr.io
+            username: ${{ github.actor }}
+            password: ${{ secrets.GITHUB_TOKEN }}
 
-          if [[ ! "$tag" =~ "rc" ]]; then
+        - name: Create & Push Multi-Arch Manifests
+          run: |
+            ghcr="ghcr.io/${{ github.repository }}"
+            tag="${{ github.ref_name }}"
+            name="${{ matrix.image }}"
+            # Use buildx imagetools to create multi-arch manifest
             docker buildx imagetools create \
-              --tag $ghcr/based-op-node:latest \
-              $ghcr/based-op-node:latest-amd64 \
-              $ghcr/based-op-node:latest-arm64 \
-              $ghcr/based-op-deployer:latest-amd64 \
-              $ghcr/based-op-deployer:latest-arm64
-          fi
+              --tag $ghcr/$name:$tag \
+              $ghcr/$name:$tag-amd64 \
+              $ghcr/$name:$tag-arm64
+            if [[ ! "$tag" =~ "rc" ]]; then
+              docker buildx imagetools create \
+                --tag $ghcr/$name:latest \
+                $ghcr/$name:latest-amd64 \
+                $ghcr/$name:latest-arm64
+            fi
