@@ -80,8 +80,8 @@ jobs:
     strategy:
       matrix:
         image:
-          - based-op-node
-          - based-op-deployer
+          - op-node
+          - op-deployer
 
     env:
       IMAGE_REG: ghcr.io/${{ github.repository }}
@@ -100,12 +100,12 @@ jobs:
           name="${{ matrix.image }}"
           # Use buildx imagetools to create multi-arch manifest
           docker buildx imagetools create \
-            --tag $ghcr/$name:$tag \
-            $ghcr/$name:$tag-amd64 \
-            $ghcr/$name:$tag-arm64
+            --tag $ghcr/based-$name:$tag \
+            $ghcr/based-$name:$tag-amd64 \
+            $ghcr/based-$name:$tag-arm64
           if [[ ! "$tag" =~ "rc" ]]; then
             docker buildx imagetools create \
-              --tag $ghcr/$name:latest \
-              $ghcr/$name:latest-amd64 \
-              $ghcr/$name:latest-arm64
+              --tag $ghcr/based-$name:latest \
+              $ghcr/based-$name:latest-amd64 \
+              $ghcr/based-$name:latest-arm64
           fi
