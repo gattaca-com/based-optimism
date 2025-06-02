@@ -24,7 +24,7 @@ jobs:
             runner: ubuntu-24.04-arm
       fail-fast: false
 
-    name: Build & Push op-node (${{ matrix.platform.arch }})
+    name: Build & Push op services (${{ matrix.platform.arch }})
     runs-on: ${{ matrix.platform.runner }}
     env:
       IMAGE_REG: ghcr.io/gattaca-com/based-optimism
