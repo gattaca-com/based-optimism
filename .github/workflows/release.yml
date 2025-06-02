@@ -17,6 +17,11 @@ jobs:
   build-and-push:
     strategy:
       matrix:
+        image:
+          - name: op-node
+            context: based
+          - name: op-deployer
+            context: based
         platform:
           - arch: amd64
             runner: ubuntu-latest
@@ -55,7 +60,7 @@ jobs:
           echo "git_commit=$GIT_COMMIT" >> $GITHUB_OUTPUT
           echo "git_date=$GIT_DATE" >> $GITHUB_OUTPUT
 
-      - name: Build & Push op-node
+      - name: Build & Push ${{ matrix.image.name }}
         run: |
           IMAGE_TAGS=${{ steps.meta.outputs.tag_name }}-${{ matrix.platform.arch }},${{ !contains(github.ref_name, 'rc') && format('latest-{0}', matrix.platform.arch) || '' }} \
           GIT_COMMIT=${{ steps.meta.outputs.git_commit }} \
@@ -67,22 +72,7 @@ jobs:
           docker buildx bake \
             -f docker-bake.hcl \
             --push \
-            op-node
-
-      - name: Build & Push op-deployer
-        run: |
-          IMAGE_TAGS=${{ steps.meta.outputs.tag_name }}-${{ matrix.platform.arch }},${{ !contains(github.ref_name, 'rc') && format('latest-{0}', matrix.platform.arch) || '' }} \
-          GIT_COMMIT=${{ steps.meta.outputs.git_commit }} \
-          GIT_DATE=${{ steps.meta.outputs.git_date }} \
-          GIT_VERSION=${{ steps.meta.outputs.tag_name }} \
-          REGISTRY=ghcr.io \
-          REPOSITORY=gattaca-com/based-optimism \
-          PLATFORMS=linux/${{ matrix.platform.arch == 'arm64' && 'arm64/v8' || matrix.platform.arch }} \
-          docker buildx bake \
-            -f docker-bake.hcl \
-            --push \
-            op-deployer
-
+            ${{ matrix.image.name }}
 
   create-manifest:
     needs: build-and-push
