@@ -69,6 +69,20 @@ jobs:
             --push \
             op-node
 
+      - name: Build & Push op-deployer
+        run: |
+          IMAGE_TAGS=${{ steps.meta.outputs.tag_name }}-${{ matrix.platform.arch }},${{ !contains(github.ref_name, 'rc') && format('latest-{0}', matrix.platform.arch) || '' }} \
+          GIT_COMMIT=${{ steps.meta.outputs.git_commit }} \
+          GIT_DATE=${{ steps.meta.outputs.git_date }} \
+          GIT_VERSION=${{ steps.meta.outputs.tag_name }} \
+          REGISTRY=ghcr.io \
+          REPOSITORY=gattaca-com/based-optimism \
+          PLATFORMS=linux/${{ matrix.platform.arch == 'arm64' && 'arm64/v8' || matrix.platform.arch }} \
+          docker buildx bake \
+            -f docker-bake.hcl \
+            --push \
+            op-deployer
+
   create-manifest:
     needs: build-and-push
     runs-on: ubuntu-latest
@@ -92,11 +106,15 @@ jobs:
           docker buildx imagetools create \
             --tag $ghcr/based-op-node:$tag \
             $ghcr/based-op-node:$tag-amd64 \
-            $ghcr/based-op-node:$tag-arm64
+            $ghcr/based-op-node:$tag-arm64 \
+            $ghcr/based-op-deployer:$tag-amd64 \
+            $ghcr/based-op-deployer:$tag-arm64 \
 
           if [[ ! "$tag" =~ "rc" ]]; then
             docker buildx imagetools create \
               --tag $ghcr/based-op-node:latest \
               $ghcr/based-op-node:latest-amd64 \
-              $ghcr/based-op-node:latest-arm64
+              $ghcr/based-op-node:latest-arm64 \
+              $ghcr/based-op-deployer:latest-amd64 \
+              $ghcr/based-op-deployer:latest-arm64
           fi
