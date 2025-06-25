@@ -309,7 +309,6 @@ type Seal struct {
 	ReceiptsRoot     Bytes32 `json:"receiptsRoot" ssz-size:"32"`
 	StateRoot        Bytes32 `json:"stateRoot" ssz-size:"32"`
 	BlockHash        Bytes32 `json:"blockHash" ssz-size:"32"`
-	WithdrawalsRoot  Bytes32 `json:"withdrawalsRoot" ssz-size:"32"`
 }
 
 type SignedEnv struct {
