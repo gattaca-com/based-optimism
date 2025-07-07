@@ -17,7 +17,7 @@ import (
 // RegistryClient provides typed bindings to retrieve registry data from an RPC source,
 // caching results for future use.
 type RegistryClient struct {
-	ethClient *EthClient
+	EthClient *EthClient
 	mu        sync.RWMutex
 	// Map of block number to gateway for that block
 	gateways           map[uint64]*RegistryResponse
@@ -58,7 +58,7 @@ func NewRegistryClient(client client.RPC, log log.Logger, metrics caching.Metric
 	}
 
 	return &RegistryClient{
-		ethClient:          ethClient,
+		EthClient:          ethClient,
 		mu:                 sync.RWMutex{},
 		gateways:           make(map[uint64]*RegistryResponse),
 		latestFetchedBlock: 0,
@@ -101,7 +101,7 @@ func (r *RegistryClient) fetchNextNGatewaysSingle(ctx context.Context, n uint64)
 	gateways := make([]*RegistryResponse, n+1)
 
 	// Fetch current gateway
-	current, err := r.ethClient.CurrentGateway(ctx)
+	current, err := r.EthClient.CurrentGateway(ctx)
 	if err != nil {
 		return err
 	}
@@ -109,7 +109,7 @@ func (r *RegistryClient) fetchNextNGatewaysSingle(ctx context.Context, n uint64)
 
 	// Fetch next n gateways
 	for i := uint64(1); i <= n; i++ {
-		gateway, err := r.ethClient.FutureGateway(ctx, i)
+		gateway, err := r.EthClient.FutureGateway(ctx, i)
 		if err != nil {
 			return err
 		}
