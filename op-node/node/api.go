@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -258,7 +259,11 @@ func (n *basedAPI) Env(ctx context.Context, signedEnv eth.SignedEnv) (string, er
 
 	root := signedEnv.Env.Root()
 
-	expectedSigner, err := n.registrySource.GatewayForBlock(ctx, signedEnv.Env.Number)
+	// expectedSigner, err := n.registrySource.GatewayForBlock(ctx, signedEnv.Env.Number)
+
+	current, err := n.registrySource.EthClient.CurrentGateway(ctx)
+	expectedSigner := current.GatewayAddress
+
 	if err != nil {
 		return "ERROR", fmt.Errorf("failed to get expected signer: %w", err)
 	}
