@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/ethereum/go-ethereum/common"
 	"io"
 	gosync "sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -444,7 +445,7 @@ func (n *OpNode) initL2(ctx context.Context, cfg *Config) error {
 
 	managedMode := false
 
-	n.preconfChannels = engine.StartPreconf(ctx, n.l2Source)
+	n.preconfChannels = engine.StartPreconf(ctx, n.l2Source, *n.metrics)
 
 	if cfg.Rollup.InteropTime != nil {
 		sys, err := cfg.InteropConfig.Setup(ctx, n.log, &n.cfg.Rollup, n.l1Source, n.l2Source, n.metrics)
