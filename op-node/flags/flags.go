@@ -455,6 +455,15 @@ var (
 		Category: RollupCategory,
 		Hidden:   true,
 	}
+	/* Unsafe flags */
+	UnsafeAllowOldPayloads = &cli.BoolFlag{
+		Name:     "unsafe-allow-old-payloads",
+		Usage:    "Allows to gossip and receive over p2p unsafe payloads whose timestamp is older 60 seconds compared to now.",
+		EnvVars:  prefixEnvVars("UNSAFE_ALLOW_OLD_PAYLOADS"),
+		Value:    false,
+		Category: RollupCategory,
+		Hidden:   false,
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -512,6 +521,7 @@ var optionalFlags = []cli.Flag{
 	InteropRPCPort,
 	InteropJWTSecret,
 	IgnoreMissingPectraBlobSchedule,
+	UnsafeAllowOldPayloads,
 }
 
 var DeprecatedFlags = []cli.Flag{

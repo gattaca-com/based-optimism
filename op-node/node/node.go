@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/ethereum/go-ethereum/common"
 	"io"
 	gosync "sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -271,7 +272,7 @@ func (n *OpNode) initRegistry(ctx context.Context, cfg *Config) error {
 
 func (n *OpNode) initRuntimeConfig(ctx context.Context, cfg *Config) error {
 	// attempt to load runtime config, repeat N times
-	n.runCfg = NewRuntimeConfig(n.log, n.l1Source, &cfg.Rollup, n.registrySource)
+	n.runCfg = NewRuntimeConfig(n.log, n.l1Source, &cfg.Rollup, n.registrySource, cfg.UnsafeAllowOldPayloads)
 
 	confDepth := cfg.Driver.VerifierConfDepth
 	reload := func(ctx context.Context) (eth.L1BlockRef, error) {
@@ -688,7 +689,6 @@ func (n *OpNode) PublishNewFrag(ctx context.Context, from peer.ID, frag *eth.Sig
 }
 
 func (n *OpNode) PublishSealFrag(ctx context.Context, from peer.ID, seal *eth.SignedSeal) error {
-
 	n.tracer.OnPublishSealFrag(ctx, from, seal)
 
 	// publish to p2p, if we are running p2p at all
@@ -704,7 +704,6 @@ func (n *OpNode) PublishSealFrag(ctx context.Context, from peer.ID, seal *eth.Si
 }
 
 func (n *OpNode) PublishEnv(ctx context.Context, from peer.ID, env *eth.SignedEnv) error {
-
 	n.tracer.OnPublishEnv(ctx, from, env)
 
 	// publish to p2p, if we are running p2p at all
@@ -783,7 +782,7 @@ func (n *OpNode) OnEnv(ctx context.Context, from peer.ID, env *eth.SignedEnv) er
 
 func (n *OpNode) RequestL2Range(ctx context.Context, start, end eth.L2BlockRef) error {
 	if p2pNode := n.getP2PNodeIfEnabled(); p2pNode != nil && p2pNode.AltSyncEnabled() {
-		if unixTimeStale(start.Time, 12*time.Hour) {
+		if !n.cfg.UnsafeAllowOldPayloads && unixTimeStale(start.Time, 12*time.Hour) {
 			n.log.Debug(
 				"ignoring request to sync L2 range, timestamp is too old for p2p",
 				"start", start,
