@@ -174,6 +174,9 @@ func (dp *DerivationPipeline) Step(ctx context.Context, pendingSafeHead eth.L2Bl
 		}
 	}()
 
+	// CHANGE(thedevbirb): disable it for chain replication
+	return nil, io.EOF
+
 	// if any stages need to be reset, do that first.
 	if dp.resetting < len(dp.stages) {
 		if !dp.engineIsReset {
