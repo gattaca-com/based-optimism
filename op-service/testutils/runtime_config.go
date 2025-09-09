@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 )
 
 type MockRuntimeConfig struct {
@@ -24,6 +23,6 @@ func (m *MockRuntimeConfig) FetchNextNGateways(ctx context.Context, n uint64, ma
 	return nil
 }
 
-func (m *MockRuntimeConfig) UnsafeAllowOldPayloads(timestamp hexutil.Uint64) bool {
+func (m *MockRuntimeConfig) UnsafeIsChainReplication() bool {
 	return false
 }

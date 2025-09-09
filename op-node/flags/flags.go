@@ -456,10 +456,10 @@ var (
 		Hidden:   true,
 	}
 	/* Unsafe flags */
-	UnsafeAllowOldPayloads = &cli.BoolFlag{
-		Name:     "unsafe-allow-old-payloads",
-		Usage:    "Allows to gossip and receive over p2p unsafe payloads whose timestamp is older 60 seconds compared to now.",
-		EnvVars:  prefixEnvVars("UNSAFE_ALLOW_OLD_PAYLOADS"),
+	UnsafeIsChainReplication = &cli.BoolFlag{
+		Name:     "unsafe-is-chain-replication",
+		Usage:    "Whether the node is running in chain replication testing mode",
+		EnvVars:  prefixEnvVars("UNSAFE_IS_CHAIN_REPLICATION"),
 		Value:    false,
 		Category: RollupCategory,
 		Hidden:   false,
@@ -521,7 +521,7 @@ var optionalFlags = []cli.Flag{
 	InteropRPCPort,
 	InteropJWTSecret,
 	IgnoreMissingPectraBlobSchedule,
-	UnsafeAllowOldPayloads,
+	UnsafeIsChainReplication,
 }
 
 var DeprecatedFlags = []cli.Flag{

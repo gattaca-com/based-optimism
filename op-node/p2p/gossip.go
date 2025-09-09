@@ -65,7 +65,7 @@ type GossipRuntimeConfig interface {
 	P2PSequencerAddress() common.Address
 	GatewayForBlock(ctx context.Context, blockNumber uint64) (common.Address, error)
 	FetchNextNGateways(ctx context.Context, n uint64, maxRetries uint64) error
-	UnsafeAllowOldPayloads() bool
+	UnsafeIsChainReplication() bool
 }
 
 //go:generate mockery --name GossipMetricer
@@ -475,7 +475,7 @@ func BuildBlocksValidator(log log.Logger, cfg *rollup.Config, runCfg GossipRunti
 		// rounding down to seconds is fine here.
 		now := uint64(time.Now().Unix())
 
-		if !runCfg.UnsafeAllowOldPayloads() {
+		if !runCfg.UnsafeIsChainReplication() {
 			// [REJECT] if the `payload.timestamp` is older than 60 seconds in the past
 			if uint64(payload.Timestamp) < now-60 {
 				log.Warn("payload is too old", "timestamp", uint64(payload.Timestamp))

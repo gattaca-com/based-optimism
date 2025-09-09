@@ -60,7 +60,7 @@ type RuntimeConfig struct {
 	// if this is invalidated with a reorg the data will have to be reloaded.
 	l1Ref eth.L1BlockRef
 
-	unsafeAllowOldPayloads bool
+	unsafeChainReplication bool
 
 	runtimeConfigData
 }
@@ -76,14 +76,14 @@ type runtimeConfigData struct {
 
 var _ p2p.GossipRuntimeConfig = (*RuntimeConfig)(nil)
 
-func NewRuntimeConfig(log log.Logger, l1Client RuntimeCfgL1Source, rollupCfg *rollup.Config, registryClient RuntimeCfgRegistrySource, unsafeAllowOldPayloads bool) *RuntimeConfig {
+func NewRuntimeConfig(log log.Logger, l1Client RuntimeCfgL1Source, rollupCfg *rollup.Config, registryClient RuntimeCfgRegistrySource, UnsafeIsChainReplication bool) *RuntimeConfig {
 	return &RuntimeConfig{
 		log:                    log,
 		l1Client:               l1Client,
 		rollupCfg:              rollupCfg,
 		registryClient:         registryClient,
 		runtimeConfigData:      runtimeConfigData{},
-		unsafeAllowOldPayloads: unsafeAllowOldPayloads,
+		unsafeChainReplication: UnsafeIsChainReplication,
 	}
 }
 
@@ -102,8 +102,8 @@ func (r *RuntimeConfig) GatewayForBlock(ctx context.Context, blockNumber uint64)
 	return addr, nil
 }
 
-func (r *RuntimeConfig) UnsafeAllowOldPayloads() bool {
-	return r.unsafeAllowOldPayloads
+func (r *RuntimeConfig) UnsafeIsChainReplication() bool {
+	return r.unsafeChainReplication
 }
 
 func (r *RuntimeConfig) FetchNextNGateways(ctx context.Context, n uint64, maxRetries uint64) error {

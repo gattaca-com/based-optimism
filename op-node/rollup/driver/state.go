@@ -449,7 +449,8 @@ func (s *SyncDeriver) SyncStep() {
 				return false
 			} else {
 				s.Emitter.Emit(rollup.CriticalErrorEvent{
-					Err: fmt.Errorf("unexpected error on SyncStep event Drain: %w", err)})
+					Err: fmt.Errorf("unexpected error on SyncStep event Drain: %w", err),
+				})
 				return false
 			}
 		}
