@@ -455,16 +455,6 @@ var (
 		Category: RollupCategory,
 		Hidden:   true,
 	}
-	/* Unsafe flags */
-	UnsafeIsChainReplication = &cli.BoolFlag{
-		Name: "unsafe-is-chain-replication",
-		Usage: "Whether the node is running in chain replication mode, to replay past L2 blocks. Such flag disables some internal mechanisms, " +
-			"like enforcing payloads not older than 60 seconds and syncing and deriving the chain via L1 data.",
-		EnvVars:  prefixEnvVars("UNSAFE_IS_CHAIN_REPLICATION"),
-		Value:    false,
-		Category: RollupCategory,
-		Hidden:   false,
-	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -522,7 +512,6 @@ var optionalFlags = []cli.Flag{
 	InteropRPCPort,
 	InteropJWTSecret,
 	IgnoreMissingPectraBlobSchedule,
-	UnsafeIsChainReplication,
 }
 
 var DeprecatedFlags = []cli.Flag{

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
@@ -174,8 +175,10 @@ func (dp *DerivationPipeline) Step(ctx context.Context, pendingSafeHead eth.L2Bl
 		}
 	}()
 
-	// CHANGE(thedevbirb): disable it for chain replication
-	return nil, io.EOF
+	// CHANGE(thedevbirb): for chain replication we must ignore deriving the chain from L1 data.
+	if _, ok := os.LookupEnv("BOP_REPLAY"); ok {
+		return nil, io.EOF
+	}
 
 	// if any stages need to be reset, do that first.
 	if dp.resetting < len(dp.stages) {

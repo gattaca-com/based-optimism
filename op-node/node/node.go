@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	gosync "sync"
 	"sync/atomic"
 	"time"
@@ -272,7 +273,7 @@ func (n *OpNode) initRegistry(ctx context.Context, cfg *Config) error {
 
 func (n *OpNode) initRuntimeConfig(ctx context.Context, cfg *Config) error {
 	// attempt to load runtime config, repeat N times
-	n.runCfg = NewRuntimeConfig(n.log, n.l1Source, &cfg.Rollup, n.registrySource, cfg.UnsafeIsChainReplication)
+	n.runCfg = NewRuntimeConfig(n.log, n.l1Source, &cfg.Rollup, n.registrySource)
 
 	confDepth := cfg.Driver.VerifierConfDepth
 	reload := func(ctx context.Context) (eth.L1BlockRef, error) {
@@ -622,7 +623,7 @@ func (n *OpNode) onEvent(ev event.Event) bool {
 
 func (n *OpNode) OnNewL1Head(ctx context.Context, sig eth.L1BlockRef) {
 	// CHANGE(thedevbirb): allow chain replication without deviation due to L1 state.
-	if n.runCfg.unsafeChainReplication {
+	if _, ok := os.LookupEnv("BOP_REPLAY"); ok {
 		return
 	}
 	n.tracer.OnNewL1Head(ctx, sig)
@@ -640,7 +641,7 @@ func (n *OpNode) OnNewL1Head(ctx context.Context, sig eth.L1BlockRef) {
 
 func (n *OpNode) OnNewL1Safe(ctx context.Context, sig eth.L1BlockRef) {
 	// CHANGE(thedevbirb): allow chain replication without deviation due to L1 state.
-	if n.runCfg.unsafeChainReplication {
+	if _, ok := os.LookupEnv("BOP_REPLAY"); ok {
 		return
 	}
 	if n.l2Driver == nil {
@@ -656,7 +657,7 @@ func (n *OpNode) OnNewL1Safe(ctx context.Context, sig eth.L1BlockRef) {
 
 func (n *OpNode) OnNewL1Finalized(ctx context.Context, sig eth.L1BlockRef) {
 	// CHANGE(thedevbirb): allow chain replication without deviation due to L1 state.
-	if n.runCfg.unsafeChainReplication {
+	if _, ok := os.LookupEnv("BOP_REPLAY"); ok {
 		return
 	}
 	if n.l2Driver == nil {
@@ -793,8 +794,10 @@ func (n *OpNode) OnEnv(ctx context.Context, from peer.ID, env *eth.SignedEnv) er
 }
 
 func (n *OpNode) RequestL2Range(ctx context.Context, start, end eth.L2BlockRef) error {
-	if p2pNode := n.getP2PNodeIfEnabled(); p2pNode != nil && p2pNode.AltSyncEnabled() {
-		if !n.runCfg.unsafeChainReplication && unixTimeStale(start.Time, 12*time.Hour) {
+	// CHANGE(thedevbirb): for chain replication, ignoring sending p2p syncing requests which may block the event loop.
+	_, isReplay := os.LookupEnv("BOP_REPLAY")
+	if p2pNode := n.getP2PNodeIfEnabled(); p2pNode != nil && p2pNode.AltSyncEnabled() && !isReplay {
+		if unixTimeStale(start.Time, 12*time.Hour) {
 			n.log.Debug(
 				"ignoring request to sync L2 range, timestamp is too old for p2p",
 				"start", start,

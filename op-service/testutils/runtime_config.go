@@ -22,7 +22,3 @@ func (m *MockRuntimeConfig) GatewayForBlock(ctx context.Context, blockNumber uin
 func (m *MockRuntimeConfig) FetchNextNGateways(ctx context.Context, n uint64, maxRetries uint64) error {
 	return nil
 }
-
-func (m *MockRuntimeConfig) UnsafeIsChainReplication() bool {
-	return false
-}

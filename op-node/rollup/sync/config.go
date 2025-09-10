@@ -22,8 +22,10 @@ const (
 	ELSyncString string = "execution-layer"
 )
 
-var Modes = []Mode{CLSync, ELSync}
-var ModeStrings = []string{CLSyncString, ELSyncString}
+var (
+	Modes       = []Mode{CLSync, ELSync}
+	ModeStrings = []string{CLSyncString, ELSyncString}
+)
 
 func StringToMode(s string) (Mode, error) {
 	switch strings.ToLower(s) {
