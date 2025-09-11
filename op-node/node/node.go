@@ -250,7 +250,7 @@ func (n *OpNode) initRegistry(ctx context.Context, cfg *Config) error {
 	}
 
 	// Initially fetch the current gateway + n gateways into the future
-	err = n.registrySource.FetchNextNGateways(ctx, 2, 3)
+	err = n.registrySource.FetchNextNGateways(ctx, 6, 3)
 	if err != nil {
 		return fmt.Errorf("failed to fetch initial gateways: %w", err)
 	}
@@ -261,7 +261,7 @@ func (n *OpNode) initRegistry(ctx context.Context, cfg *Config) error {
 			fetchCtx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 			defer cancel()
 
-			if err := n.registrySource.FetchNextNGateways(fetchCtx, 2, 3); err != nil {
+			if err := n.registrySource.FetchNextNGateways(fetchCtx, 6, 3); err != nil {
 				n.log.Warn("registry fetch error", "err", err)
 			}
 			time.Sleep(time.Second)
