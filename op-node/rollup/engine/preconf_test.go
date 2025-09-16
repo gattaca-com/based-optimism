@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/ethereum-optimism/optimism/op-node/metrics"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/google/go-cmp/cmp"
@@ -109,7 +110,7 @@ func seal() eth.SignedSeal {
 func TestInOrder(t *testing.T) {
 	// General setup
 	var m MockEngine
-	state := NewPreconfState(context.Background(), &m)
+	state := NewPreconfState(context.Background(), &m, *metrics.NewMetrics("test"))
 
 	// Data for the first block
 	e := env()
@@ -175,7 +176,7 @@ func TestInOrder(t *testing.T) {
 func TestFragSealOutOfOrder(t *testing.T) {
 	// General setup
 	var m MockEngine
-	state := NewPreconfState(context.Background(), &m)
+	state := NewPreconfState(context.Background(), &m, *metrics.NewMetrics("test"))
 
 	// Data for the first block. Same as the happy path.
 	e := env()
@@ -197,7 +198,7 @@ func TestFragSealOutOfOrder(t *testing.T) {
 func TestFragsOutOfOrder(t *testing.T) {
 	// General setup
 	var m MockEngine
-	state := NewPreconfState(context.Background(), &m)
+	state := NewPreconfState(context.Background(), &m, *metrics.NewMetrics("test"))
 
 	// Data for the first block. Same as the happy path.
 	e := env()
@@ -226,7 +227,7 @@ func TestFragsOutOfOrder(t *testing.T) {
 func TestSealBeforeLastFrag(t *testing.T) {
 	// General setup
 	var m MockEngine
-	state := NewPreconfState(context.Background(), &m)
+	state := NewPreconfState(context.Background(), &m, *metrics.NewMetrics("test"))
 
 	// Data for the first block
 	e := env()
@@ -264,7 +265,7 @@ func TestSealBeforeLastFrag(t *testing.T) {
 func TestEverythingOutOfOrderAllAtOnce(t *testing.T) {
 	// General setup
 	var m MockEngine
-	state := NewPreconfState(context.Background(), &m)
+	state := NewPreconfState(context.Background(), &m, *metrics.NewMetrics("test"))
 
 	// Data for the first block
 	e := env()
@@ -300,7 +301,7 @@ func TestEverythingOutOfOrderAllAtOnce(t *testing.T) {
 
 func TestPreconfGapSavedByL2Block(t *testing.T) {
 	var m MockEngine
-	state := NewPreconfState(context.Background(), &m)
+	state := NewPreconfState(context.Background(), &m, *metrics.NewMetrics("test"))
 
 	// Data for the first block
 	e := env()
@@ -364,7 +365,7 @@ func TestPreconfGapSavedByL2Block(t *testing.T) {
 
 func TestOldStuffIsPrunedAndNotSent(t *testing.T) {
 	var m MockEngine
-	state := NewPreconfState(context.Background(), &m)
+	state := NewPreconfState(context.Background(), &m, *metrics.NewMetrics("test"))
 
 	// Data for the first block
 	e := env()

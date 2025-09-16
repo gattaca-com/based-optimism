@@ -150,6 +150,11 @@ type Metrics struct {
 	// ProtocolVersions is pseudo-metric to report the exact protocol version info
 	ProtocolVersions *prometheus.GaugeVec
 
+	// Based metrics
+	BasedNewFrag               prometheus.Counter
+	BasedSealFrag              prometheus.Counter
+	BasedLastBlockWithAllFrags prometheus.Gauge
+
 	registry *prometheus.Registry
 	factory  metrics.Factory
 }
@@ -391,6 +396,23 @@ func NewMetrics(procName string) *Metrics {
 			"engine",
 			"recommended",
 			"required",
+		}),
+
+		// Based metrics
+		BasedNewFrag: factory.NewCounter(prometheus.CounterOpts{
+			Namespace: ns,
+			Name:      "based_new_frag",
+			Help:      "Number of new frags inserted into the execution engine",
+		}),
+		BasedSealFrag: factory.NewCounter(prometheus.CounterOpts{
+			Namespace: ns,
+			Name:      "based_seal_frag",
+			Help:      "Number of seal frags inserted into the execution engine",
+		}),
+		BasedLastBlockWithAllFrags: factory.NewGauge(prometheus.GaugeOpts{
+			Namespace: ns,
+			Name:      "based_last_block_with_all_frags",
+			Help:      "Block number of the last block with all frags inserted into the execution engine",
 		}),
 
 		AltDAMetrics: altda.MakeMetrics(ns, factory),

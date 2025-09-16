@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 
+	"github.com/ethereum-optimism/optimism/op-node/metrics"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 )
 
@@ -93,9 +94,10 @@ type PreconfState struct {
 	pendingSeals map[uint64]eth.SignedSeal
 	ctx          context.Context
 	e            ExecEngine
+	m            metrics.Metrics
 }
 
-func NewPreconfState(ctx context.Context, e ExecEngine) PreconfState {
+func NewPreconfState(ctx context.Context, e ExecEngine, m metrics.Metrics) PreconfState {
 	return PreconfState{
 		pendingEnvs:  make(map[uint64]eth.SignedEnv),
 		pendingFrags: make(map[FragIndex]eth.SignedNewFrag),
@@ -110,13 +112,14 @@ func NewPreconfState(ctx context.Context, e ExecEngine) PreconfState {
 		lastBlockPruned: 0,
 		ctx:             ctx,
 		e:               e,
+		m:               m,
 	}
 }
 
 // Builds the preconf channels and starts a concurrent preconf handler in a separate goroutine.
-func StartPreconf(ctx context.Context, e ExecEngine) PreconfChannels {
+func StartPreconf(ctx context.Context, e ExecEngine, m metrics.Metrics) PreconfChannels {
 	channels := NewPreconfChannels()
-	go preconfHandler(ctx, channels, e)
+	go preconfHandler(ctx, channels, e, m)
 	return channels
 }
 
@@ -150,10 +153,12 @@ func (s *PreconfState) putFrag(sFrag *eth.SignedNewFrag) {
 	if isFirst || previousSent {
 		s.lastFragSent.Set(idx)
 		s.e.NewFrag(s.ctx, sFrag)
+		s.m.BasedNewFrag.Inc()
 
 		// When a frag is sent we should check if the next is present or if the seal is present
 		if frag.IsLast {
 			s.lastBlockWithAllFrags.Set(idx.BlockNumber)
+			s.m.BasedLastBlockWithAllFrags.Set(float64(idx.BlockNumber))
 			nextSeal, ok := s.pendingSeals[idx.BlockNumber]
 			if ok {
 				delete(s.pendingSeals, idx.BlockNumber)
@@ -177,6 +182,8 @@ func (s *PreconfState) putSeal(sSeal *eth.SignedSeal) {
 	if s.lastBlockWithAllFrags.IsEqual(seal.BlockNumber) {
 		s.lastSealSent.Set(seal.BlockNumber)
 		s.e.SealFrag(s.ctx, sSeal)
+		s.m.BasedSealFrag.Inc()
+
 		// When we put a seal we should check if the env of the next is present.
 		nextEnv, ok := s.pendingEnvs[seal.BlockNumber+1]
 		if ok {
@@ -235,8 +242,8 @@ func (s *PreconfState) prune(currentBlock uint64) {
 // Listens for env, frag and seal events and updates the local state.
 // If the events are ready, they are sent to the engine api. If not, they are
 // saved in the local state as pending until they are.
-func preconfHandler(ctx context.Context, c PreconfChannels, e ExecEngine) {
-	state := NewPreconfState(ctx, e)
+func preconfHandler(ctx context.Context, c PreconfChannels, e ExecEngine, m metrics.Metrics) {
+	state := NewPreconfState(ctx, e, m)
 
 	for {
 		select {
