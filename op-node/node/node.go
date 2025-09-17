@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	gosync "sync"
 	"sync/atomic"
 	"time"
@@ -24,6 +23,7 @@ import (
 	"github.com/ethereum-optimism/optimism/op-node/metrics"
 	"github.com/ethereum-optimism/optimism/op-node/node/safedb"
 	"github.com/ethereum-optimism/optimism/op-node/p2p"
+	"github.com/ethereum-optimism/optimism/op-node/params"
 	"github.com/ethereum-optimism/optimism/op-node/rollup"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/conductor"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/driver"
@@ -623,7 +623,7 @@ func (n *OpNode) onEvent(ev event.Event) bool {
 
 func (n *OpNode) OnNewL1Head(ctx context.Context, sig eth.L1BlockRef) {
 	// CHANGE(thedevbirb): allow chain replication without deviation due to L1 state.
-	if _, ok := os.LookupEnv("BOP_REPLAY"); ok {
+	if params.BopReplay {
 		return
 	}
 	n.tracer.OnNewL1Head(ctx, sig)
@@ -641,7 +641,7 @@ func (n *OpNode) OnNewL1Head(ctx context.Context, sig eth.L1BlockRef) {
 
 func (n *OpNode) OnNewL1Safe(ctx context.Context, sig eth.L1BlockRef) {
 	// CHANGE(thedevbirb): allow chain replication without deviation due to L1 state.
-	if _, ok := os.LookupEnv("BOP_REPLAY"); ok {
+	if params.BopReplay {
 		return
 	}
 	if n.l2Driver == nil {
@@ -657,7 +657,7 @@ func (n *OpNode) OnNewL1Safe(ctx context.Context, sig eth.L1BlockRef) {
 
 func (n *OpNode) OnNewL1Finalized(ctx context.Context, sig eth.L1BlockRef) {
 	// CHANGE(thedevbirb): allow chain replication without deviation due to L1 state.
-	if _, ok := os.LookupEnv("BOP_REPLAY"); ok {
+	if params.BopReplay {
 		return
 	}
 	if n.l2Driver == nil {
@@ -795,8 +795,7 @@ func (n *OpNode) OnEnv(ctx context.Context, from peer.ID, env *eth.SignedEnv) er
 
 func (n *OpNode) RequestL2Range(ctx context.Context, start, end eth.L2BlockRef) error {
 	// CHANGE(thedevbirb): for chain replication, ignoring sending p2p syncing requests which may block the event loop.
-	_, isReplay := os.LookupEnv("BOP_REPLAY")
-	if p2pNode := n.getP2PNodeIfEnabled(); p2pNode != nil && p2pNode.AltSyncEnabled() && !isReplay {
+	if p2pNode := n.getP2PNodeIfEnabled(); p2pNode != nil && p2pNode.AltSyncEnabled() && !params.BopReplay {
 		if unixTimeStale(start.Time, 12*time.Hour) {
 			n.log.Debug(
 				"ignoring request to sync L2 range, timestamp is too old for p2p",

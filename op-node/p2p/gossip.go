@@ -7,7 +7,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"os"
 	"sync"
 	"time"
 
@@ -23,6 +22,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 
+	"github.com/ethereum-optimism/optimism/op-node/params"
 	"github.com/ethereum-optimism/optimism/op-node/rollup"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	opsigner "github.com/ethereum-optimism/optimism/op-service/signer"
@@ -476,7 +476,7 @@ func BuildBlocksValidator(log log.Logger, cfg *rollup.Config, runCfg GossipRunti
 		now := uint64(time.Now().Unix())
 
 		// CHANGE(thedevbirb): for chain replication, allow old blocks.
-		if _, ok := os.LookupEnv("BOP_REPLAY"); !ok {
+		if !params.BopReplay {
 			// [REJECT] if the `payload.timestamp` is older than 60 seconds in the past
 			if uint64(payload.Timestamp) < now-60 {
 				log.Warn("payload is too old", "timestamp", uint64(payload.Timestamp))
