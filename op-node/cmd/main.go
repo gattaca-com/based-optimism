@@ -18,6 +18,7 @@ import (
 	"github.com/ethereum-optimism/optimism/op-node/flags"
 	"github.com/ethereum-optimism/optimism/op-node/metrics"
 	"github.com/ethereum-optimism/optimism/op-node/node"
+	"github.com/ethereum-optimism/optimism/op-node/params"
 	"github.com/ethereum-optimism/optimism/op-node/version"
 	opservice "github.com/ethereum-optimism/optimism/op-service"
 	"github.com/ethereum-optimism/optimism/op-service/cliapp"
@@ -92,6 +93,11 @@ func RollupNodeMain(ctx *cli.Context, closeApp context.CancelCauseFunc) (cliapp.
 		log.Info("rollup config:\n" + cfg.Rollup.Description(chaincfg.L2ChainIDToNetworkDisplayName))
 	} else {
 		cfg.Rollup.LogDescription(log, chaincfg.L2ChainIDToNetworkDisplayName)
+	}
+
+	// CHANGE(thedevbirb): assess whether we're in chain replication mode at startup.
+	if _, ok := os.LookupEnv("BOP_REPLAY"); ok {
+		params.BopReplay = true
 	}
 
 	n, err := node.New(ctx.Context, cfg, log, VersionWithMeta, m)

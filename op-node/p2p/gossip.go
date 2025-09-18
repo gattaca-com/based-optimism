@@ -7,9 +7,10 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/ethereum/go-ethereum/crypto"
 	"sync"
 	"time"
+
+	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/golang/snappy"
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -21,6 +22,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 
+	"github.com/ethereum-optimism/optimism/op-node/params"
 	"github.com/ethereum-optimism/optimism/op-node/rollup"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	opsigner "github.com/ethereum-optimism/optimism/op-service/signer"
@@ -49,8 +51,10 @@ const (
 // Message domains, the msg id function uncompresses to keep data monomorphic,
 // but invalid compressed data will need a unique different id.
 
-var MessageDomainInvalidSnappy = [4]byte{0, 0, 0, 0}
-var MessageDomainValidSnappy = [4]byte{1, 0, 0, 0}
+var (
+	MessageDomainInvalidSnappy = [4]byte{0, 0, 0, 0}
+	MessageDomainValidSnappy   = [4]byte{1, 0, 0, 0}
+)
 
 type GossipSetupConfigurables interface {
 	PeerScoringParams() *ScoringParams
@@ -404,7 +408,6 @@ func verifyGatewaySignature(log log.Logger, signatureBytes []byte, messageBytes 
 }
 
 func BuildBlocksValidator(log log.Logger, cfg *rollup.Config, runCfg GossipRuntimeConfig, blockVersion eth.BlockVersion) pubsub.ValidatorEx {
-
 	// Seen block hashes per block height
 	// uint64 -> *seenBlocks
 	blockHeightLRU, err := lru.New[uint64, *seenBlocks](1000)
@@ -472,10 +475,13 @@ func BuildBlocksValidator(log log.Logger, cfg *rollup.Config, runCfg GossipRunti
 		// rounding down to seconds is fine here.
 		now := uint64(time.Now().Unix())
 
-		// [REJECT] if the `payload.timestamp` is older than 60 seconds in the past
-		if uint64(payload.Timestamp) < now-60 {
-			log.Warn("payload is too old", "timestamp", uint64(payload.Timestamp))
-			return pubsub.ValidationReject
+		// CHANGE(thedevbirb): for chain replication, allow old blocks.
+		if !params.BopReplay {
+			// [REJECT] if the `payload.timestamp` is older than 60 seconds in the past
+			if uint64(payload.Timestamp) < now-60 {
+				log.Warn("payload is too old", "timestamp", uint64(payload.Timestamp))
+				return pubsub.ValidationReject
+			}
 		}
 
 		// [REJECT] if the `payload.timestamp` is more than 5 seconds into the future
@@ -703,7 +709,7 @@ type publisher struct {
 var _ GossipOut = (*publisher)(nil)
 
 func combinePeers(allPeers ...[]peer.ID) []peer.ID {
-	var seen = make(map[peer.ID]bool)
+	seen := make(map[peer.ID]bool)
 	var res []peer.ID
 	for _, peers := range allPeers {
 		for _, p := range peers {
@@ -933,7 +939,6 @@ func newNewFragTopic(ctx context.Context, topicId string, ps *pubsub.PubSub, log
 		validator,
 		pubsub.WithValidatorTimeout(3*time.Second),
 		pubsub.WithValidatorConcurrency(4))
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to register gossip topic: %w", err)
 	}
@@ -971,7 +976,6 @@ func sealFragFragTopic(ctx context.Context, topicId string, ps *pubsub.PubSub, l
 		validator,
 		pubsub.WithValidatorTimeout(3*time.Second),
 		pubsub.WithValidatorConcurrency(4))
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to register gossip topic: %w", err)
 	}
@@ -1009,7 +1013,6 @@ func newEnvTopic(ctx context.Context, topicId string, ps *pubsub.PubSub, log log
 		validator,
 		pubsub.WithValidatorTimeout(3*time.Second),
 		pubsub.WithValidatorConcurrency(4))
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to register gossip topic: %w", err)
 	}
@@ -1047,7 +1050,6 @@ func newBlockTopic(ctx context.Context, topicId string, ps *pubsub.PubSub, log l
 		validator,
 		pubsub.WithValidatorTimeout(3*time.Second),
 		pubsub.WithValidatorConcurrency(4))
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to register gossip topic: %w", err)
 	}
@@ -1080,8 +1082,10 @@ func newBlockTopic(ctx context.Context, topicId string, ps *pubsub.PubSub, log l
 	}, nil
 }
 
-type TopicSubscriber func(ctx context.Context, sub *pubsub.Subscription)
-type MessageHandler func(ctx context.Context, from peer.ID, msg any) error
+type (
+	TopicSubscriber func(ctx context.Context, sub *pubsub.Subscription)
+	MessageHandler  func(ctx context.Context, from peer.ID, msg any) error
+)
 
 func NewFragHandler(onNewFrag func(ctx context.Context, from peer.ID, msg *eth.SignedNewFrag) error) MessageHandler {
 	return func(ctx context.Context, from peer.ID, msg any) error {

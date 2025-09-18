@@ -23,6 +23,7 @@ import (
 	"github.com/ethereum-optimism/optimism/op-node/metrics"
 	"github.com/ethereum-optimism/optimism/op-node/node/safedb"
 	"github.com/ethereum-optimism/optimism/op-node/p2p"
+	"github.com/ethereum-optimism/optimism/op-node/params"
 	"github.com/ethereum-optimism/optimism/op-node/rollup"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/conductor"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/driver"
@@ -249,7 +250,7 @@ func (n *OpNode) initRegistry(ctx context.Context, cfg *Config) error {
 	}
 
 	// Initially fetch the current gateway + n gateways into the future
-	err = n.registrySource.FetchNextNGateways(ctx, 2, 3)
+	err = n.registrySource.FetchNextNGateways(ctx, 6, 3)
 	if err != nil {
 		return fmt.Errorf("failed to fetch initial gateways: %w", err)
 	}
@@ -260,7 +261,7 @@ func (n *OpNode) initRegistry(ctx context.Context, cfg *Config) error {
 			fetchCtx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 			defer cancel()
 
-			if err := n.registrySource.FetchNextNGateways(fetchCtx, 2, 3); err != nil {
+			if err := n.registrySource.FetchNextNGateways(fetchCtx, 6, 3); err != nil {
 				n.log.Warn("registry fetch error", "err", err)
 			}
 			time.Sleep(time.Second)
@@ -621,6 +622,10 @@ func (n *OpNode) onEvent(ev event.Event) bool {
 }
 
 func (n *OpNode) OnNewL1Head(ctx context.Context, sig eth.L1BlockRef) {
+	// CHANGE(thedevbirb): allow chain replication without deviation due to L1 state.
+	if params.BopReplay {
+		return
+	}
 	n.tracer.OnNewL1Head(ctx, sig)
 
 	if n.l2Driver == nil {
@@ -635,6 +640,10 @@ func (n *OpNode) OnNewL1Head(ctx context.Context, sig eth.L1BlockRef) {
 }
 
 func (n *OpNode) OnNewL1Safe(ctx context.Context, sig eth.L1BlockRef) {
+	// CHANGE(thedevbirb): allow chain replication without deviation due to L1 state.
+	if params.BopReplay {
+		return
+	}
 	if n.l2Driver == nil {
 		return
 	}
@@ -647,6 +656,10 @@ func (n *OpNode) OnNewL1Safe(ctx context.Context, sig eth.L1BlockRef) {
 }
 
 func (n *OpNode) OnNewL1Finalized(ctx context.Context, sig eth.L1BlockRef) {
+	// CHANGE(thedevbirb): allow chain replication without deviation due to L1 state.
+	if params.BopReplay {
+		return
+	}
 	if n.l2Driver == nil {
 		return
 	}
@@ -689,7 +702,6 @@ func (n *OpNode) PublishNewFrag(ctx context.Context, from peer.ID, frag *eth.Sig
 }
 
 func (n *OpNode) PublishSealFrag(ctx context.Context, from peer.ID, seal *eth.SignedSeal) error {
-
 	n.tracer.OnPublishSealFrag(ctx, from, seal)
 
 	// publish to p2p, if we are running p2p at all
@@ -705,7 +717,6 @@ func (n *OpNode) PublishSealFrag(ctx context.Context, from peer.ID, seal *eth.Si
 }
 
 func (n *OpNode) PublishEnv(ctx context.Context, from peer.ID, env *eth.SignedEnv) error {
-
 	n.tracer.OnPublishEnv(ctx, from, env)
 
 	// publish to p2p, if we are running p2p at all
@@ -783,7 +794,8 @@ func (n *OpNode) OnEnv(ctx context.Context, from peer.ID, env *eth.SignedEnv) er
 }
 
 func (n *OpNode) RequestL2Range(ctx context.Context, start, end eth.L2BlockRef) error {
-	if p2pNode := n.getP2PNodeIfEnabled(); p2pNode != nil && p2pNode.AltSyncEnabled() {
+	// CHANGE(thedevbirb): for chain replication, ignoring sending p2p syncing requests which may block the event loop.
+	if p2pNode := n.getP2PNodeIfEnabled(); p2pNode != nil && p2pNode.AltSyncEnabled() && !params.BopReplay {
 		if unixTimeStale(start.Time, 12*time.Hour) {
 			n.log.Debug(
 				"ignoring request to sync L2 range, timestamp is too old for p2p",

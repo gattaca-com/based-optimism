@@ -85,7 +85,7 @@ func NewConfig(ctx *cli.Context, log log.Logger) (*node.Config, error) {
 	conductorRPCEndpoint := ctx.String(flags.ConductorRpcFlag.Name)
 	cfg := &node.Config{
 		L1:            l1Endpoint,
-		Registry:   registryEndpoint,
+		Registry:      registryEndpoint,
 		L2:            l2Endpoint,
 		Rollup:        *rollupConfig,
 		Driver:        *driverConfig,
