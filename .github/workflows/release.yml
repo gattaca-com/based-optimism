@@ -24,7 +24,7 @@ jobs:
             runner: ubuntu-24.04-arm
       fail-fast: false
 
-    name: Build & Push op-node (${{ matrix.platform.arch }})
+    name: Build & Push op services (${{ matrix.platform.arch }})
     runs-on: ${{ matrix.platform.runner }}
     env:
       IMAGE_REG: ghcr.io/gattaca-com/based-optimism
@@ -48,13 +48,11 @@ jobs:
           # Extract tag name (remove refs/tags/ prefix)
           TAG_NAME=${GITHUB_REF#refs/tags/}
           echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
-
           # Extract git commit and date
           GIT_COMMIT=$(git rev-parse HEAD)
           GIT_DATE=$(git log -1 --format=%ct)
           echo "git_commit=$GIT_COMMIT" >> $GITHUB_OUTPUT
           echo "git_date=$GIT_DATE" >> $GITHUB_OUTPUT
-
       - name: Build & Push op-node
         run: |
           IMAGE_TAGS=${{ steps.meta.outputs.tag_name }}-${{ matrix.platform.arch }},${{ !contains(github.ref_name, 'rc') && format('latest-{0}', matrix.platform.arch) || '' }} \
@@ -68,7 +66,6 @@ jobs:
             -f docker-bake.hcl \
             --push \
             op-node
-
       - name: Build & Push op-deployer
         run: |
           IMAGE_TAGS=${{ steps.meta.outputs.tag_name }}-${{ matrix.platform.arch }},${{ !contains(github.ref_name, 'rc') && format('latest-{0}', matrix.platform.arch) || '' }} \
@@ -82,40 +79,38 @@ jobs:
             -f docker-bake.hcl \
             --push \
             op-deployer
+  create-manifest:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        image:
+          - op-node
+          - op-deployer
 
+    env:
+      IMAGE_REG: ghcr.io/${{ github.repository }}
 
-    create-manifest:
-      needs: build-and-push
-      runs-on: ubuntu-latest
-      strategy:
-        matrix:
-          image:
-            - based-op-node
-            - based-op-deployer
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      env:
-        IMAGE_REG: ghcr.io/${{ github.repository }}
-
-      steps:
-        - uses: docker/login-action@v3
-          with:
-            registry: ghcr.io
-            username: ${{ github.actor }}
-            password: ${{ secrets.GITHUB_TOKEN }}
-
-        - name: Create & Push Multi-Arch Manifests
-          run: |
-            ghcr="ghcr.io/${{ github.repository }}"
-            tag="${{ github.ref_name }}"
-            name="${{ matrix.image }}"
-            # Use buildx imagetools to create multi-arch manifest
+      - name: Create & Push Multi-Arch Manifests
+        run: |
+          ghcr="ghcr.io/${{ github.repository }}"
+          tag="${{ github.ref_name }}"
+          name="${{ matrix.image }}"
+          # Use buildx imagetools to create multi-arch manifest
+          docker buildx imagetools create \
+            --tag $ghcr/based-$name:$tag \
+            $ghcr/$name:$tag-amd64 \
+            $ghcr/$name:$tag-arm64
+          if [[ ! "$tag" =~ "rc" ]]; then
             docker buildx imagetools create \
-              --tag $ghcr/$name:$tag \
-              $ghcr/$name:$tag-amd64 \
-              $ghcr/$name:$tag-arm64
-            if [[ ! "$tag" =~ "rc" ]]; then
-              docker buildx imagetools create \
-                --tag $ghcr/$name:latest \
-                $ghcr/$name:latest-amd64 \
-                $ghcr/$name:latest-arm64
-            fi
+              --tag $ghcr/based-$name:latest \
+              $ghcr/$name:latest-amd64 \
+              $ghcr/$name:latest-arm64
+          fi
