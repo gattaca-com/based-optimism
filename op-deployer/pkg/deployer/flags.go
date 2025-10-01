@@ -25,6 +25,7 @@ const (
 	PrivateKeyFlagName       = "private-key"
 	IntentTypeFlagName       = "intent-type"
 	EtherscanAPIKeyFlagName  = "etherscan-api-key"
+	EtherscanUrlFlagName     = "etherscan-url"
 	InputFileFlagName        = "input-file"
 	ContractNameFlagName     = "contract-name"
 )
@@ -138,6 +139,12 @@ var (
 		EnvVars:  PrefixEnvVar("ETHERSCAN_API_KEY"),
 		Required: true,
 	}
+	EtherscanUrlFlag = &cli.StringFlag{
+		Name:     EtherscanUrlFlagName,
+		Usage:    "etherscan URL for contract verification. if empty, only mainnet & sepolia chain IDs supported.",
+		EnvVars:  PrefixEnvVar("ETHERSCAN_API_URL"),
+		Required: false,
+	}
 	InputFileFlag = &cli.StringFlag{
 		Name:    InputFileFlagName,
 		Usage:   "filepath of input file for command",
@@ -177,6 +184,7 @@ var VerifyFlags = []cli.Flag{
 	L1RPCURLFlag,
 	ArtifactsLocatorFlag,
 	EtherscanAPIKeyFlag,
+	EtherscanUrlFlag,
 	InputFileFlag,
 	ContractNameFlag,
 }

@@ -30,10 +30,20 @@ type Verifier struct {
 	numFailed   int
 }
 
-func NewVerifier(apiKey string, l1ChainID uint64, artifactsFS foundry.StatDirFs, l log.Logger, l1Client *ethclient.Client) (*Verifier, error) {
-	etherscanUrl, err := getAPIEndpoint(l1ChainID)
-	if err != nil {
-		return nil, fmt.Errorf("unsupported L1 chain ID: %d", l1ChainID)
+func NewVerifier(
+	apiKey string,
+	l1ChainID uint64,
+	artifactsFS foundry.StatDirFs,
+	l log.Logger,
+	l1Client *ethclient.Client,
+	etherscanUrl string,
+) (*Verifier, error) {
+	if len(etherscanUrl) == 0 {
+		var err error
+		etherscanUrl, err = getAPIEndpoint(l1ChainID)
+		if err != nil {
+			return nil, fmt.Errorf("unsupported L1 chain ID: %d", l1ChainID)
+		}
 	}
 
 	etherscan := NewEtherscanClient(apiKey, etherscanUrl, rate.NewLimiter(rate.Limit(3), 2))
@@ -93,7 +103,8 @@ func VerifyCLI(cliCtx *cli.Context) error {
 	}
 	l.Info("Downloaded artifacts", "path", artifactsFS)
 
-	v, err := NewVerifier(etherscanAPIKey, l1ChainId, artifactsFS, l, l1Client)
+	etherscanUrl := cliCtx.String(deployer.EtherscanUrlFlagName)
+	v, err := NewVerifier(etherscanAPIKey, l1ChainId, artifactsFS, l, l1Client, etherscanUrl)
 	if err != nil {
 		return fmt.Errorf("failed to create verifier: %w", err)
 	}
