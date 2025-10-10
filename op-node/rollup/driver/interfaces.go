@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-service/event"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 type Metrics interface {
@@ -99,6 +100,9 @@ type SyncStatusTracker interface {
 type Network interface {
 	// SignAndPublishL2Payload is called by the driver whenever there is a new payload to publish, synchronously with the driver main loop.
 	SignAndPublishL2Payload(ctx context.Context, payload *eth.ExecutionPayloadEnvelope) error
+	PublishNewFrag(ctx context.Context, from peer.ID, frag *eth.SignedNewFrag) error
+	PublishSealFrag(ctx context.Context, from peer.ID, seal *eth.SignedSeal) error
+	PublishEnv(ctx context.Context, from peer.ID, env *eth.SignedEnv) error
 }
 
 type AltSync interface {

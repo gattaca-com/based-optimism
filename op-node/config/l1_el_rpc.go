@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 
+	"github.com/ethereum-optimism/optimism/op-node/rollup"
 	"github.com/ethereum-optimism/optimism/op-service/client"
 	opmetrics "github.com/ethereum-optimism/optimism/op-service/metrics"
 	"github.com/ethereum-optimism/optimism/op-service/sources"
@@ -18,6 +19,11 @@ type L1EndpointSetup interface {
 	// The results of the RPC client may be trusted for faster processing, or strictly validated.
 	// The kind of the RPC may be non-basic, to optimize RPC usage.
 	Setup(ctx context.Context, log log.Logger, defaultCacheSize int, metrics opmetrics.RPCMetricer) (cl client.RPC, rpcCfg *sources.L1ClientConfig, err error)
+	Check() error
+}
+
+type RegistryEndpointSetup interface {
+	Setup(ctx context.Context, log log.Logger, rollupCfg *rollup.Config, metrics opmetrics.RPCMetricer) (cl client.RPC, rpcCfg *sources.EthClientConfig, err error)
 	Check() error
 }
 
@@ -96,6 +102,57 @@ func (cfg *L1EndpointConfig) Setup(ctx context.Context, log log.Logger, defaultC
 	l1Cfg.MaxRequestsPerBatch = cfg.BatchSize
 	l1Cfg.MaxConcurrentRequests = cfg.MaxConcurrency
 	return l1RPC, l1Cfg, nil
+}
+
+type RegistryEndpointConfig struct {
+	RegistryNodeAddr string // Address of Registry JSON-RPC endpoint to use (registry namespace required)
+
+	// RateLimit specifies a self-imposed rate-limit on Registry requests. 0 is no rate-limit.
+	RateLimit float64
+
+	// BatchSize specifies the maximum batch-size, which also applies as Registry rate-limit burst amount (if set).
+	BatchSize int
+
+	// MaxConcurrency specifies the maximum number of concurrent requests to the Registry RPC.
+	MaxConcurrency int
+
+	HttpPollInterval time.Duration
+}
+
+var _ RegistryEndpointSetup = (*RegistryEndpointConfig)(nil)
+
+func (cfg *RegistryEndpointConfig) Check() error {
+	if cfg.BatchSize < 1 || cfg.BatchSize > 500 {
+		return fmt.Errorf("batch size is invalid or unreasonable: %d", cfg.BatchSize)
+	}
+	if cfg.RateLimit < 0 {
+		return fmt.Errorf("rate limit cannot be negative")
+	}
+	if cfg.MaxConcurrency < 1 {
+		return fmt.Errorf("max concurrent requests cannot be less than 1, was %d", cfg.MaxConcurrency)
+	}
+	return nil
+}
+
+func (cfg *RegistryEndpointConfig) Setup(ctx context.Context, log log.Logger, rollupCfg *rollup.Config, metrics opmetrics.RPCMetricer) (client.RPC, *sources.EthClientConfig, error) {
+	opts := []client.RPCOption{
+		client.WithHttpPollInterval(cfg.HttpPollInterval),
+		client.WithDialAttempts(10),
+		client.WithRPCRecorder(metrics.NewRecorder("registry")),
+	}
+	if cfg.RateLimit != 0 {
+		opts = append(opts, client.WithRateLimit(cfg.RateLimit, cfg.BatchSize))
+	}
+
+	registryNode, err := client.NewRPC(ctx, log, cfg.RegistryNodeAddr, opts...)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to dial registry address (%s): %w", cfg.RegistryNodeAddr, err)
+	}
+
+	rpcCfg := sources.RegistryClientDefaultConfig(rollupCfg, sources.RPCKindAny)
+	rpcCfg.MaxRequestsPerBatch = cfg.BatchSize
+	rpcCfg.MaxConcurrentRequests = cfg.MaxConcurrency
+	return registryNode, rpcCfg, nil
 }
 
 // PreparedL1Endpoint enables testing with an in-process pre-setup RPC connection to L1
