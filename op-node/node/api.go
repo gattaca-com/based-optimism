@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/backend/depset"
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -14,11 +16,13 @@ import (
 	"github.com/ethereum-optimism/optimism/op-node/node/safedb"
 	"github.com/ethereum-optimism/optimism/op-node/p2p"
 	"github.com/ethereum-optimism/optimism/op-node/rollup"
+	"github.com/ethereum-optimism/optimism/op-node/rollup/engine"
 	"github.com/ethereum-optimism/optimism/op-node/version"
 	"github.com/ethereum-optimism/optimism/op-service/apis"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-service/rpc"
 	"github.com/ethereum-optimism/optimism/op-service/sources"
+	opsigner "github.com/ethereum-optimism/optimism/op-service/signer"
 )
 
 type l2EthClient interface {
@@ -36,7 +40,7 @@ type driverClient interface {
 	StartSequencer(ctx context.Context, blockHash common.Hash) error
 	StopSequencer(context.Context) (common.Hash, error)
 	SequencerActive(context.Context) (bool, error)
-	OnUnsafeL2Payload(ctx context.Context, payload *eth.ExecutionPayloadEnvelope) error
+	OnUnsafeL2Payload(ctx context.Context, payload *eth.ExecutionPayloadEnvelope)
 	OverrideLeader(ctx context.Context) error
 	ConductorEnabled(ctx context.Context) (bool, error)
 	SetRecoverMode(ctx context.Context, mode bool) error
@@ -84,8 +88,8 @@ func (n *adminAPI) PostUnsafePayload(ctx context.Context, envelope *eth.Executio
 		log.Error("payload has bad block hash", "bad_hash", payload.BlockHash.String(), "actual", actual.String())
 		return fmt.Errorf("payload has bad block hash: %s, actual block hash is: %s", payload.BlockHash.String(), actual.String())
 	}
-
-	return n.dr.OnUnsafeL2Payload(ctx, envelope)
+	n.dr.OnUnsafeL2Payload(ctx, envelope)
+	return nil
 }
 
 // OverrideLeader disables sequencer conductor interactions and allow sequencer to run in non-HA mode during disaster recovery scenarios.
@@ -104,6 +108,7 @@ func (n *adminAPI) SetRecoverMode(ctx context.Context, mode bool) error {
 
 type nodeAPI struct {
 	config *rollup.Config
+	depSet depset.DependencySet
 	client l2EthClient
 	dr     driverClient
 	safeDB SafeDBReader
@@ -112,9 +117,10 @@ type nodeAPI struct {
 
 var _ apis.RollupNodeServer = (*nodeAPI)(nil)
 
-func NewNodeAPI(config *rollup.Config, l2Client l2EthClient, dr driverClient, safeDB SafeDBReader, log log.Logger) *nodeAPI {
+func NewNodeAPI(config *rollup.Config, depSet depset.DependencySet, l2Client l2EthClient, dr driverClient, safeDB SafeDBReader, log log.Logger) *nodeAPI {
 	return &nodeAPI{
 		config: config,
+		depSet: depSet,
 		client: l2Client,
 		dr:     dr,
 		safeDB: safeDB,
@@ -163,6 +169,13 @@ func (n *nodeAPI) SyncStatus(ctx context.Context) (*eth.SyncStatus, error) {
 
 func (n *nodeAPI) RollupConfig(_ context.Context) (*rollup.Config, error) {
 	return n.config, nil
+}
+
+func (n *nodeAPI) DependencySet(_ context.Context) (depset.DependencySet, error) {
+	if n.depSet != nil {
+		return n.depSet, nil
+	}
+	return nil, ethereum.NotFound
 }
 
 func (n *nodeAPI) Version(ctx context.Context) (string, error) {
@@ -279,4 +292,34 @@ func (n *basedAPI) Env(ctx context.Context, signedEnv eth.SignedEnv) (string, er
 	}
 
 	return "OK", nil
+type opstackAPI struct {
+	engine    engine.RollupAPI
+	publisher apis.PublishAPI
+}
+
+func NewOpstackAPI(eng engine.RollupAPI, publisher apis.PublishAPI) *opstackAPI {
+	return &opstackAPI{
+		engine:    eng,
+		publisher: publisher,
+	}
+}
+
+func (a *opstackAPI) OpenBlockV1(ctx context.Context, parent eth.BlockID, attrs *eth.PayloadAttributes) (eth.PayloadInfo, error) {
+	return a.engine.OpenBlock(ctx, parent, attrs)
+}
+
+func (a *opstackAPI) CancelBlockV1(ctx context.Context, id eth.PayloadInfo) error {
+	return a.engine.CancelBlock(ctx, id)
+}
+
+func (a *opstackAPI) SealBlockV1(ctx context.Context, id eth.PayloadInfo) (*eth.ExecutionPayloadEnvelope, error) {
+	return a.engine.SealBlock(ctx, id)
+}
+
+func (a *opstackAPI) CommitBlockV1(ctx context.Context, envelope *opsigner.SignedExecutionPayloadEnvelope) error {
+	return a.engine.CommitBlock(ctx, envelope)
+}
+
+func (a *opstackAPI) PublishBlockV1(ctx context.Context, signed *opsigner.SignedExecutionPayloadEnvelope) error {
+	return a.publisher.PublishBlock(ctx, signed)
 }

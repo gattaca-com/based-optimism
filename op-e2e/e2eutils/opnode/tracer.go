@@ -5,7 +5,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 
-	"github.com/ethereum-optimism/optimism/op-node/node"
+	"github.com/ethereum-optimism/optimism/op-node/node/tracer"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 )
 
@@ -75,4 +75,4 @@ func (n *FnTracer) OnPublishEnv(ctx context.Context, from peer.ID, env *eth.Sign
 	}
 }
 
-var _ node.Tracer = (*FnTracer)(nil)
+var _ tracer.Tracer = (*FnTracer)(nil)

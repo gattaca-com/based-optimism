@@ -9,6 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/params"
 
 	"github.com/ethereum-optimism/optimism/op-node/rollup"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
@@ -96,14 +97,14 @@ type DerivationPipeline struct {
 }
 
 // NewDerivationPipeline creates a DerivationPipeline, to turn L1 data into L2 block-inputs.
-func NewDerivationPipeline(log log.Logger, rollupCfg *rollup.Config, l1Fetcher L1Fetcher, l1Blobs L1BlobsFetcher,
-	altDA AltDAInputFetcher, l2Source L2Source, metrics Metrics, managedMode bool,
+func NewDerivationPipeline(log log.Logger, rollupCfg *rollup.Config, depSet DependencySet, l1Fetcher L1Fetcher, l1Blobs L1BlobsFetcher,
+	altDA AltDAInputFetcher, l2Source L2Source, metrics Metrics, managedBySupervisor bool, l1ChainConfig *params.ChainConfig,
 ) *DerivationPipeline {
 	spec := rollup.NewChainSpec(rollupCfg)
 	// Stages are strung together into a pipeline,
 	// results are pulled from the stage closed to the L2 engine, which pulls from the previous stage, and so on.
 	var l1Traversal l1TraversalStage
-	if managedMode {
+	if managedBySupervisor {
 		l1Traversal = NewL1TraversalManaged(log, rollupCfg, l1Fetcher)
 	} else {
 		l1Traversal = NewL1Traversal(log, rollupCfg, l1Fetcher)
@@ -114,7 +115,7 @@ func NewDerivationPipeline(log log.Logger, rollupCfg *rollup.Config, l1Fetcher L
 	channelMux := NewChannelMux(log, spec, frameQueue, metrics)
 	chInReader := NewChannelInReader(rollupCfg, log, channelMux, metrics)
 	batchMux := NewBatchMux(log, rollupCfg, chInReader, l2Source)
-	attrBuilder := NewFetchingAttributesBuilder(rollupCfg, l1Fetcher, l2Source)
+	attrBuilder := NewFetchingAttributesBuilder(rollupCfg, l1ChainConfig, depSet, l1Fetcher, l2Source)
 	attributesQueue := NewAttributesQueue(log, rollupCfg, attrBuilder, batchMux)
 
 	// Reset from ResetEngine then up from L1 Traversal. The stages do not talk to each other during
@@ -139,7 +140,8 @@ func NewDerivationPipeline(log log.Logger, rollupCfg *rollup.Config, l1Fetcher L
 // DerivationReady returns true if the derivation pipeline is ready to be used.
 // When it's being reset its state is inconsistent, and should not be used externally.
 func (dp *DerivationPipeline) DerivationReady() bool {
-	return dp.engineIsReset && dp.resetting > 0
+	// Ready only when the engine has been confirmed reset and all stages finished resetting
+	return dp.engineIsReset && dp.resetting >= len(dp.stages)
 }
 
 func (dp *DerivationPipeline) Reset() {
@@ -277,7 +279,7 @@ func (dp *DerivationPipeline) initialReset(ctx context.Context, resetL2Safe eth.
 
 func (db *DerivationPipeline) transformStages(oldOrigin, newOrigin eth.L1BlockRef) {
 	fork := db.rollupCfg.IsActivationBlock(oldOrigin.Time, newOrigin.Time)
-	if fork == "" {
+	if fork == rollup.None {
 		return
 	}
 

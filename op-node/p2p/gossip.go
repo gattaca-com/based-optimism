@@ -60,6 +60,8 @@ type GossipSetupConfigurables interface {
 	PeerScoringParams() *ScoringParams
 	// ConfigureGossip creates configuration options to apply to the GossipSub setup
 	ConfigureGossip(rollupCfg *rollup.Config) []pubsub.Option
+	// GetGossipTimestampThreshold returns the threshold for rejecting gossip messages with old timestamps
+	GetGossipTimestampThreshold() time.Duration
 }
 
 type GossipRuntimeConfig interface {
@@ -299,7 +301,7 @@ const (
 	EnvV0 EnvVersion = iota
 )
 
-func BuildNewFragValidator(log log.Logger, cfg *rollup.Config, runCfg GossipRuntimeConfig, newFragVersion NewFragVersion) pubsub.ValidatorEx {
+func BuildBlocksValidator(log log.Logger, cfg *rollup.Config, runCfg GossipRuntimeConfig, blockVersion eth.BlockVersion, gossipConf GossipSetupConfigurables) pubsub.ValidatorEx {
 	return func(ctx context.Context, id peer.ID, message *pubsub.Message) pubsub.ValidationResult {
 		var signedFrag eth.SignedNewFrag
 
@@ -478,8 +480,9 @@ func BuildBlocksValidator(log log.Logger, cfg *rollup.Config, runCfg GossipRunti
 		// CHANGE(thedevbirb): for chain replication, allow old blocks.
 		if !params.BopReplay {
 			// [REJECT] if the `payload.timestamp` is older than 60 seconds in the past
+			threshold := uint64(gossipConf.GetGossipTimestampThreshold().Seconds())
 			if uint64(payload.Timestamp) < now-60 {
-				log.Warn("payload is too old", "timestamp", uint64(payload.Timestamp))
+				log.Warn("payload is too old", "timestamp", uint64(payload.Timestamp), "threshold_seconds", threshold)
 				return pubsub.ValidationReject
 			}
 		}
@@ -860,11 +863,11 @@ func (p *publisher) Close() error {
 	return errors.Join(e1, e2)
 }
 
-func JoinGossip(self peer.ID, ps *pubsub.PubSub, log log.Logger, cfg *rollup.Config, runCfg GossipRuntimeConfig, gossipIn GossipIn) (GossipOut, error) {
+func JoinGossip(self peer.ID, ps *pubsub.PubSub, log log.Logger, cfg *rollup.Config, runCfg GossipRuntimeConfig, gossipIn GossipIn, gossipConf GossipSetupConfigurables) (GossipOut, error) {
 	p2pCtx, p2pCancel := context.WithCancel(context.Background())
 
 	v1Logger := log.New("topic", "blocksV1")
-	blocksV1Validator := guardGossipValidator(log, logValidationResult(self, "validated blockv1", v1Logger, BuildBlocksValidator(v1Logger, cfg, runCfg, eth.BlockV1)))
+	blocksV1Validator := guardGossipValidator(log, logValidationResult(self, "validated blockv1", v1Logger, BuildBlocksValidator(v1Logger, cfg, runCfg, eth.BlockV1, gossipConf)))
 	blocksV1, err := newBlockTopic(p2pCtx, blocksTopicV1(cfg), ps, v1Logger, gossipIn, blocksV1Validator)
 	if err != nil {
 		p2pCancel()
@@ -872,7 +875,7 @@ func JoinGossip(self peer.ID, ps *pubsub.PubSub, log log.Logger, cfg *rollup.Con
 	}
 
 	v2Logger := log.New("topic", "blocksV2")
-	blocksV2Validator := guardGossipValidator(log, logValidationResult(self, "validated blockv2", v2Logger, BuildBlocksValidator(v2Logger, cfg, runCfg, eth.BlockV2)))
+	blocksV2Validator := guardGossipValidator(log, logValidationResult(self, "validated blockv2", v2Logger, BuildBlocksValidator(v2Logger, cfg, runCfg, eth.BlockV2, gossipConf)))
 	blocksV2, err := newBlockTopic(p2pCtx, blocksTopicV2(cfg), ps, v2Logger, gossipIn, blocksV2Validator)
 	if err != nil {
 		p2pCancel()
@@ -880,7 +883,7 @@ func JoinGossip(self peer.ID, ps *pubsub.PubSub, log log.Logger, cfg *rollup.Con
 	}
 
 	v3Logger := log.New("topic", "blocksV3")
-	blocksV3Validator := guardGossipValidator(log, logValidationResult(self, "validated blockv3", v3Logger, BuildBlocksValidator(v3Logger, cfg, runCfg, eth.BlockV3)))
+	blocksV3Validator := guardGossipValidator(log, logValidationResult(self, "validated blockv3", v3Logger, BuildBlocksValidator(v3Logger, cfg, runCfg, eth.BlockV3, gossipConf)))
 	blocksV3, err := newBlockTopic(p2pCtx, blocksTopicV3(cfg), ps, v3Logger, gossipIn, blocksV3Validator)
 	if err != nil {
 		p2pCancel()
@@ -888,7 +891,7 @@ func JoinGossip(self peer.ID, ps *pubsub.PubSub, log log.Logger, cfg *rollup.Con
 	}
 
 	v4Logger := log.New("topic", "blocksV4")
-	blocksV4Validator := guardGossipValidator(log, logValidationResult(self, "validated blockv4", v4Logger, BuildBlocksValidator(v4Logger, cfg, runCfg, eth.BlockV4)))
+	blocksV4Validator := guardGossipValidator(log, logValidationResult(self, "validated blockv4", v4Logger, BuildBlocksValidator(v4Logger, cfg, runCfg, eth.BlockV4, gossipConf)))
 	blocksV4, err := newBlockTopic(p2pCtx, blocksTopicV4(cfg), ps, v4Logger, gossipIn, blocksV4Validator)
 	if err != nil {
 		p2pCancel()
