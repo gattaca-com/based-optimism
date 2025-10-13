@@ -696,6 +696,8 @@ func (e *EngineController) OnEvent(ctx context.Context, ev event.Event) bool {
 		if !e.rollupCfg.IsInterop(x.Ref.Time) {
 			e.emitter.Emit(ctx, PromoteCrossUnsafeEvent(x))
 		}
+		log.Debug("sending L2Block to preconf", "number", x.Ref.Number)
+		e.preconfChannels.SendL2Block(&x.Ref)
 		// Try to apply the forkchoice changes
 		e.tryUpdateEngine(ctx)
 	case PromoteCrossUnsafeEvent:
@@ -800,6 +802,8 @@ func (e *EngineController) tryUpdateUnsafe(ctx context.Context, ref eth.L2BlockR
 }
 
 func (e *EngineController) PromoteSafe(ctx context.Context, ref eth.L2BlockRef, source eth.L1BlockRef) {
+	log.Debug("sending L2Block to preconf", "number", ref.Number)
+	e.preconfChannels.SendL2Block(&ref)
 	e.log.Debug("Updating safe", "safe", ref, "unsafe", e.unsafeHead)
 	e.SetSafeHead(ref)
 	// Finalizer can pick up this safe cross-block now
