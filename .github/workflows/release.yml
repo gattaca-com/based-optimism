@@ -55,7 +55,7 @@ jobs:
           echo "git_date=$GIT_DATE" >> $GITHUB_OUTPUT
       - name: Build & Push op-node
         run: |
-          IMAGE_TAGS=${{ steps.meta.outputs.tag_name }}-${{ matrix.platform.arch }},${{ !contains(github.ref_name, 'rc') && format('latest-{0}', matrix.platform.arch) || '' }} \
+          IMAGE_TAGS=${{ steps.meta.outputs.tag_name }}-${{ matrix.platform.arch }}${{ !contains(github.ref_name, 'rc') && format(',latest-{0}', matrix.platform.arch) || '' }} \
           GIT_COMMIT=${{ steps.meta.outputs.git_commit }} \
           GIT_DATE=${{ steps.meta.outputs.git_date }} \
           GIT_VERSION=${{ steps.meta.outputs.tag_name }} \
@@ -68,7 +68,7 @@ jobs:
             op-node
       - name: Build & Push op-deployer
         run: |
-          IMAGE_TAGS=${{ steps.meta.outputs.tag_name }}-${{ matrix.platform.arch }},${{ !contains(github.ref_name, 'rc') && format('latest-{0}', matrix.platform.arch) || '' }} \
+          IMAGE_TAGS=${{ steps.meta.outputs.tag_name }}-${{ matrix.platform.arch }}${{ !contains(github.ref_name, 'rc') && format(',latest-{0}', matrix.platform.arch) || '' }} \
           GIT_COMMIT=${{ steps.meta.outputs.git_commit }} \
           GIT_DATE=${{ steps.meta.outputs.git_date }} \
           GIT_VERSION=${{ steps.meta.outputs.tag_name }} \
