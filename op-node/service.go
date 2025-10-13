@@ -101,15 +101,15 @@ func NewConfig(ctx *cli.Context, log log.Logger) (*config.Config, error) {
 	}
 	conductorRPCEndpoint := ctx.String(flags.ConductorRpcFlag.Name)
 	cfg := &config.Config{
-		L1:            l1Endpoint,
-		L2:            l2Endpoint,
-		L1ChainConfig: l1ChainConfig,
-		Rollup:        *rollupConfig,
-		DependencySet: depSet,
-		Driver:        *driverConfig,
-		Beacon:        NewBeaconEndpointConfig(ctx),
-		InteropConfig: NewSupervisorEndpointConfig(ctx),
-		// TODO(merge): EnableBased: ctx.Bool(flags.RPCEnableBased.Name),
+		L1:                          l1Endpoint,
+		Registry:                    registryEndpoint,
+		L2:                          l2Endpoint,
+		L1ChainConfig:               l1ChainConfig,
+		Rollup:                      *rollupConfig,
+		DependencySet:               depSet,
+		Driver:                      *driverConfig,
+		Beacon:                      NewBeaconEndpointConfig(ctx),
+		InteropConfig:               NewSupervisorEndpointConfig(ctx),
 		RPC:                         rpc.ReadCLIConfig(ctx),
 		Metrics:                     opmetrics.ReadCLIConfig(ctx),
 		Pprof:                       oppprof.ReadCLIConfig(ctx),
@@ -183,7 +183,7 @@ func NewL1EndpointConfig(ctx *cli.Context) *config.L1EndpointConfig {
 }
 
 func NewRegistryEndpointConfig(ctx *cli.Context) *config.RegistryEndpointConfig {
-	return &node.RegistryEndpointConfig{
+	return &config.RegistryEndpointConfig{
 		RegistryNodeAddr: ctx.String(flags.RegistryNodeAddr.Name),
 		RateLimit:        ctx.Float64(flags.L1RPCRateLimit.Name),
 		BatchSize:        ctx.Int(flags.L1RPCMaxBatchSize.Name),

@@ -12,6 +12,7 @@ const (
 	ListenAddrFlagName  = "rpc.addr"
 	PortFlagName        = "rpc.port"
 	EnableAdminFlagName = "rpc.enable-admin"
+	RPCEnableBasedName  = "rpc.enable-based"
 )
 
 var ErrInvalidPort = errors.New("invalid RPC port")
@@ -54,6 +55,7 @@ type CLIConfig struct {
 	ListenAddr  string
 	ListenPort  int
 	EnableAdmin bool
+	EnableBased bool
 }
 
 func DefaultCLIConfig() CLIConfig {
@@ -77,5 +79,6 @@ func ReadCLIConfig(ctx *cli.Context) CLIConfig {
 		ListenAddr:  ctx.String(ListenAddrFlagName),
 		ListenPort:  ctx.Int(PortFlagName),
 		EnableAdmin: ctx.Bool(EnableAdminFlagName),
+		EnableBased: ctx.Bool(RPCEnableBasedName),
 	}
 }

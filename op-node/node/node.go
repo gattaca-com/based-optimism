@@ -77,7 +77,6 @@ type OpNode struct {
 	p2pMu             gosync.Mutex            // protects p2pNode
 	p2pSigner         p2p.Signer              // p2p gossip application messages will be signed with this signer
 	p2pGatewayAddress common.Address          // Gateway address for P2P
-	tracer            Tracer                  // tracer to get events for testing/debugging
 	runCfg            *runcfg.RuntimeConfig   // runtime configurables
 	preconfChannels   engine.PreconfChannels
 
@@ -263,7 +262,7 @@ func (n *OpNode) initL1Handlers(cfg *config.Config) error {
 	return nil
 }
 
-func (n *OpNode) initRegistry(ctx context.Context, cfg *Config) error {
+func (n *OpNode) initRegistry(ctx context.Context, cfg *config.Config) error {
 	registryNode, rpcCfg, err := cfg.Registry.Setup(ctx, n.log, &cfg.Rollup, n.metrics)
 	if err != nil {
 		return fmt.Errorf("failed to get Registry RPC client: %w", err)
@@ -298,7 +297,7 @@ func (n *OpNode) initRegistry(ctx context.Context, cfg *Config) error {
 
 func (n *OpNode) initRuntimeConfig(ctx context.Context, cfg *config.Config) error {
 	// attempt to load runtime config, repeat N times
-	n.runCfg = runcfg.NewRuntimeConfig(n.log, n.l1Source, &cfg.Rollup)
+	n.runCfg = runcfg.NewRuntimeConfig(n.log, n.l1Source, &cfg.Rollup, n.registrySource)
 
 	confDepth := cfg.Driver.VerifierConfDepth
 	reload := func(ctx context.Context) (eth.L1BlockRef, error) {
@@ -735,68 +734,6 @@ func (n *OpNode) PublishEnv(ctx context.Context, from peer.ID, env *eth.SignedEn
 		return n.p2pNode.GossipOut().PublishEnv(ctx, from, env)
 	}
 	// if p2p is not enabled then we just don't publish the env
-	return nil
-}
-
-func (n *OpNode) OnUnsafeL2Payload(ctx context.Context, from peer.ID, envelope *eth.ExecutionPayloadEnvelope) error {
-	// ignore if it's from ourselves
-	if p2pNode := n.getP2PNodeIfEnabled(); p2pNode != nil && from == p2pNode.Host().ID() {
-		return nil
-	}
-
-	n.tracer.OnUnsafeL2Payload(ctx, from, envelope)
-
-	n.log.Info("Received signed execution payload from p2p", "id", envelope.ExecutionPayload.ID(), "peer", from,
-		"txs", len(envelope.ExecutionPayload.Transactions))
-
-	// Pass on the event to the L2 Engine
-	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
-	defer cancel()
-
-	if err := n.l2Driver.OnUnsafeL2Payload(ctx, envelope); err != nil {
-		n.log.Warn("failed to notify engine driver of new L2 payload", "err", err, "id", envelope.ExecutionPayload.ID())
-	}
-
-	return nil
-}
-
-func (n *OpNode) OnNewFrag(ctx context.Context, from peer.ID, frag *eth.SignedNewFrag) error {
-	// FIXME: Uncomment this
-	// ignore if it's from ourselves
-	// if n.p2pEnabled() && from == n.p2pNode.Host().ID() {
-	// 	return nil
-	// }
-
-	n.tracer.OnNewFrag(ctx, from, frag)
-	n.log.Info("Received new fragment", "block", frag.Frag.BlockNumber, "frag", frag.Frag.Seq)
-	n.preconfChannels.SendFrag(frag)
-	return nil
-}
-
-func (n *OpNode) OnSealFrag(ctx context.Context, from peer.ID, seal *eth.SignedSeal) error {
-	// FIXME: Uncomment this
-	// // ignore if it's from ourselves
-	// if n.p2pEnabled() && from == n.p2pNode.Host().ID() {
-	// 	return nil
-	// }
-
-	n.tracer.OnSealFrag(ctx, from, seal)
-	n.log.Info("Received new seal", "seal", seal)
-	n.preconfChannels.SendSeal(seal)
-
-	return nil
-}
-
-func (n *OpNode) OnEnv(ctx context.Context, from peer.ID, env *eth.SignedEnv) error {
-	// FIXME: Uncomment this
-	// // ignore if it's from ourselves
-	// if n.p2pEnabled() && from == n.p2pNode.Host().ID() {
-	// 	return nil
-	// }
-
-	n.tracer.OnEnv(ctx, from, env)
-	n.log.Info("Received new env", "env", env)
-	n.preconfChannels.SendEnv(env)
 	return nil
 }
 

@@ -60,7 +60,7 @@ func NewDriver(
 	l1 = metered.NewMeteredL1Fetcher(l1Tracker, metrics)
 	verifConfDepth := confdepth.NewConfDepth(driverCfg.VerifierConfDepth, statusTracker.L1Head, l1)
 
-	ec := engine.NewEngineController(driverCtx, l2, log, metrics, cfg, syncCfg, l1, sys.Register("engine-controller", nil))
+	ec := engine.NewEngineController(driverCtx, l2, log, metrics, cfg, syncCfg, l1, sys.Register("engine-controller", nil), preconfChannels)
 	// TODO(#17115): Refactor dependency cycles
 	ec.SetCrossUpdateHandler(statusTracker)
 
@@ -106,8 +106,6 @@ func NewDriver(
 	//  Couple EngDeriver and NewAttributesHandler for event refactoring
 	ec.SyncDeriver = syncDeriver
 	sys.Register("sync", syncDeriver)
-	// TODO(merge):
-	// sys.Register("engine", engine.NewEngDeriver(log, driverCtx, cfg, metrics, ec, preconfChannels), opts)
 	sys.Register("engine", ec)
 
 	var sequencer sequencing.SequencerIface
@@ -419,7 +417,7 @@ func (s *Driver) OnNewFrag(ctx context.Context, frag *eth.SignedNewFrag) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	default:
-		s.Emitter.Emit(engine.NewFragProcessEvent{SignedNewFrag: frag})
+		s.emitter.Emit(ctx, engine.NewFragProcessEvent{SignedNewFrag: frag})
 		return nil
 	}
 }
@@ -429,7 +427,7 @@ func (s *Driver) OnSealFrag(ctx context.Context, seal *eth.SignedSeal) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	default:
-		s.Emitter.Emit(engine.SealFragProcessEvent{SignedSeal: seal})
+		s.emitter.Emit(ctx, engine.SealFragProcessEvent{SignedSeal: seal})
 		return nil
 	}
 }
@@ -439,7 +437,7 @@ func (s *Driver) OnEnv(ctx context.Context, env *eth.SignedEnv) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	default:
-		s.Emitter.Emit(engine.EnvProcessEvent{SignedEnv: env})
+		s.emitter.Emit(ctx, engine.EnvProcessEvent{SignedEnv: env})
 		return nil
 	}
 }

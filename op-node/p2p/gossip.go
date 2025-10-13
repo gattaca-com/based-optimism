@@ -301,7 +301,7 @@ const (
 	EnvV0 EnvVersion = iota
 )
 
-func BuildBlocksValidator(log log.Logger, cfg *rollup.Config, runCfg GossipRuntimeConfig, blockVersion eth.BlockVersion, gossipConf GossipSetupConfigurables) pubsub.ValidatorEx {
+func BuildNewFragValidator(log log.Logger, cfg *rollup.Config, runCfg GossipRuntimeConfig, newFragVersion NewFragVersion) pubsub.ValidatorEx {
 	return func(ctx context.Context, id peer.ID, message *pubsub.Message) pubsub.ValidationResult {
 		var signedFrag eth.SignedNewFrag
 
@@ -409,7 +409,7 @@ func verifyGatewaySignature(log log.Logger, signatureBytes []byte, messageBytes 
 	return pubsub.ValidationAccept
 }
 
-func BuildBlocksValidator(log log.Logger, cfg *rollup.Config, runCfg GossipRuntimeConfig, blockVersion eth.BlockVersion) pubsub.ValidatorEx {
+func BuildBlocksValidator(log log.Logger, cfg *rollup.Config, runCfg GossipRuntimeConfig, blockVersion eth.BlockVersion, gossipConf GossipSetupConfigurables) pubsub.ValidatorEx {
 	// Seen block hashes per block height
 	// uint64 -> *seenBlocks
 	blockHeightLRU, err := lru.New[uint64, *seenBlocks](1000)

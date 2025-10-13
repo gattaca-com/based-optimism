@@ -12,7 +12,7 @@ func (ev EnvProcessEvent) String() string {
 	return "env-frag-process"
 }
 
-func (eq *EngDeriver) onEnvProcess(ev EnvProcessEvent) {
-	eq.ec.engine.Env(eq.ctx, ev.SignedEnv)
-	eq.log.Info("new env sent", "env", ev.SignedEnv)
+func (ec *EngineController) onEnvProcess(ev EnvProcessEvent) {
+	ec.engine.Env(ec.ctx, ev.SignedEnv)
+	ec.log.Info("new env sent", "env", ev.SignedEnv)
 }

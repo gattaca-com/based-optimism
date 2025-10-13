@@ -158,12 +158,15 @@ type EngineController struct {
 	crossUpdateHandler CrossUpdateHandler
 
 	unsafePayloads *PayloadsQueue // queue of unsafe payloads, ordered by ascending block number, may have gaps and duplicates
+
+	// CHANGE(based)
+	preconfChannels PreconfChannels
 }
 
 var _ event.Deriver = (*EngineController)(nil)
 
 func NewEngineController(ctx context.Context, engine ExecEngine, log log.Logger, m opmetrics.Metricer,
-	rollupCfg *rollup.Config, syncCfg *sync.Config, l1 sync.L1Chain, emitter event.Emitter,
+	rollupCfg *rollup.Config, syncCfg *sync.Config, l1 sync.L1Chain, emitter event.Emitter, preconfChannels PreconfChannels,
 ) *EngineController {
 	syncStatus := syncStatusCL
 	if syncCfg.SyncMode == sync.ELSync {
@@ -171,18 +174,19 @@ func NewEngineController(ctx context.Context, engine ExecEngine, log log.Logger,
 	}
 
 	return &EngineController{
-		engine:         engine,
-		log:            log,
-		metrics:        m,
-		chainSpec:      rollup.NewChainSpec(rollupCfg),
-		rollupCfg:      rollupCfg,
-		syncCfg:        syncCfg,
-		syncStatus:     syncStatus,
-		clock:          clock.SystemClock,
-		l1:             l1,
-		ctx:            ctx,
-		emitter:        emitter,
-		unsafePayloads: NewPayloadsQueue(log, maxUnsafePayloadsMemory, payloadMemSize),
+		engine:          engine,
+		log:             log,
+		metrics:         m,
+		chainSpec:       rollup.NewChainSpec(rollupCfg),
+		rollupCfg:       rollupCfg,
+		syncCfg:         syncCfg,
+		syncStatus:      syncStatus,
+		clock:           clock.SystemClock,
+		l1:              l1,
+		ctx:             ctx,
+		emitter:         emitter,
+		unsafePayloads:  NewPayloadsQueue(log, maxUnsafePayloadsMemory, payloadMemSize),
+		preconfChannels: preconfChannels,
 	}
 }
 
@@ -727,11 +731,11 @@ func (e *EngineController) OnEvent(ctx context.Context, ev event.Event) bool {
 	case ResetEngineRequestEvent:
 		e.onResetEngineRequest(ctx)
 	case NewFragProcessEvent:
-		d.onNewFragProcess(x)
+		e.onNewFragProcess(x)
 	case SealFragProcessEvent:
-		d.onSealFragProcess(x)
+		e.onSealFragProcess(x)
 	case EnvProcessEvent:
-		d.onEnvProcess(x)
+		e.onEnvProcess(x)
 	default:
 		return false
 	}

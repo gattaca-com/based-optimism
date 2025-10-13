@@ -12,7 +12,7 @@ func (ev NewFragProcessEvent) String() string {
 	return "new-frag-process"
 }
 
-func (eq *EngDeriver) onNewFragProcess(ev NewFragProcessEvent) {
-	eq.ec.engine.NewFrag(eq.ctx, ev.SignedNewFrag)
-	eq.log.Info("new fragment sent", "frag", ev.SignedNewFrag)
+func (ec *EngineController) onNewFragProcess(ev NewFragProcessEvent) {
+	ec.engine.NewFrag(ec.ctx, ev.SignedNewFrag)
+	ec.log.Info("new fragment sent", "frag", ev.SignedNewFrag)
 }

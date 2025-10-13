@@ -21,8 +21,8 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/apis"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-service/rpc"
-	"github.com/ethereum-optimism/optimism/op-service/sources"
 	opsigner "github.com/ethereum-optimism/optimism/op-service/signer"
+	"github.com/ethereum-optimism/optimism/op-service/sources"
 )
 
 type l2EthClient interface {
@@ -292,6 +292,8 @@ func (n *basedAPI) Env(ctx context.Context, signedEnv eth.SignedEnv) (string, er
 	}
 
 	return "OK", nil
+}
+
 type opstackAPI struct {
 	engine    engine.RollupAPI
 	publisher apis.PublishAPI

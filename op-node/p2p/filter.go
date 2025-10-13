@@ -26,3 +26,15 @@ func (f *FilterSelf) OnUnsafeL2Payload(ctx context.Context, from peer.ID, msg *e
 	}
 	return f.inner.OnUnsafeL2Payload(ctx, from, msg)
 }
+
+func (f *FilterSelf) OnNewFrag(ctx context.Context, from peer.ID, frag *eth.SignedNewFrag) error {
+	return f.inner.OnNewFrag(ctx, from, frag)
+}
+
+func (f *FilterSelf) OnSealFrag(ctx context.Context, from peer.ID, seal *eth.SignedSeal) error {
+	return f.inner.OnSealFrag(ctx, from, seal)
+}
+
+func (f *FilterSelf) OnEnv(ctx context.Context, from peer.ID, env *eth.SignedEnv) error {
+	return f.inner.OnEnv(ctx, from, env)
+}
