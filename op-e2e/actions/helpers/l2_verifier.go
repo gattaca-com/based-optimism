@@ -147,7 +147,9 @@ func NewL2Verifier(t Testing, log log.Logger, l1 derive.L1Fetcher,
 	}
 
 	metrics := &testutils.TestDerivationMetrics{}
-	ec := engine.NewEngineController(ctx, eng, log, opnodemetrics.NoopMetrics, cfg, syncCfg, l1, sys.Register("engine-controller", nil, opts))
+	// TODO(merge)
+	// preconfChannels := engine.StartPreconf(ctx, eng, metrics)
+	ec := engine.NewEngineController(ctx, eng, log, opnodemetrics.NoopMetrics, cfg, syncCfg, l1, sys.Register("engine-controller", nil, opts), preconfChannels)
 
 	if mm, ok := interopSys.(*indexing.IndexingMode); ok {
 		mm.SetEngineController(ec)
@@ -201,9 +203,6 @@ func NewL2Verifier(t Testing, log log.Logger, l1 derive.L1Fetcher,
 	//  Couple EngDeriver and NewAttributesHandler for event refactoring
 	ec.SyncDeriver = syncDeriver
 	sys.Register("sync", syncDeriver, opts)
-	// TODO(merge)
-	// channels := engine.StartPreconf(ctx, eng)
-	// sys.Register("engine", engine.NewEngDeriver(log, ctx, cfg, metrics, ec, channels), opts)
 	sys.Register("engine", ec, opts)
 
 	rollupNode := &L2Verifier{
