@@ -39,12 +39,13 @@ type BlockReceiver struct {
 
 var _ GossipIn = (*BlockReceiver)(nil)
 
-func NewBlockReceiver(log log.Logger, metrics BlockReceiverMetrics, syncDeriver SyncDeriver, tracer tracer.Tracer) *BlockReceiver {
+func NewBlockReceiver(log log.Logger, metrics BlockReceiverMetrics, syncDeriver SyncDeriver, tracer tracer.Tracer, preconfChannels engine.PreconfChannels) *BlockReceiver {
 	return &BlockReceiver{
-		log:         log,
-		metrics:     metrics,
-		syncDeriver: syncDeriver,
-		tracer:      tracer,
+		log:             log,
+		metrics:         metrics,
+		syncDeriver:     syncDeriver,
+		tracer:          tracer,
+		preconfChannels: preconfChannels,
 	}
 }
 
