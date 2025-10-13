@@ -68,7 +68,9 @@ func (n *BlockReceiver) OnNewFrag(ctx context.Context, from peer.ID, frag *eth.S
 	// 	return nil
 	// }
 
-	n.tracer.OnNewFrag(ctx, from, frag)
+	if n.tracer != nil { // tracer is optional
+		n.tracer.OnNewFrag(ctx, from, frag)
+	}
 	n.log.Info("Received new fragment", "block", frag.Frag.BlockNumber, "frag", frag.Frag.Seq)
 	n.preconfChannels.SendFrag(frag)
 	return nil
@@ -81,7 +83,9 @@ func (n *BlockReceiver) OnSealFrag(ctx context.Context, from peer.ID, seal *eth.
 	// 	return nil
 	// }
 
-	n.tracer.OnSealFrag(ctx, from, seal)
+	if n.tracer != nil { // tracer is optional
+		n.tracer.OnSealFrag(ctx, from, seal)
+	}
 	n.log.Info("Received new seal", "seal", seal)
 	n.preconfChannels.SendSeal(seal)
 
@@ -95,7 +99,9 @@ func (n *BlockReceiver) OnEnv(ctx context.Context, from peer.ID, env *eth.Signed
 	// 	return nil
 	// }
 
-	n.tracer.OnEnv(ctx, from, env)
+	if n.tracer != nil { // tracer is optional
+		n.tracer.OnEnv(ctx, from, env)
+	}
 	n.log.Info("Received new env", "env", env)
 	n.preconfChannels.SendEnv(env)
 	return nil
