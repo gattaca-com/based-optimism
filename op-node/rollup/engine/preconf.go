@@ -3,6 +3,8 @@ package engine
 import (
 	"context"
 
+	"github.com/ethereum/go-ethereum/log"
+
 	"github.com/ethereum-optimism/optimism/op-node/metrics"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 )
@@ -95,9 +97,10 @@ type PreconfState struct {
 	ctx          context.Context
 	e            ExecEngine
 	m            metrics.Metrics
+	log          log.Logger
 }
 
-func NewPreconfState(ctx context.Context, e ExecEngine, m metrics.Metrics) PreconfState {
+func NewPreconfState(ctx context.Context, e ExecEngine, m metrics.Metrics, log log.Logger) PreconfState {
 	return PreconfState{
 		pendingEnvs:  make(map[uint64]eth.SignedEnv),
 		pendingFrags: make(map[FragIndex]eth.SignedNewFrag),
@@ -113,13 +116,14 @@ func NewPreconfState(ctx context.Context, e ExecEngine, m metrics.Metrics) Preco
 		ctx:             ctx,
 		e:               e,
 		m:               m,
+		log:             log,
 	}
 }
 
 // Builds the preconf channels and starts a concurrent preconf handler in a separate goroutine.
-func StartPreconf(ctx context.Context, e ExecEngine, m metrics.Metrics) PreconfChannels {
+func StartPreconf(ctx context.Context, e ExecEngine, m metrics.Metrics, log log.Logger) PreconfChannels {
 	channels := NewPreconfChannels()
-	go preconfHandler(ctx, channels, e, m)
+	go preconfHandler(ctx, channels, e, m, log)
 	return channels
 }
 
@@ -150,9 +154,25 @@ func (s *PreconfState) putFrag(sFrag *eth.SignedNewFrag) {
 	idx := index(frag)
 	isFirst := frag.Seq == 0 && s.lastEnvSent.IsEqual(frag.BlockNumber)
 	previousSent := s.lastFragSent.IsEqual(idx.prev())
+
+	s.log.Debug("putFrag check",
+		"block", frag.BlockNumber,
+		"seq", frag.Seq,
+		"isFirst", isFirst,
+		"previousSent", previousSent,
+		"lastEnvSent", s.lastEnvSent.IsSet(),
+		"lastFragSent", s.lastFragSent.IsSet(),
+		"pendingFrags", len(s.pendingFrags))
+
 	if isFirst || previousSent {
 		s.lastFragSent.Set(idx)
-		s.e.NewFrag(s.ctx, sFrag)
+		s.log.Info("Sending frag to engine", "block", frag.BlockNumber, "seq", frag.Seq)
+		_, err := s.e.NewFrag(s.ctx, sFrag)
+		if err != nil {
+			s.log.Error("Failed to send frag to engine", "block", frag.BlockNumber, "seq", frag.Seq, "err", err)
+		} else {
+			s.log.Info("Successfully sent frag to engine", "block", frag.BlockNumber, "seq", frag.Seq)
+		}
 		s.m.BasedNewFrag.Inc()
 
 		// When a frag is sent we should check if the next is present or if the seal is present
@@ -172,7 +192,14 @@ func (s *PreconfState) putFrag(sFrag *eth.SignedNewFrag) {
 			}
 		}
 	} else if idx.BlockNumber >= s.lastBlockPruned {
+		s.log.Warn("Frag held as pending - conditions not met",
+			"block", frag.BlockNumber,
+			"seq", frag.Seq,
+			"needsEnv", frag.Seq == 0 && !s.lastEnvSent.IsEqual(frag.BlockNumber),
+			"needsPrevFrag", frag.Seq > 0 && !s.lastFragSent.IsEqual(idx.prev()))
 		s.pendingFrags[idx] = *sFrag
+	} else {
+		s.log.Warn("Frag discarded - block already pruned", "block", frag.BlockNumber, "seq", frag.Seq, "lastPruned", s.lastBlockPruned)
 	}
 }
 
@@ -242,19 +269,27 @@ func (s *PreconfState) prune(currentBlock uint64) {
 // Listens for env, frag and seal events and updates the local state.
 // If the events are ready, they are sent to the engine api. If not, they are
 // saved in the local state as pending until they are.
-func preconfHandler(ctx context.Context, c PreconfChannels, e ExecEngine, m metrics.Metrics) {
-	state := NewPreconfState(ctx, e, m)
+func preconfHandler(ctx context.Context, c PreconfChannels, e ExecEngine, m metrics.Metrics, log log.Logger) {
+	state := NewPreconfState(ctx, e, m, log)
+	log.Info("Preconf handler started")
 
 	for {
 		select {
 		case env := <-c.EnvCh:
+			log.Info("Preconf handler received env", "block", env.Env.Number)
 			state.putEnv(env)
 		case frag := <-c.NewFragCh:
+			log.Info("Preconf handler received frag", "block", frag.Frag.BlockNumber, "seq", frag.Frag.Seq)
 			state.putFrag(frag)
 		case seal := <-c.SealCh:
+			log.Info("Preconf handler received seal", "block", seal.Seal.BlockNumber)
 			state.putSeal(seal)
 		case l2Block := <-c.l2BlockCh:
+			log.Info("Preconf handler received L2 block", "block", l2Block.Number)
 			state.putL2Block(l2Block)
+		case <-ctx.Done():
+			log.Warn("Preconf handler context cancelled, exiting")
+			return
 		}
 	}
 }

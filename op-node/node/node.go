@@ -468,7 +468,7 @@ func (n *OpNode) initL2(ctx context.Context, cfg *config.Config) error {
 		return err
 	}
 
-	n.preconfChannels = engine.StartPreconf(n.resourcesCtx, n.l2Source, *n.metrics)
+	n.preconfChannels = engine.StartPreconf(n.resourcesCtx, n.l2Source, *n.metrics, n.log)
 	indexingMode := false
 	sys, err := cfg.InteropConfig.Setup(ctx, n.log, &n.cfg.Rollup, n.l1Source, n.l2Source, n.metrics)
 	if err != nil {
