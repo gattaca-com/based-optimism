@@ -12,7 +12,7 @@ func (ev SealFragProcessEvent) String() string {
 	return "seal-frag-process"
 }
 
-func (eq *EngDeriver) onSealFragProcess(ev SealFragProcessEvent) {
-	eq.ec.engine.SealFrag(eq.ctx, ev.SignedSeal)
-	eq.log.Info("new seal sent", "seal", ev.SignedSeal)
+func (ec *EngineController) onSealFragProcess(ev SealFragProcessEvent) {
+	ec.engine.SealFrag(ec.ctx, ev.SignedSeal)
+	ec.log.Info("new seal sent", "seal", ev.SignedSeal)
 }
