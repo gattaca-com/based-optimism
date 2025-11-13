@@ -25,6 +25,7 @@ import (
 	"github.com/ethereum-optimism/optimism/op-node/params"
 	"github.com/ethereum-optimism/optimism/op-node/rollup"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
+	"github.com/ethereum-optimism/optimism/op-service/ptr"
 	opsigner "github.com/ethereum-optimism/optimism/op-service/signer"
 )
 
@@ -530,15 +531,21 @@ func BuildBlocksValidator(log log.Logger, cfg *rollup.Config, runCfg GossipRunti
 		}
 
 		if blockVersion.HasBlobProperties() {
-			// [REJECT] if the block is on a topic >= V3 and has a blob gas used value that is not zero
-			if payload.BlobGasUsed == nil || *payload.BlobGasUsed != 0 {
-				log.Warn("payload is on v3 topic, but has non-zero blob gas used", "bad_hash", payload.BlockHash.String(), "blob_gas_used", payload.BlobGasUsed)
+			// [REJECT] if the block is on a topic >= V3 and has a nil blob gas used
+			if payload.BlobGasUsed == nil {
+				log.Warn("payload is on v3 topic, but has nil blob gas used", "bad_hash", payload.BlockHash.String())
+				return pubsub.ValidationReject
+				// [REJECT] if the block is on a topic >= V3 and has a non-zero blob gas used field pre-Jovian
+			} else if !cfg.IsDAFootprintBlockLimit(uint64(payload.Timestamp)) && *payload.BlobGasUsed != 0 {
+				log.Warn("payload is on v3 topic, but has non-zero blob gas used",
+					"bad_hash", payload.BlockHash.String(), "blob_gas_used", *payload.BlobGasUsed)
 				return pubsub.ValidationReject
 			}
 
 			// [REJECT] if the block is on a topic >= V3 and has an excess blob gas value that is not zero
 			if payload.ExcessBlobGas == nil || *payload.ExcessBlobGas != 0 {
-				log.Warn("payload is on v3 topic, but has non-zero excess blob gas", "bad_hash", payload.BlockHash.String(), "excess_blob_gas", payload.ExcessBlobGas)
+				log.Warn("payload is on v3 topic, but has non-zero excess blob gas",
+					"bad_hash", payload.BlockHash.String(), "excess_blob_gas", ptr.Str(payload.ExcessBlobGas))
 				return pubsub.ValidationReject
 			}
 		}
