@@ -6,17 +6,12 @@ import (
 	"net/http"
 
 	"github.com/ethereum-optimism/optimism/devnet-sdk/descriptors"
-	"github.com/ethereum-optimism/optimism/kurtosis-devnet/pkg/kurtosis/api/wrappers"
+	"github.com/kurtosis-tech/kurtosis/api/golang/engine/lib/kurtosis_context"
 )
 
-type PortMap map[string]*descriptors.PortInfo
+type PortMap map[string]descriptors.PortInfo
 
-type Service struct {
-	Labels map[string]string
-	Ports  PortMap
-}
-
-type ServiceMap map[string]*Service
+type ServiceMap map[string]PortMap
 
 // InspectData represents a summary of the output of "kurtosis enclave inspect"
 type InspectData struct {
@@ -32,21 +27,13 @@ func NewInspector(enclaveID string) *Inspector {
 	return &Inspector{enclaveID: enclaveID}
 }
 
-func ShortenedUUIDString(fullUUID string) string {
-	lengthToTrim := 12
-	if lengthToTrim > len(fullUUID) {
-		lengthToTrim = len(fullUUID)
-	}
-	return fullUUID[:lengthToTrim]
-}
-
 func (e *Inspector) ExtractData(ctx context.Context) (*InspectData, error) {
-	kurtosisCtx, err := wrappers.GetDefaultKurtosisContext()
+	kurtosisCtx, err := kurtosis_context.NewKurtosisContextFromLocalEngine()
 	if err != nil {
 		return nil, err
 	}
 
-	enclaveCtx, err := kurtosisCtx.GetEnclave(ctx, e.enclaveID)
+	enclaveCtx, err := kurtosisCtx.GetEnclaveContext(ctx, e.enclaveID)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +61,7 @@ func (e *Inspector) ExtractData(ctx context.Context) (*InspectData, error) {
 
 	for svc := range services {
 		svc := string(svc)
-		svcCtx, err := enclaveCtx.GetService(svc)
+		svcCtx, err := enclaveCtx.GetServiceContext(svc)
 		if err != nil {
 			return nil, err
 		}
@@ -83,20 +70,19 @@ func (e *Inspector) ExtractData(ctx context.Context) (*InspectData, error) {
 		portMap := make(PortMap)
 
 		for port, portSpec := range svcCtx.GetPublicPorts() {
-			portMap[port] = &descriptors.PortInfo{
+			portMap[port] = descriptors.PortInfo{
 				Host: svcCtx.GetMaybePublicIPAddress(),
 				Port: int(portSpec.GetNumber()),
 			}
 		}
-		shortEnclaveUuid := ShortenedUUIDString(enclaveUUID)
-		shortServiceUuid := ShortenedUUIDString(svcUUID)
+
 		for port, portSpec := range svcCtx.GetPrivatePorts() {
 			// avoid non-mapped ports, we shouldn't have to use them.
 			if p, ok := portMap[port]; ok {
 				p.PrivatePort = int(portSpec.GetNumber())
 				p.ReverseProxyHeader = http.Header{
 					// This allows going through the kurtosis reverse proxy for each port
-					"Host": []string{fmt.Sprintf("%d-%s-%s", p.PrivatePort, shortServiceUuid, shortEnclaveUuid)},
+					"Host": []string{fmt.Sprintf("%d-%.12s-%.12s", p.PrivatePort, svcUUID, enclaveUUID)},
 				}
 
 				portMap[port] = p
@@ -104,10 +90,7 @@ func (e *Inspector) ExtractData(ctx context.Context) (*InspectData, error) {
 		}
 
 		if len(portMap) != 0 {
-			data.UserServices[svc] = &Service{
-				Ports:  portMap,
-				Labels: svcCtx.GetLabels(),
-			}
+			data.UserServices[svc] = portMap
 		}
 
 	}

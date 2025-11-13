@@ -3,6 +3,7 @@ package p2p_test
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"math/rand"
 	"testing"
 	"time"
@@ -27,6 +28,7 @@ import (
 	p2p "github.com/ethereum-optimism/optimism/op-node/p2p"
 	p2pMocks "github.com/ethereum-optimism/optimism/op-node/p2p/mocks"
 	"github.com/ethereum-optimism/optimism/op-node/p2p/store"
+	"github.com/ethereum-optimism/optimism/op-node/rollup"
 	"github.com/ethereum-optimism/optimism/op-service/clock"
 	testlog "github.com/ethereum-optimism/optimism/op-service/testlog"
 )
@@ -111,6 +113,7 @@ func newGossipSubs(testSuite *PeerScoresTestSuite, ctx context.Context, hosts []
 		require.NoError(testSuite.T(), err)
 
 		scorer := p2p.NewScorer(
+			&rollup.Config{L2ChainID: big.NewInt(123)},
 			extPeerStore, testSuite.mockMetricer, &discriminatingAppScorer{badPeer: hosts[0].ID()}, logger)
 		opts = append(opts, p2p.ConfigurePeerScoring(&p2p.Config{
 			ScoringParams: &p2p.ScoringParams{

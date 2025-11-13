@@ -13,7 +13,6 @@ import (
 	ktfs "github.com/ethereum-optimism/optimism/devnet-sdk/kt/fs"
 	"github.com/ethereum-optimism/optimism/devnet-sdk/types"
 	"github.com/ethereum-optimism/optimism/op-chain-ops/devkeys"
-	"github.com/ethereum-optimism/optimism/op-node/rollup"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
@@ -29,7 +28,6 @@ const (
 	defaultGenesisArtifactName  = "el_cl_genesis_data"
 	defaultMnemonicName         = "mnemonics.yaml"
 	defaultGenesisNameTemplate  = "genesis-{{.ChainID}}.json"
-	defaultRollupNameTemplate   = "rollup-{{.ChainID}}.json"
 	defaultL1GenesisName        = "genesis.json"
 )
 
@@ -40,12 +38,11 @@ type DeploymentAddresses map[string]types.Address
 type DeploymentStateAddresses map[string]DeploymentAddresses
 
 type DeploymentState struct {
-	L1Addresses  DeploymentAddresses `json:"l1_addresses"`
-	L2Addresses  DeploymentAddresses `json:"l2_addresses"`
-	L1Wallets    WalletList          `json:"l1_wallets"`
-	L2Wallets    WalletList          `json:"l2_wallets"`
-	Config       *params.ChainConfig `json:"chain_config"`
-	RollupConfig *rollup.Config      `json:"rollup_config"`
+	L1Addresses DeploymentAddresses `json:"l1_addresses"`
+	L2Addresses DeploymentAddresses `json:"l2_addresses"`
+	L1Wallets   WalletList          `json:"l1_wallets"`
+	L2Wallets   WalletList          `json:"l2_wallets"`
+	Config      *params.ChainConfig `json:"chain_config"`
 }
 
 type DeployerState struct {
@@ -56,7 +53,7 @@ type DeployerState struct {
 // StateFile represents the structure of the state.json file
 type StateFile struct {
 	OpChainDeployments        []map[string]interface{} `json:"opChainDeployments"`
-	SuperChainContracts       map[string]interface{}   `json:"superchainContracts"`
+	SuperChainDeployment      map[string]interface{}   `json:"superchainDeployment"`
 	ImplementationsDeployment map[string]interface{}   `json:"implementationsDeployment"`
 }
 
@@ -86,7 +83,6 @@ type Deployer struct {
 	genesisArtifactName     string
 	l1ValidatorMnemonicName string
 	l2GenesisNameTemplate   string
-	l2RollupNameTemplate    string
 	l1GenesisName           string
 }
 
@@ -128,12 +124,6 @@ func WithGenesisNameTemplate(name string) DeployerOption {
 	}
 }
 
-func WithRollupNameTemplate(name string) DeployerOption {
-	return func(d *Deployer) {
-		d.l2RollupNameTemplate = name
-	}
-}
-
 func NewDeployer(enclave string, opts ...DeployerOption) *Deployer {
 	d := &Deployer{
 		enclave:                 enclave,
@@ -143,7 +133,6 @@ func NewDeployer(enclave string, opts ...DeployerOption) *Deployer {
 		genesisArtifactName:     defaultGenesisArtifactName,
 		l1ValidatorMnemonicName: defaultMnemonicName,
 		l2GenesisNameTemplate:   defaultGenesisNameTemplate,
-		l2RollupNameTemplate:    defaultRollupNameTemplate,
 		l1GenesisName:           defaultL1GenesisName,
 	}
 
@@ -247,10 +236,11 @@ func parseStateFile(r io.Reader) (*DeployerState, error) {
 	}
 
 	mapDeployment := func(deployment map[string]interface{}) DeploymentAddresses {
+		addrSuffix := "Address"
 		addresses := make(DeploymentAddresses)
 		for key, value := range deployment {
-			if strings.HasSuffix(key, "Proxy") || strings.HasSuffix(key, "Impl") {
-				addresses[key] = common.HexToAddress(value.(string))
+			if strings.HasSuffix(key, addrSuffix) {
+				addresses[strings.TrimSuffix(key, addrSuffix)] = common.HexToAddress(value.(string))
 			}
 		}
 		return addresses
@@ -279,7 +269,7 @@ func parseStateFile(r io.Reader) (*DeployerState, error) {
 		// so we need to map them manually.
 		// TODO: Update op-deployer to sort rollup contracts by category
 		l2Addresses := make(DeploymentAddresses)
-		for _, addressName := range []string{"OptimismMintableErc20FactoryProxy"} {
+		for _, addressName := range []string{"optimismMintableERC20FactoryProxy"} {
 			if addr, ok := l1Addresses[addressName]; ok {
 				l2Addresses[addressName] = addr
 				delete(l1Addresses, addressName)
@@ -294,7 +284,7 @@ func parseStateFile(r io.Reader) (*DeployerState, error) {
 
 	result.Addresses = mapDeployment(state.ImplementationsDeployment)
 	// merge the superchain and implementations addresses
-	for key, value := range mapDeployment(state.SuperChainContracts) {
+	for key, value := range mapDeployment(state.SuperChainDeployment) {
 		result.Addresses[key] = value
 	}
 
@@ -365,29 +355,6 @@ func (d *Deployer) ExtractData(ctx context.Context) (*DeployerData, error) {
 
 		// Store the genesis data in the deployment state
 		deployment.Config = genesis.Config
-
-		rollupBuffer := bytes.NewBuffer(nil)
-		rollupName, err := d.renderRollupNameTemplate(id)
-		if err != nil {
-			return nil, err
-		}
-
-		if err := deployerArtifact.ExtractFiles(
-			ktfs.NewArtifactFileWriter(rollupName, rollupBuffer),
-		); err != nil {
-			return nil, err
-		}
-
-		// Parse the genesis file JSON into a core.Genesis struct
-		var rollupCfg rollup.Config
-		if err := json.NewDecoder(rollupBuffer).Decode(&rollupCfg); err != nil {
-			return nil, fmt.Errorf("failed to parse rollup file %s in artifact %s for chain ID %s: %w", rollupName, d.deployerArtifactName, id, err)
-		}
-
-		// Store the data in the deployment state
-		deployment.Config = genesis.Config
-		deployment.RollupConfig = &rollupCfg
-
 		state.Deployments[id] = deployment
 	}
 
@@ -415,23 +382,15 @@ func (d *Deployer) ExtractData(ctx context.Context) (*DeployerData, error) {
 }
 
 func (d *Deployer) renderGenesisNameTemplate(chainID string) (string, error) {
-	return d.renderNameTemplate(d.l2GenesisNameTemplate, chainID)
-}
-
-func (d *Deployer) renderRollupNameTemplate(chainID string) (string, error) {
-	return d.renderNameTemplate(d.l2RollupNameTemplate, chainID)
-}
-
-func (d *Deployer) renderNameTemplate(t, chainID string) (string, error) {
-	tmpl, err := template.New("").Parse(t)
+	tmpl, err := template.New("genesis").Parse(d.l2GenesisNameTemplate)
 	if err != nil {
-		return "", fmt.Errorf("failed to compile name template %s: %w", t, err)
+		return "", fmt.Errorf("failed to compile genesis name template %s: %w", d.l2GenesisNameTemplate, err)
 	}
 
 	var buf bytes.Buffer
 	err = tmpl.Execute(&buf, map[string]string{"ChainID": chainID})
 	if err != nil {
-		return "", fmt.Errorf("failed to execute name template %s: %w", t, err)
+		return "", fmt.Errorf("failed to execute name template %s: %w", d.l2GenesisNameTemplate, err)
 	}
 
 	return buf.String(), nil

@@ -11,7 +11,6 @@ import (
 	"github.com/ethereum-optimism/optimism/op-program/chainconfig"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/stretchr/testify/require"
 )
 
@@ -23,7 +22,6 @@ func TestBootstrapClient(t *testing.T) {
 		L2Claim:            common.HexToHash("0x3333"),
 		L2ClaimBlockNumber: 1,
 		L2ChainID:          eth.ChainIDFromBig(rollupCfg.L2ChainID),
-		L1ChainConfig:      params.SepoliaChainConfig,
 		L2ChainConfig:      chainconfig.OPSepoliaChainConfig(),
 		RollupConfig:       rollupCfg,
 	}
@@ -39,28 +37,12 @@ func TestBootstrapClient_CustomChain(t *testing.T) {
 		L2Claim:            common.HexToHash("0x3333"),
 		L2ClaimBlockNumber: 1,
 		L2ChainID:          CustomChainIDIndicator,
-		L1ChainConfig:      params.SepoliaChainConfig,
 		L2ChainConfig:      chainconfig.OPSepoliaChainConfig(),
 		RollupConfig:       chaincfg.OPSepolia(),
 	}
 	mockOracle := newMockPreinteropBootstrapOracle(bootInfo, true)
 	readBootInfo := NewBootstrapClient(mockOracle).BootInfo()
 	require.EqualValues(t, bootInfo, readBootInfo)
-}
-
-func TestBootstrapClient_CustomChain_L1ChainConfigMismatch(t *testing.T) {
-	bootInfo := &BootInfo{
-		L1Head:             common.HexToHash("0x1111"),
-		L2OutputRoot:       common.HexToHash("0x2222"),
-		L2Claim:            common.HexToHash("0x3333"),
-		L2ClaimBlockNumber: 1,
-		L2ChainID:          CustomChainIDIndicator,
-		L1ChainConfig:      params.MainnetChainConfig,
-		L2ChainConfig:      chainconfig.OPSepoliaChainConfig(),
-		RollupConfig:       chaincfg.OPSepolia(),
-	}
-	mockOracle := newMockPreinteropBootstrapOracle(bootInfo, true)
-	require.Panics(t, func() { NewBootstrapClient(mockOracle).BootInfo() })
 }
 
 func TestBootstrapClient_UnknownChainPanics(t *testing.T) {
@@ -76,9 +58,9 @@ func TestBootstrapClient_UnknownChainPanics(t *testing.T) {
 	require.Panics(t, func() { client.BootInfo() })
 }
 
-func newMockPreinteropBootstrapOracle(info *BootInfo, custom bool) *mockPreinteropBootstrapOracle {
-	return &mockPreinteropBootstrapOracle{
-		mockBootstrapOracle: mockBootstrapOracle{
+func newMockPreinteropBootstrapOracle(info *BootInfo, custom bool) *mockPreinteropBoostrapOracle {
+	return &mockPreinteropBoostrapOracle{
+		mockBoostrapOracle: mockBoostrapOracle{
 			l1Head:             info.L1Head,
 			l2OutputRoot:       info.L2OutputRoot,
 			l2Claim:            info.L2Claim,
@@ -89,13 +71,13 @@ func newMockPreinteropBootstrapOracle(info *BootInfo, custom bool) *mockPreinter
 	}
 }
 
-type mockPreinteropBootstrapOracle struct {
-	mockBootstrapOracle
+type mockPreinteropBoostrapOracle struct {
+	mockBoostrapOracle
 	b      *BootInfo
 	custom bool
 }
 
-func (o *mockPreinteropBootstrapOracle) Get(key preimage.Key) []byte {
+func (o *mockPreinteropBoostrapOracle) Get(key preimage.Key) []byte {
 	switch key.PreimageKey() {
 	case L2ChainIDLocalIndex.PreimageKey():
 		return binary.BigEndian.AppendUint64(nil, eth.EvilChainIDToUInt64(o.b.L2ChainID))
@@ -105,12 +87,6 @@ func (o *mockPreinteropBootstrapOracle) Get(key preimage.Key) []byte {
 		}
 		b, _ := json.Marshal(o.b.L2ChainConfig)
 		return b
-	case L1ChainConfigLocalIndex.PreimageKey():
-		if !o.custom {
-			panic(fmt.Sprintf("unexpected oracle request for preimage key %x", key.PreimageKey()))
-		}
-		b, _ := json.Marshal(o.b.L1ChainConfig)
-		return b
 	case RollupConfigLocalIndex.PreimageKey():
 		if !o.custom {
 			panic(fmt.Sprintf("unexpected oracle request for preimage key %x", key.PreimageKey()))
@@ -118,6 +94,6 @@ func (o *mockPreinteropBootstrapOracle) Get(key preimage.Key) []byte {
 		b, _ := json.Marshal(o.b.RollupConfig)
 		return b
 	default:
-		return o.mockBootstrapOracle.Get(key)
+		return o.mockBoostrapOracle.Get(key)
 	}
 }

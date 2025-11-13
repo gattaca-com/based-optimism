@@ -42,19 +42,17 @@ type claimer interface {
 }
 
 type gameMonitor struct {
-	logger              log.Logger
-	clock               RWClock
-	source              gameSource
-	scheduler           gameScheduler
-	preimages           preimageScheduler
-	gameWindow          time.Duration
-	claimer             claimer
-	allowedGames        []common.Address
-	l1HeadsSub          ethereum.Subscription
-	l1Source            *headSource
-	runState            sync.Mutex
-	minUpdatePeriod     time.Duration
-	lastUpdateBlockTime time.Time
+	logger       log.Logger
+	clock        RWClock
+	source       gameSource
+	scheduler    gameScheduler
+	preimages    preimageScheduler
+	gameWindow   time.Duration
+	claimer      claimer
+	allowedGames []common.Address
+	l1HeadsSub   ethereum.Subscription
+	l1Source     *headSource
+	runState     sync.Mutex
 }
 
 type MinimalSubscriber interface {
@@ -79,19 +77,17 @@ func newGameMonitor(
 	claimer claimer,
 	allowedGames []common.Address,
 	l1Source MinimalSubscriber,
-	minUpdatePeriodSeconds time.Duration,
 ) *gameMonitor {
 	return &gameMonitor{
-		logger:          logger,
-		clock:           cl,
-		scheduler:       scheduler,
-		preimages:       preimages,
-		source:          source,
-		gameWindow:      gameWindow,
-		claimer:         claimer,
-		allowedGames:    allowedGames,
-		l1Source:        &headSource{inner: l1Source},
-		minUpdatePeriod: minUpdatePeriodSeconds,
+		logger:       logger,
+		clock:        cl,
+		scheduler:    scheduler,
+		preimages:    preimages,
+		source:       source,
+		gameWindow:   gameWindow,
+		claimer:      claimer,
+		allowedGames: allowedGames,
+		l1Source:     &headSource{inner: l1Source},
 	}
 }
 
@@ -132,17 +128,12 @@ func (m *gameMonitor) progressGames(ctx context.Context, blockHash common.Hash, 
 	return nil
 }
 
-func (m *gameMonitor) onNewL1Head(ctx context.Context, block eth.L1BlockRef) {
-	m.clock.SetTime(block.Time)
-	blockTime := time.Unix(int64(block.Time), 0)
-	if m.lastUpdateBlockTime.Add(m.minUpdatePeriod).After(blockTime) {
-		return
-	}
-	m.lastUpdateBlockTime = blockTime
-	if err := m.progressGames(ctx, block.Hash, block.Number); err != nil {
+func (m *gameMonitor) onNewL1Head(ctx context.Context, sig eth.L1BlockRef) {
+	m.clock.SetTime(sig.Time)
+	if err := m.progressGames(ctx, sig.Hash, sig.Number); err != nil {
 		m.logger.Error("Failed to progress games", "err", err)
 	}
-	if err := m.preimages.Schedule(block.Hash, block.Number); err != nil {
+	if err := m.preimages.Schedule(sig.Hash, sig.Number); err != nil {
 		m.logger.Error("Failed to validate large preimages", "err", err)
 	}
 }

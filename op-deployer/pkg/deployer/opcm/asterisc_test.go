@@ -1,31 +1,36 @@
 package opcm
 
 import (
-	"math/big"
 	"testing"
 
+	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/broadcaster"
+	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/testutil"
+	"github.com/ethereum-optimism/optimism/op-deployer/pkg/env"
+	"github.com/ethereum-optimism/optimism/op-service/testlog"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewDeployAsteriscScript(t *testing.T) {
-	t.Run("should not fail with current version of DeployAsterisc contract", func(t *testing.T) {
-		// First we grab a test host
-		host1 := createTestHost(t)
+func TestDeployAsterisc(t *testing.T) {
+	t.Parallel()
 
-		// Then we load the script
-		//
-		// This would raise an error if the Go types didn't match the ABI
-		deploySuperchain, err := NewDeployAsteriscScript(host1)
-		require.NoError(t, err)
+	_, artifacts := testutil.LocalArtifacts(t)
 
-		// Then we deploy
-		output, err := deploySuperchain.Run(DeployAsteriscInput{
-			PreimageOracle: common.BigToAddress(big.NewInt(1)),
-		})
+	host, err := env.DefaultScriptHost(
+		broadcaster.NoopBroadcaster(),
+		testlog.Logger(t, log.LevelInfo),
+		common.Address{'D'},
+		artifacts,
+	)
+	require.NoError(t, err)
 
-		// And do some simple asserts
-		require.NoError(t, err)
-		require.NotNil(t, output)
-	})
+	input := DeployAsteriscInput{
+		PreimageOracle: common.Address{0xab},
+	}
+
+	output, err := DeployAsterisc(host, input)
+	require.NoError(t, err)
+
+	require.NotEmpty(t, output.AsteriscSingleton)
 }

@@ -8,8 +8,6 @@ import (
 
 	common "github.com/ethereum/go-ethereum/common"
 
-	eth "github.com/ethereum-optimism/optimism/op-service/eth"
-
 	mock "github.com/stretchr/testify/mock"
 
 	rpc "github.com/ethereum/go-ethereum/rpc"
@@ -68,26 +66,6 @@ func (_m *TxManager) BlockNumber(ctx context.Context) (uint64, error) {
 	}
 
 	return r0, r1
-}
-
-// ChainID provides a mock function with given fields:
-func (_m *TxManager) ChainID() eth.ChainID {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for ChainID")
-	}
-
-	var r0 eth.ChainID
-	if rf, ok := ret.Get(0).(func() eth.ChainID); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(eth.ChainID)
-		}
-	}
-
-	return r0
 }
 
 // Close provides a mock function with given fields:

@@ -18,13 +18,11 @@ func GeneratePreState(ctx context.Context, pEnv *Env, globalIntent *state.Intent
 	lgr := pEnv.Logger.New("stage", "generate-pre-state")
 
 	if preStateBuilder == nil {
-		lgr.Debug("preStateBuilder not found, skipping prestate generation")
+		lgr.Warn("preStateBuilder not found - skipping prestate generation")
 		return nil
 	}
-	lgr.Info("preStateBuilder found, proceeding with prestate generation")
 
 	prestateBuilderOpts := []prestate.PrestateBuilderOption{}
-	generateDepSet := false
 	for _, chain := range globalIntent.Chains {
 		genesis, rollup, err := RenderGenesisAndRollup(st, chain.ID, globalIntent)
 		if err != nil {
@@ -41,10 +39,6 @@ func GeneratePreState(ctx context.Context, pEnv *Env, globalIntent *state.Intent
 			return fmt.Errorf("failed to marshal genesis config: %w", err)
 		}
 
-		if genesis.Config.InteropTime != nil {
-			generateDepSet = true
-		}
-
 		prestateBuilderOpts = append(prestateBuilderOpts, prestate.WithChainConfig(
 			chain.ID.Big().String(),
 			bytes.NewReader(rollupJSON),
@@ -52,7 +46,7 @@ func GeneratePreState(ctx context.Context, pEnv *Env, globalIntent *state.Intent
 		))
 	}
 
-	if generateDepSet {
+	if globalIntent.UseInterop {
 		lgr.Info("adding the interop deployment set option to the prestate builder")
 		prestateBuilderOpts = append(prestateBuilderOpts, prestate.WithGeneratedInteropDepSet())
 	}

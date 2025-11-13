@@ -18,9 +18,9 @@ import (
 	"github.com/ethereum-optimism/optimism/op-node/rollup/conductor"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/derive"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/engine"
+	"github.com/ethereum-optimism/optimism/op-node/rollup/event"
 	"github.com/ethereum-optimism/optimism/op-service/clock"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
-	"github.com/ethereum-optimism/optimism/op-service/event"
 	"github.com/ethereum-optimism/optimism/op-service/predeploys"
 	"github.com/ethereum-optimism/optimism/op-service/testlog"
 	"github.com/ethereum-optimism/optimism/op-service/testutils"
@@ -161,18 +161,6 @@ func (f *FakeAsyncGossip) Start() {
 
 var _ AsyncGossiper = (*FakeAsyncGossip)(nil)
 
-type fakeEngController struct{}
-
-func (fakeEngController) RequestForkchoiceUpdate(ctx context.Context) {}
-
-func (fakeEngController) TryUpdatePendingSafe(ctx context.Context, ref eth.L2BlockRef, concluding bool, source eth.L1BlockRef) {
-}
-
-func (fakeEngController) TryUpdateLocalSafe(ctx context.Context, ref eth.L2BlockRef, concluding bool, source eth.L1BlockRef) {
-}
-
-func (fakeEngController) RequestPendingSafeUpdate(ctx context.Context) {}
-
 // TestSequencer_StartStop runs through start/stop state back and forth to test state changes.
 func TestSequencer_StartStop(t *testing.T) {
 	logger := testlog.Logger(t, log.LevelError)
@@ -185,9 +173,8 @@ func TestSequencer_StartStop(t *testing.T) {
 	// Also see issue #11121 for context: the conductor is checked by the infra, when initialized in active state.
 	deps.conductor.leader = true
 
-	testCtx := context.Background()
-	// TODO(#16917): direct call used now; no ForkchoiceRequestEvent expected
-	require.NoError(t, seq.Init(testCtx, false))
+	emitter.ExpectOnce(engine.ForkchoiceRequestEvent{})
+	require.NoError(t, seq.Init(context.Background(), false))
 	emitter.AssertExpectations(t)
 	require.False(t, deps.conductor.closed, "conductor is ready")
 	require.True(t, deps.asyncGossip.started, "async gossip is always started on initialization")
@@ -206,7 +193,7 @@ func TestSequencer_StartStop(t *testing.T) {
 		Envelope: envelope,
 		Ref:      eth.L2BlockRef{Hash: common.Hash{0xaa}},
 	})
-	seq.OnEvent(context.Background(), engine.BuildSealedEvent{
+	seq.OnEvent(engine.BuildSealedEvent{
 		Envelope: envelope,
 		Ref:      eth.L2BlockRef{Hash: common.Hash{0xaa}},
 	})
@@ -216,7 +203,7 @@ func TestSequencer_StartStop(t *testing.T) {
 
 	// update latestHead
 	emitter.AssertExpectations(t)
-	seq.OnEvent(context.Background(), engine.ForkchoiceUpdateEvent{
+	seq.OnEvent(engine.ForkchoiceUpdateEvent{
 		UnsafeL2Head:    eth.L2BlockRef{Hash: common.Hash{0xaa}},
 		SafeL2Head:      eth.L2BlockRef{},
 		FinalizedL2Head: eth.L2BlockRef{},
@@ -275,9 +262,8 @@ func TestSequencer_StaleBuild(t *testing.T) {
 	seq.AttachEmitter(emitter)
 	deps.conductor.leader = true
 
-	testCtx := context.Background()
-	// TODO(#16917): direct call used now; no ForkchoiceRequestEvent expected
-	require.NoError(t, seq.Init(testCtx, false))
+	emitter.ExpectOnce(engine.ForkchoiceRequestEvent{})
+	require.NoError(t, seq.Init(context.Background(), false))
 	emitter.AssertExpectations(t)
 	require.False(t, deps.conductor.closed, "conductor is ready")
 	require.True(t, deps.asyncGossip.started, "async gossip is always started on initialization")
@@ -292,7 +278,7 @@ func TestSequencer_StaleBuild(t *testing.T) {
 		},
 		Time: uint64(testClock.Now().Unix()),
 	}
-	seq.OnEvent(context.Background(), engine.ForkchoiceUpdateEvent{UnsafeL2Head: head})
+	seq.OnEvent(engine.ForkchoiceUpdateEvent{UnsafeL2Head: head})
 
 	require.NoError(t, seq.Start(context.Background(), head.Hash))
 	require.True(t, seq.Active())
@@ -321,7 +307,7 @@ func TestSequencer_StaleBuild(t *testing.T) {
 		require.Equal(t, eth.L1BlockRef{}, x.Attributes.DerivedFrom)
 		sentAttributes = x.Attributes
 	})
-	seq.OnEvent(context.Background(), SequencerActionEvent{})
+	seq.OnEvent(SequencerActionEvent{})
 	emitter.AssertExpectations(t)
 
 	// Now report the block was started
@@ -331,7 +317,7 @@ func TestSequencer_StaleBuild(t *testing.T) {
 		ID:        eth.PayloadID{0x42},
 		Timestamp: head.Time + deps.cfg.BlockTime,
 	}
-	seq.OnEvent(context.Background(), engine.BuildStartedEvent{
+	seq.OnEvent(engine.BuildStartedEvent{
 		Info:         payloadInfo,
 		BuildStarted: startedTime,
 		Parent:       head,
@@ -348,7 +334,7 @@ func TestSequencer_StaleBuild(t *testing.T) {
 		Concluding:   false,
 		DerivedFrom:  eth.L1BlockRef{},
 	})
-	seq.OnEvent(context.Background(), SequencerActionEvent{})
+	seq.OnEvent(SequencerActionEvent{})
 	emitter.AssertExpectations(t)
 
 	_, ok = seq.NextAction()
@@ -381,7 +367,7 @@ func TestSequencer_StaleBuild(t *testing.T) {
 		Ref:         payloadRef,
 	})
 	// And report back the sealing result to the engine
-	seq.OnEvent(context.Background(), engine.BuildSealedEvent{
+	seq.OnEvent(engine.BuildSealedEvent{
 		Concluding:  false,
 		DerivedFrom: eth.L1BlockRef{},
 		Info:        payloadInfo,
@@ -408,7 +394,7 @@ func TestSequencer_StaleBuild(t *testing.T) {
 		Envelope: payloadEnvelope,
 		Ref:      head,
 	})
-	seq.OnEvent(context.Background(), engine.BuildSealedEvent{
+	seq.OnEvent(engine.BuildSealedEvent{
 		Info:     payloadInfo,
 		Envelope: payloadEnvelope,
 		Ref:      head,
@@ -444,7 +430,7 @@ func TestSequencer_StaleBuild(t *testing.T) {
 		L1Origin: newL1Origin.ID(),
 		Time:     uint64(testClock.Now().Unix()),
 	}
-	seq.OnEvent(context.Background(), engine.ForkchoiceUpdateEvent{UnsafeL2Head: newHead})
+	seq.OnEvent(engine.ForkchoiceUpdateEvent{UnsafeL2Head: newHead})
 
 	// Regression check: async-gossip is cleared upon sequencer un-pause.
 	// We could clear it earlier. But absolutely have to clear it upon Start(),
@@ -471,7 +457,7 @@ func TestSequencer_StaleBuild(t *testing.T) {
 		require.True(t, ok)
 		require.Equal(t, newHead, buildEv.Attributes.Parent, "build on the new L2 head")
 	})
-	seq.OnEvent(context.Background(), SequencerActionEvent{})
+	seq.OnEvent(SequencerActionEvent{})
 	emitter.AssertExpectations(t)
 }
 
@@ -484,16 +470,15 @@ func TestSequencerBuild(t *testing.T) {
 	emitter := &testutils.MockEmitter{}
 	seq.AttachEmitter(emitter)
 
-	testCtx := context.Background()
 	// Init will request a forkchoice update
-	// TODO(#16917): direct call used now; no ForkchoiceRequestEvent expected
-	require.NoError(t, seq.Init(testCtx, true))
+	emitter.ExpectOnce(engine.ForkchoiceRequestEvent{})
+	require.NoError(t, seq.Init(context.Background(), true))
 	emitter.AssertExpectations(t)
 	require.True(t, seq.Active(), "started in active mode")
 
 	// It will request a forkchoice update, it needs the head before being able to build on top of it
-	// TODO(#16917): direct call used now; no ForkchoiceRequestEvent expected
-	seq.OnEvent(context.Background(), SequencerActionEvent{})
+	emitter.ExpectOnce(engine.ForkchoiceRequestEvent{})
+	seq.OnEvent(SequencerActionEvent{})
 	emitter.AssertExpectations(t)
 
 	// Now send the forkchoice data, for the sequencer to learn what to build on top of.
@@ -506,7 +491,7 @@ func TestSequencerBuild(t *testing.T) {
 		},
 		Time: uint64(testClock.Now().Unix()),
 	}
-	seq.OnEvent(context.Background(), engine.ForkchoiceUpdateEvent{UnsafeL2Head: head})
+	seq.OnEvent(engine.ForkchoiceUpdateEvent{UnsafeL2Head: head})
 	emitter.AssertExpectations(t)
 
 	// pretend we progress to the next L1 origin, catching up with the L2 time
@@ -528,7 +513,7 @@ func TestSequencerBuild(t *testing.T) {
 		require.Equal(t, eth.L1BlockRef{}, x.Attributes.DerivedFrom)
 		sentAttributes = x.Attributes
 	})
-	seq.OnEvent(context.Background(), SequencerActionEvent{})
+	seq.OnEvent(SequencerActionEvent{})
 	emitter.AssertExpectations(t)
 
 	// pretend we are already 150ms into the block-window when starting building
@@ -538,7 +523,7 @@ func TestSequencerBuild(t *testing.T) {
 		ID:        eth.PayloadID{0x42},
 		Timestamp: head.Time + deps.cfg.BlockTime,
 	}
-	seq.OnEvent(context.Background(), engine.BuildStartedEvent{
+	seq.OnEvent(engine.BuildStartedEvent{
 		Info:         payloadInfo,
 		BuildStarted: startedTime,
 		Parent:       head,
@@ -559,7 +544,7 @@ func TestSequencerBuild(t *testing.T) {
 		Concluding:   false,
 		DerivedFrom:  eth.L1BlockRef{},
 	})
-	seq.OnEvent(context.Background(), SequencerActionEvent{})
+	seq.OnEvent(SequencerActionEvent{})
 	emitter.AssertExpectations(t)
 	_, ok = seq.NextAction()
 	require.False(t, ok, "cannot act until sealing completes/fails")
@@ -591,7 +576,7 @@ func TestSequencerBuild(t *testing.T) {
 		Ref:         payloadRef,
 	})
 	// And report back the sealing result to the engine
-	seq.OnEvent(context.Background(), engine.BuildSealedEvent{
+	seq.OnEvent(engine.BuildSealedEvent{
 		Concluding:  false,
 		DerivedFrom: eth.L1BlockRef{},
 		Info:        payloadInfo,
@@ -607,7 +592,7 @@ func TestSequencerBuild(t *testing.T) {
 	require.False(t, ok, "optimistically published, but not ready to sequence next, until local processing completes")
 
 	// Mock that the processing was successful
-	seq.OnEvent(context.Background(), engine.PayloadSuccessEvent{
+	seq.OnEvent(engine.PayloadSuccessEvent{
 		Concluding:  false,
 		DerivedFrom: eth.L1BlockRef{},
 		Envelope:    payloadEnvelope,
@@ -623,7 +608,7 @@ func TestSequencerBuild(t *testing.T) {
 	// Pretend we only completed processing the block 120 ms into the next block time window.
 	// (This is why we publish optimistically)
 	testClock.Set(time.Unix(int64(payloadRef.Time), 0).Add(time.Millisecond * 120))
-	seq.OnEvent(context.Background(), engine.ForkchoiceUpdateEvent{
+	seq.OnEvent(engine.ForkchoiceUpdateEvent{
 		UnsafeL2Head:    payloadRef,
 		SafeL2Head:      eth.L2BlockRef{},
 		FinalizedL2Head: eth.L2BlockRef{},
@@ -642,13 +627,16 @@ func TestSequencerL1TemporaryErrorEvent(t *testing.T) {
 	emitter := &testutils.MockEmitter{}
 	seq.AttachEmitter(emitter)
 
-	testCtx := context.Background()
-	// Init
-	require.NoError(t, seq.Init(testCtx, true))
+	// Init will request a forkchoice update
+	emitter.ExpectOnce(engine.ForkchoiceRequestEvent{})
+	require.NoError(t, seq.Init(context.Background(), true))
+	emitter.AssertExpectations(t)
 	require.True(t, seq.Active(), "started in active mode")
 
-	// It needs the head before being able to build on top of it
-	seq.OnEvent(context.Background(), SequencerActionEvent{})
+	// It will request a forkchoice update, it needs the head before being able to build on top of it
+	emitter.ExpectOnce(engine.ForkchoiceRequestEvent{})
+	seq.OnEvent(SequencerActionEvent{})
+	emitter.AssertExpectations(t)
 
 	// Now send the forkchoice data, for the sequencer to learn what to build on top of.
 	head := eth.L2BlockRef{
@@ -660,7 +648,7 @@ func TestSequencerL1TemporaryErrorEvent(t *testing.T) {
 		},
 		Time: uint64(testClock.Now().Unix()),
 	}
-	seq.OnEvent(context.Background(), engine.ForkchoiceUpdateEvent{UnsafeL2Head: head})
+	seq.OnEvent(engine.ForkchoiceUpdateEvent{UnsafeL2Head: head})
 	emitter.AssertExpectations(t)
 
 	// force FindL1Origin to return an error
@@ -674,7 +662,7 @@ func TestSequencerL1TemporaryErrorEvent(t *testing.T) {
 	})
 
 	sealTargetTime1, ok1 := seq.NextAction()
-	seq.OnEvent(context.Background(), SequencerActionEvent{})
+	seq.OnEvent(SequencerActionEvent{})
 	emitter.AssertExpectations(t)
 
 	// FindL1Origin error will updating d.nextAction
@@ -716,8 +704,6 @@ func createSequencer(log log.Logger) (*Sequencer, *sequencerTestDeps) {
 		FjordTime:         new(uint64),
 		GraniteTime:       new(uint64),
 		HoloceneTime:      new(uint64),
-		IsthmusTime:       new(uint64),
-		JovianTime:        new(uint64),
 	}
 	deps := &sequencerTestDeps{
 		cfg:           cfg,
@@ -733,7 +719,7 @@ func createSequencer(log log.Logger) (*Sequencer, *sequencerTestDeps) {
 	}
 	seq := NewSequencer(context.Background(), log, cfg, deps.attribBuilder,
 		deps.l1OriginSelector, deps.seqState, deps.conductor,
-		deps.asyncGossip, metrics.NoopMetrics, fakeEngController{})
+		deps.asyncGossip, metrics.NoopMetrics)
 	// We create mock payloads, with the epoch-id as tx[0], rather than proper L1Block-info deposit tx.
 	seq.toBlockRef = func(rollupCfg *rollup.Config, payload *eth.ExecutionPayload) (eth.L2BlockRef, error) {
 		return eth.L2BlockRef{

@@ -4,29 +4,30 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
+	op_e2e "github.com/ethereum-optimism/optimism/op-e2e"
 
+	"github.com/ethereum-optimism/optimism/op-e2e/system/e2esys"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/stretchr/testify/require"
 
 	bss "github.com/ethereum-optimism/optimism/op-batcher/batcher"
 	batcherFlags "github.com/ethereum-optimism/optimism/op-batcher/flags"
 	con "github.com/ethereum-optimism/optimism/op-conductor/conductor"
 	"github.com/ethereum-optimism/optimism/op-conductor/consensus"
 	conrpc "github.com/ethereum-optimism/optimism/op-conductor/rpc"
-	op_e2e "github.com/ethereum-optimism/optimism/op-e2e"
 	"github.com/ethereum-optimism/optimism/op-e2e/e2eutils/setuputils"
 	"github.com/ethereum-optimism/optimism/op-e2e/e2eutils/wait"
-	"github.com/ethereum-optimism/optimism/op-e2e/system/e2esys"
-	"github.com/ethereum-optimism/optimism/op-node/config"
+	rollupNode "github.com/ethereum-optimism/optimism/op-node/node"
 	"github.com/ethereum-optimism/optimism/op-node/rollup"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/derive"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/driver"
-	"github.com/ethereum-optimism/optimism/op-node/rollup/interop"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/sync"
 	oplog "github.com/ethereum-optimism/optimism/op-service/log"
 	"github.com/ethereum-optimism/optimism/op-service/retry"
@@ -275,16 +276,16 @@ func setupBatcher(t *testing.T, sys *e2esys.System, conductors map[string]*condu
 	// enable active sequencer follow mode.
 	// in sequencer HA, all batcher / proposer requests will be proxied by conductor so that we can make sure
 	// that requests are always handled by leader.
-	l2EthRpc := []string{
+	l2EthRpc := strings.Join([]string{
 		conductors[Sequencer1Name].RPCEndpoint(),
 		conductors[Sequencer2Name].RPCEndpoint(),
 		conductors[Sequencer3Name].RPCEndpoint(),
-	}
-	rollupRpc := []string{
+	}, ",")
+	rollupRpc := strings.Join([]string{
 		conductors[Sequencer1Name].RPCEndpoint(),
 		conductors[Sequencer2Name].RPCEndpoint(),
 		conductors[Sequencer3Name].RPCEndpoint(),
-	}
+	}, ",")
 	batcherCLIConfig := &bss.CLIConfig{
 		L1EthRpc:               sys.EthInstances["l1"].UserRPC().RPC(),
 		L2EthRpc:               l2EthRpc,
@@ -343,8 +344,8 @@ func sequencerFailoverSystemConfig(t *testing.T, conductorRPCEndpoints func(ctx 
 	return cfg
 }
 
-func sequencerCfg(conductorRPCEndpoint config.ConductorRPCFunc) *config.Config {
-	return &config.Config{
+func sequencerCfg(conductorRPCEndpoint rollupNode.ConductorRPCFunc) *rollupNode.Config {
+	return &rollupNode.Config{
 		Driver: driver.Config{
 			VerifierConfDepth:  0,
 			SequencerConfDepth: 0,
@@ -352,15 +353,14 @@ func sequencerCfg(conductorRPCEndpoint config.ConductorRPCFunc) *config.Config {
 			SequencerStopped:   true,
 		},
 		// Submitter PrivKey is set in system start for rollup nodes where sequencer = true
-		RPC: oprpc.CLIConfig{
+		RPC: rollupNode.RPCConfig{
 			ListenAddr:  localhost,
 			ListenPort:  0,
 			EnableAdmin: true,
 		},
-		InteropConfig:               &interop.Config{},
 		L1EpochPollInterval:         time.Second * 2,
 		RuntimeConfigReloadInterval: time.Minute * 10,
-		ConfigPersistence:           &config.DisabledConfigPersistence{},
+		ConfigPersistence:           &rollupNode.DisabledConfigPersistence{},
 		Sync:                        sync.Config{SyncMode: sync.CLSync},
 		ConductorEnabled:            true,
 		ConductorRpc:                conductorRPCEndpoint,

@@ -62,6 +62,7 @@ func NewNodeP2P(
 	l2Chain L2Chain,
 	runCfg GossipRuntimeConfig,
 	metrics metrics.Metricer,
+	elSyncEnabled bool,
 ) (*NodeP2P, error) {
 	if setup == nil {
 		return nil, errors.New("p2p node cannot be created without setup")
@@ -70,7 +71,7 @@ func NewNodeP2P(
 		return nil, errors.New("SetupP2P.Disabled is true")
 	}
 	var n NodeP2P
-	if err := n.init(resourcesCtx, rollupCfg, log, setup, gossipIn, l2Chain, runCfg, metrics); err != nil {
+	if err := n.init(resourcesCtx, rollupCfg, log, setup, gossipIn, l2Chain, runCfg, metrics, elSyncEnabled); err != nil {
 		closeErr := n.Close()
 		if closeErr != nil {
 			log.Error("failed to close p2p after starting with err", "closeErr", closeErr, "err", err)
@@ -94,6 +95,7 @@ func (n *NodeP2P) init(
 	l2Chain L2Chain,
 	runCfg GossipRuntimeConfig,
 	metrics metrics.Metricer,
+	elSyncEnabled bool,
 ) error {
 	bwc := p2pmetrics.NewBandwidthCounter()
 
@@ -109,9 +111,6 @@ func (n *NodeP2P) init(
 		return fmt.Errorf("failed to start p2p host: %w", err)
 	}
 
-	// Don't ingest blocks that we publish ourselves
-	gossipIn = NewFilterSelf(n.host.ID(), gossipIn)
-
 	// Enable extra features, if any. During testing we don't setup the most advanced host all the time.
 	if extra, ok := n.host.(ExtraHostFeatures); ok {
 		n.gater = extra.ConnectionGater()
@@ -125,12 +124,12 @@ func (n *NodeP2P) init(
 	scoreParams := setup.PeerScoringParams()
 
 	if scoreParams != nil {
-		n.appScorer = NewPeerApplicationScorer(resourcesCtx, log, clock.SystemClock, &scoreParams.ApplicationScoring, eps, n.host.Network().Peers)
+		n.appScorer = newPeerApplicationScorer(resourcesCtx, log, clock.SystemClock, &scoreParams.ApplicationScoring, eps, n.host.Network().Peers)
 	} else {
 		n.appScorer = &NoopApplicationScorer{}
 	}
 	// Activate the P2P req-resp sync if enabled by feature-flag.
-	if setup.ReqRespSyncEnabled() {
+	if setup.ReqRespSyncEnabled() && !elSyncEnabled {
 		n.syncCl = NewSyncClient(log, rollupCfg, n.host, gossipIn.OnUnsafeL2Payload, metrics, n.appScorer)
 		n.host.Network().Notify(&network.NotifyBundle{
 			ConnectedF: func(nw network.Network, conn network.Conn) {
@@ -155,7 +154,7 @@ func (n *NodeP2P) init(
 			n.host.SetStreamHandler(PayloadByNumberProtocolID(rollupCfg.L2ChainID), payloadByNumber)
 		}
 	}
-	n.scorer = NewScorer(eps, metrics, n.appScorer, log)
+	n.scorer = NewScorer(rollupCfg, eps, metrics, n.appScorer, log)
 	// notify of any new connections/streams/etc.
 	n.host.Network().Notify(NewNetworkNotifier(log, metrics))
 	// note: the IDDelta functionality was removed from libP2P, and no longer needs to be explicitly disabled.
@@ -163,7 +162,7 @@ func (n *NodeP2P) init(
 	if err != nil {
 		return fmt.Errorf("failed to start gossipsub router: %w", err)
 	}
-	n.gsOut, err = JoinGossip(n.host.ID(), n.gs, log, rollupCfg, runCfg, gossipIn, setup)
+	n.gsOut, err = JoinGossip(n.host.ID(), n.gs, log, rollupCfg, runCfg, gossipIn)
 	if err != nil {
 		return fmt.Errorf("failed to join blocks gossip topic: %w", err)
 	}
@@ -188,7 +187,8 @@ func (n *NodeP2P) init(
 		n.peerMonitor = monitor.NewPeerMonitor(resourcesCtx, log, clock.SystemClock, n, setup.BanThreshold(), setup.BanDuration())
 		n.peerMonitor.Start()
 	}
-	n.appScorer.Start()
+	n.appScorer.start()
+
 	return nil
 }
 
@@ -298,7 +298,7 @@ func (n *NodeP2P) Close() error {
 		}
 	}
 	if n.appScorer != nil {
-		n.appScorer.Stop()
+		n.appScorer.stop()
 	}
 	return result.ErrorOrNil()
 }

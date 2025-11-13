@@ -6,8 +6,9 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/ethereum-optimism/optimism/op-node/rollup"
-	"github.com/ethereum-optimism/optimism/op-node/rollup/interop/indexing"
-	"github.com/ethereum-optimism/optimism/op-service/event"
+	"github.com/ethereum-optimism/optimism/op-node/rollup/event"
+	"github.com/ethereum-optimism/optimism/op-node/rollup/interop/managed"
+	"github.com/ethereum-optimism/optimism/op-node/rollup/interop/standard"
 	opmetrics "github.com/ethereum-optimism/optimism/op-service/metrics"
 )
 
@@ -18,14 +19,15 @@ type SubSystem interface {
 	Stop(ctx context.Context) error
 }
 
-var _ SubSystem = (*indexing.IndexingMode)(nil)
+var _ SubSystem = (*managed.ManagedMode)(nil)
+var _ SubSystem = (*standard.StandardMode)(nil)
 
 type L1Source interface {
-	indexing.L1Source
+	managed.L1Source
 }
 
 type L2Source interface {
-	indexing.L2Source
+	managed.L2Source
 }
 
 type Setup interface {

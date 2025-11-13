@@ -140,12 +140,7 @@ func (c *chain) ID() types.ChainID {
 	if c.id == "" {
 		return types.ChainID(big.NewInt(0))
 	}
-	base := 10
-	if len(c.id) >= 2 && c.id[0:2] == "0x" {
-		c.id = c.id[2:]
-		base = 16
-	}
-	id, ok := new(big.Int).SetString(c.id, base)
+	id, ok := new(big.Int).SetString(c.id, 10)
 	if !ok {
 		return types.ChainID(big.NewInt(0))
 	}
@@ -223,7 +218,7 @@ func newChain(chainID string, wallets WalletMap, chainConfig *params.ChainConfig
 func newL2ChainFromDescriptor(d *descriptors.L2Chain) (*l2Chain, error) {
 	// TODO: handle incorrect descriptors better. We could panic here.
 
-	nodes := newNodesFromDescriptor(d.Chain)
+	nodes := newNodesFromDescriptor(&d.Chain)
 	c := newL2Chain(d.ID, nil, nil, d.Config, AddressMap(d.L1Addresses), AddressMap(d.Addresses), nodes) // Create chain first
 
 	l2Wallets, err := newWalletMapFromDescriptorWalletMap(d.Wallets, c)

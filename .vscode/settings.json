@@ -1,7 +1,4 @@
 {
   "editorconfig.generateAuto": false,
-  "files.trimTrailingWhitespace": true,
-  "openInGitHub.defaultBranch": "develop",
-  "openInGitHub.alwaysUseDefaultBranch": false,
-  "openInGitHub.excludeCurrentRevision": true
+  "files.trimTrailingWhitespace": true
 }

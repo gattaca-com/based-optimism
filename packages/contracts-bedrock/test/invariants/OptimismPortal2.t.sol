@@ -6,7 +6,6 @@ import { StdUtils } from "forge-std/Test.sol";
 import { Vm } from "forge-std/Vm.sol";
 import { CommonTest } from "test/setup/CommonTest.sol";
 import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
-import { DisputeGameFactory_TestInit } from "test/dispute/DisputeGameFactory.t.sol";
 
 // Contracts
 import { ResourceMetering } from "src/L1/ResourceMetering.sol";
@@ -82,7 +81,7 @@ contract OptimismPortal2_Depositor is StdUtils, ResourceMetering {
     }
 }
 
-contract OptimismPortal2_Invariant_Harness is DisputeGameFactory_TestInit {
+contract OptimismPortal2_Invariant_Harness is CommonTest {
     // Reusable default values for a test withdrawal
     Types.WithdrawalTransaction _defaultTx;
 
@@ -121,14 +120,12 @@ contract OptimismPortal2_Invariant_Harness is DisputeGameFactory_TestInit {
         // Warp forward in time to ensure that the game is created after the retirement timestamp.
         vm.warp(anchorStateRegistry.retirementTimestamp() + 1);
 
-        setupFaultDisputeGame(Claim.wrap(bytes32(0)));
-
         // Create a dispute game with the output root we've proposed.
         _proposedBlockNumber = 0xFF;
         IFaultDisputeGame game = IFaultDisputeGame(
             payable(
                 address(
-                    disputeGameFactory.create{ value: disputeGameFactory.initBonds(optimismPortal2.respectedGameType()) }(
+                    disputeGameFactory.create(
                         optimismPortal2.respectedGameType(), Claim.wrap(_outputRoot), abi.encode(_proposedBlockNumber)
                     )
                 )
@@ -143,7 +140,6 @@ contract OptimismPortal2_Invariant_Harness is DisputeGameFactory_TestInit {
 
         // Fund the portal so that we can withdraw ETH.
         vm.deal(address(ethLockbox), 0xFFFFFFFF);
-        vm.deal(address(optimismPortal2), 0xFFFFFFFF);
     }
 }
 

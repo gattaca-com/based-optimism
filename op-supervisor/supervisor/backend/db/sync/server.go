@@ -1,7 +1,6 @@
 package sync
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -9,11 +8,6 @@ import (
 	"strings"
 
 	"github.com/ethereum-optimism/optimism/op-service/eth"
-)
-
-var (
-	errInvalidRootDirectory = errors.New("invalid root directory")
-	errInvalidPath          = errors.New("invalid path")
 )
 
 // Server handles sync requests
@@ -36,7 +30,7 @@ func NewServer(config Config, chains []eth.ChainID) (*Server, error) {
 		return nil, fmt.Errorf("cannot access root directory: %w", err)
 	}
 	if !rootInfo.IsDir() {
-		return nil, fmt.Errorf("root path is not a directory: %s. %w", root, errInvalidRootDirectory)
+		return nil, fmt.Errorf("root path is not a directory: %s", root)
 	}
 
 	// Build map of valid chains for efficient lookup
@@ -60,7 +54,7 @@ func parsePath(path string) (eth.ChainID, string, error) {
 	// Trim leading and trailing slashes and split into segments
 	segments := strings.Split(strings.Trim(path, "/"), "/")
 	if len(segments) < 2 {
-		return chainID, fileAlias, fmt.Errorf("%w: %s", errInvalidPath, path)
+		return chainID, fileAlias, fmt.Errorf("invalid path: %s", path)
 	}
 	chainIDStr := segments[len(segments)-2]
 	fileAlias = segments[len(segments)-1]

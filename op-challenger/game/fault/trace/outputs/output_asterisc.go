@@ -45,8 +45,7 @@ func NewOutputAsteriscTraceAccessor(
 		return provider, nil
 	}
 
-	metricsLabel := fmt.Sprintf("outputs_%s_provider", cfg.VmType.String())
-	cache := NewProviderCache(m, metricsLabel, asteriscCreator)
+	cache := NewProviderCache(m, "output_asterisc_provider", asteriscCreator)
 	selector := split.NewSplitProviderSelector(outputProvider, splitDepth, OutputRootSplitAdapter(outputProvider, cache.GetOrCreate))
 	return trace.NewAccessor(selector), nil
 }

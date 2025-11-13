@@ -78,8 +78,6 @@ type Precompile[E any] struct {
 
 	// abiMethods is effectively the jump-table for 4-byte ABI calls to the precompile.
 	abiMethods map[[4]byte]*precompileFunc
-
-	name string
 }
 
 var _ vm.PrecompiledContract = (*Precompile[struct{}])(nil)
@@ -109,7 +107,6 @@ func NewPrecompile[E any](e E, opts ...PrecompileOption[E]) (*Precompile[E], err
 		fieldsOnly:  false,
 		fieldSetter: false,
 		settable:    make(map[[4]byte]*settableField),
-		name:        reflect.TypeOf(e).Name(),
 	}
 	for _, opt := range opts {
 		opt(out)
@@ -191,7 +188,7 @@ func hasTrailingError(argCount int, getType func(i int) reflect.Type) bool {
 		return false
 	}
 	lastTyp := getType(argCount - 1)
-	return lastTyp.Kind() == reflect.Interface && lastTyp.Implements(reflect.TypeFor[error]())
+	return lastTyp.Kind() == reflect.Interface && lastTyp.Implements(typeFor[error]())
 }
 
 // setupMethod takes a method definition, attached to selfVal,
@@ -359,9 +356,9 @@ func goTypeToABIType(typ reflect.Type) (abi.Type, error) {
 // since big.Int interpretation defaults to uint256.
 type ABIInt256 big.Int
 
-var abiInt256Type = reflect.TypeFor[ABIInt256]()
+var abiInt256Type = typeFor[ABIInt256]()
 
-var abiUint256Type = reflect.TypeFor[uint256.Int]()
+var abiUint256Type = typeFor[uint256.Int]()
 
 // goTypeToSolidityType converts a Go type to the solidity ABI type definition.
 // The "internalType" is a quirk of the Geth ABI utils, for nested structures.
@@ -411,7 +408,7 @@ func goTypeToSolidityType(typ reflect.Type) (typeDef, internalType string, err e
 		if typ.AssignableTo(abiInt256Type) {
 			return "int256", "", nil
 		}
-		if typ.ConvertibleTo(reflect.TypeFor[big.Int]()) {
+		if typ.ConvertibleTo(typeFor[big.Int]()) {
 			return "uint256", "", nil
 		}
 		// We can parse into abi.TupleTy in the future, if necessary
@@ -634,10 +631,6 @@ func (p *Precompile[E]) Run(input []byte) ([]byte, error) {
 	return out, nil
 }
 
-func (p *Precompile[E]) Name() string {
-	return p.name
-}
-
 // revertSelector is the ABI signature of a default error type in solidity.
 var revertSelector = crypto.Keccak256([]byte("Error(string)"))[:4]
 
@@ -649,4 +642,10 @@ func encodeRevert(outErr error) ([]byte, error) {
 	out = append(out, b32(uint64(len(outErrStr)))...) // length of string
 	out = append(out, rightPad32(outErrStr)...)       // the error message string
 	return out, vm.ErrExecutionReverted               // Geth EVM will pick this up as a revert with return-data
+}
+
+// typeFor returns the [Type] that represents the type argument T.
+// Note: not available yet in Go 1.21, but part of std-lib later.
+func typeFor[T any]() reflect.Type {
+	return reflect.TypeOf((*T)(nil)).Elem()
 }

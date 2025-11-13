@@ -2,6 +2,8 @@ package p2p
 
 import (
 	"time"
+
+	"github.com/ethereum-optimism/optimism/op-node/rollup"
 )
 
 type ApplicationScoreParams struct {
@@ -21,8 +23,8 @@ type ApplicationScoreParams struct {
 	DecayInterval time.Duration
 }
 
-func LightApplicationScoreParams(blockTime uint64) ApplicationScoreParams {
-	slot := time.Duration(blockTime) * time.Second
+func LightApplicationScoreParams(cfg *rollup.Config) ApplicationScoreParams {
+	slot := time.Duration(cfg.BlockTime) * time.Second
 	if slot == 0 {
 		slot = 2 * time.Second
 	}

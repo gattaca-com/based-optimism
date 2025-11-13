@@ -3,6 +3,7 @@ pragma solidity 0.8.15;
 
 // Libraries
 import { Constants } from "src/libraries/Constants.sol";
+import { NotDepositor } from "src/libraries/L1BlockErrors.sol";
 
 // Interfaces
 import { ISemver } from "interfaces/universal/ISemver.sol";
@@ -61,9 +62,9 @@ contract L1Block is ISemver {
     /// @notice The scalar value applied to the operator fee.
     uint32 public operatorFeeScalar;
 
-    /// @custom:semver 1.6.1
+    /// @custom:semver 1.6.0
     function version() public pure virtual returns (string memory) {
-        return "1.6.1";
+        return "1.6.0";
     }
 
     /// @notice Returns the gas paying token, its decimals, name and symbol.

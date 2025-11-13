@@ -1,7 +1,6 @@
 package status
 
 import (
-	"context"
 	"testing"
 
 	"github.com/ethereum-optimism/optimism/op-service/eth"
@@ -24,11 +23,11 @@ func TestUpdateMinSyncedL1(t *testing.T) {
 	chains := []eth.ChainID{chain1, chain2}
 	tracker := NewStatusTracker(chains)
 	minL1 := eth.BlockRef{Number: 204, Hash: common.Hash{0xaa}}
-	tracker.OnEvent(context.Background(), superevents.LocalDerivedOriginUpdateEvent{
+	tracker.OnEvent(superevents.LocalDerivedOriginUpdateEvent{
 		ChainID: chain1,
 		Origin:  minL1,
 	})
-	tracker.OnEvent(context.Background(), superevents.LocalDerivedOriginUpdateEvent{
+	tracker.OnEvent(superevents.LocalDerivedOriginUpdateEvent{
 		ChainID: chain2,
 		Origin:  eth.BlockRef{Number: 228, Hash: common.Hash{0xbb}},
 	})
@@ -44,11 +43,11 @@ func TestUpdateLocalUnsafe(t *testing.T) {
 	tracker := NewStatusTracker(chains)
 	chain1Unsafe := eth.BlockRef{Number: 204, Hash: common.Hash{0xaa}}
 	chain2Unsafe := eth.BlockRef{Number: 228, Hash: common.Hash{0xbb}}
-	tracker.OnEvent(context.Background(), superevents.LocalUnsafeUpdateEvent{
+	tracker.OnEvent(superevents.LocalUnsafeUpdateEvent{
 		ChainID:        chain1,
 		NewLocalUnsafe: chain1Unsafe,
 	})
-	tracker.OnEvent(context.Background(), superevents.LocalUnsafeUpdateEvent{
+	tracker.OnEvent(superevents.LocalUnsafeUpdateEvent{
 		ChainID:        chain2,
 		NewLocalUnsafe: chain2Unsafe,
 	})
@@ -77,19 +76,19 @@ func TestUpdateCrossSafe(t *testing.T) {
 			Timestamp: 228000,
 		},
 	}
-	tracker.OnEvent(context.Background(), superevents.CrossSafeUpdateEvent{
+	tracker.OnEvent(superevents.CrossSafeUpdateEvent{
 		ChainID:      chain1,
 		NewCrossSafe: chain1Safe,
 	})
-	tracker.OnEvent(context.Background(), superevents.CrossSafeUpdateEvent{
+	tracker.OnEvent(superevents.CrossSafeUpdateEvent{
 		ChainID:      chain2,
 		NewCrossSafe: chain2Safe,
 	})
 	status, err := tracker.SyncStatus()
 	require.NoError(t, err)
 	require.Equal(t, chain1Safe.Derived.Timestamp, status.SafeTimestamp)
-	require.Equal(t, chain1Safe.Derived.ID(), status.Chains[chain1].CrossSafe)
-	require.Equal(t, chain2Safe.Derived.ID(), status.Chains[chain2].CrossSafe)
+	require.Equal(t, chain1Safe.Derived.ID(), status.Chains[chain1].Safe)
+	require.Equal(t, chain2Safe.Derived.ID(), status.Chains[chain2].Safe)
 }
 
 func TestUpdateFinalized(t *testing.T) {
@@ -107,11 +106,11 @@ func TestUpdateFinalized(t *testing.T) {
 		Hash:      common.Hash{0xaa},
 		Timestamp: 228000,
 	}
-	tracker.OnEvent(context.Background(), superevents.FinalizedL2UpdateEvent{
+	tracker.OnEvent(superevents.FinalizedL2UpdateEvent{
 		ChainID:     chain1,
 		FinalizedL2: chain1Finalized,
 	})
-	tracker.OnEvent(context.Background(), superevents.FinalizedL2UpdateEvent{
+	tracker.OnEvent(superevents.FinalizedL2UpdateEvent{
 		ChainID:     chain2,
 		FinalizedL2: chain2Finalized,
 	})

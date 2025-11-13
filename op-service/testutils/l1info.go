@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/params"
 )
 
 var _ eth.BlockInfo = &MockBlockInfo{}
@@ -67,7 +66,7 @@ func (l *MockBlockInfo) BaseFee() *big.Int {
 	return l.InfoBaseFee
 }
 
-func (l *MockBlockInfo) BlobBaseFee(chainConfig *params.ChainConfig) *big.Int {
+func (l *MockBlockInfo) BlobBaseFee() *big.Int {
 	return l.InfoBlobBaseFee
 }
 

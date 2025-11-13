@@ -39,8 +39,8 @@ type Config struct {
 	GameFactoryAddress common.Address // Address of the dispute game factory
 
 	HonestActors    []common.Address // List of honest actors to monitor claims for.
-	RollupRpcs      []string         // The rollup node RPC URLs.
-	SupervisorRpcs  []string         // The supervisor RPC URLs.
+	RollupRpc       string           // The rollup node RPC URL.
+	SupervisorRpc   string           // The supervisor RPC URL.
 	MonitorInterval time.Duration    // Frequency to check for new games to monitor.
 	GameWindow      time.Duration    // Maximum window to look for games to monitor.
 	IgnoredGames    []common.Address // Games to exclude from monitoring
@@ -50,19 +50,19 @@ type Config struct {
 	PprofConfig   oppprof.CLIConfig
 }
 
-func NewInteropConfig(gameFactoryAddress common.Address, l1EthRpc string, supervisorRpcs []string) Config {
-	return NewCombinedConfig(gameFactoryAddress, l1EthRpc, nil, supervisorRpcs)
+func NewInteropConfig(gameFactoryAddress common.Address, l1EthRpc string, supervisorRpc string) Config {
+	return NewCombinedConfig(gameFactoryAddress, l1EthRpc, "", supervisorRpc)
 }
 
-func NewConfig(gameFactoryAddress common.Address, l1EthRpc string, rollupRpcs []string) Config {
-	return NewCombinedConfig(gameFactoryAddress, l1EthRpc, rollupRpcs, nil)
+func NewConfig(gameFactoryAddress common.Address, l1EthRpc string, rollupRpc string) Config {
+	return NewCombinedConfig(gameFactoryAddress, l1EthRpc, rollupRpc, "")
 }
 
-func NewCombinedConfig(gameFactoryAddress common.Address, l1EthRpc string, rollupRpcs []string, supervisorRpcs []string) Config {
+func NewCombinedConfig(gameFactoryAddress common.Address, l1EthRpc string, rollupRpc string, supervisorRpc string) Config {
 	return Config{
 		L1EthRpc:           l1EthRpc,
-		RollupRpcs:         rollupRpcs,
-		SupervisorRpcs:     supervisorRpcs,
+		RollupRpc:          rollupRpc,
+		SupervisorRpc:      supervisorRpc,
 		GameFactoryAddress: gameFactoryAddress,
 
 		MonitorInterval: DefaultMonitorInterval,
@@ -78,7 +78,7 @@ func (c Config) Check() error {
 	if c.L1EthRpc == "" {
 		return ErrMissingL1EthRPC
 	}
-	if len(c.RollupRpcs) == 0 && len(c.SupervisorRpcs) == 0 {
+	if c.RollupRpc == "" && c.SupervisorRpc == "" {
 		return ErrMissingRollupAndSupervisorRpc
 	}
 	if c.GameFactoryAddress == (common.Address{}) {

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strconv"
 
 	"github.com/holiman/uint256"
 
@@ -17,14 +18,26 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 )
 
-var (
-	errLogIndexTooLarge        = errors.New("log index too large")
-	errNilSafetyLevel          = errors.New("nil safety level")
-	errUnrecognizedSafetyLevel = errors.New("unrecognized safety level")
-	errInvalidParentBlock      = errors.New("invalid parent block")
-)
+// ChainIndex represents the lifetime of a chain in a dependency set.
+// Warning: JSON-encoded as string, in base-10.
+type ChainIndex uint32
 
-var ExecutingMessageEventTopic = crypto.Keccak256Hash([]byte("ExecutingMessage(bytes32,(address,uint256,uint256,uint256,uint256))"))
+func (ci ChainIndex) String() string {
+	return strconv.FormatUint(uint64(ci), 10)
+}
+
+func (ci ChainIndex) MarshalText() ([]byte, error) {
+	return []byte(ci.String()), nil
+}
+
+func (ci *ChainIndex) UnmarshalText(data []byte) error {
+	v, err := strconv.ParseUint(string(data), 10, 32)
+	if err != nil {
+		return err
+	}
+	*ci = ChainIndex(v)
+	return nil
+}
 
 type Revision uint64
 
@@ -79,16 +92,16 @@ type ContainsQuery struct {
 }
 
 type ExecutingMessage struct {
-	ChainID   eth.ChainID
+	Chain     ChainIndex // same as ChainID for now, but will be indirect, i.e. translated to full ID, later
 	BlockNum  uint64
 	LogIdx    uint32
 	Timestamp uint64
-	Checksum  MessageChecksum
+	Hash      common.Hash // LogHash (hash of msgHash and origin address)
 }
 
 func (s *ExecutingMessage) String() string {
-	return fmt.Sprintf("ExecMsg(chain: %s, block: %d, log: %d, time: %d, checksum: %s)",
-		s.ChainID, s.BlockNum, s.LogIdx, s.Timestamp, s.Checksum)
+	return fmt.Sprintf("ExecMsg(chainIndex: %s, block: %d, log: %d, time: %d, logHash: %s)",
+		s.Chain, s.BlockNum, s.LogIdx, s.Timestamp, s.Hash)
 }
 
 type Message struct {
@@ -112,50 +125,6 @@ func (m *Message) Checksum() MessageChecksum {
 
 func (m *Message) Access() Access {
 	return m.ToCheckSumArgs().Access()
-}
-
-func (m *Message) DecodeEvent(topics []common.Hash, data []byte) error {
-	if len(topics) != 2 { // event hash, indexed payloadHash
-		return fmt.Errorf("unexpected number of event topics: %d", len(topics))
-	}
-	if topics[0] != ExecutingMessageEventTopic {
-		return fmt.Errorf("unexpected event topic %q", topics[0])
-	}
-	if len(data) != 32*5 {
-		return fmt.Errorf("unexpected identifier data length: %d", len(data))
-	}
-	take := func(length uint) []byte {
-		taken := data[:length]
-		data = data[length:]
-		return taken
-	}
-	takeZeroes := func(length uint) error {
-		for _, v := range take(length) {
-			if v != 0 {
-				return errors.New("expected zero")
-			}
-		}
-		return nil
-	}
-	if err := takeZeroes(12); err != nil {
-		return fmt.Errorf("invalid address padding: %w", err)
-	}
-	m.Identifier.Origin = common.Address(take(20))
-	if err := takeZeroes(32 - 8); err != nil {
-		return fmt.Errorf("invalid block number padding: %w", err)
-	}
-	m.Identifier.BlockNumber = binary.BigEndian.Uint64(take(8))
-	if err := takeZeroes(32 - 4); err != nil {
-		return fmt.Errorf("invalid log index padding: %w", err)
-	}
-	m.Identifier.LogIndex = binary.BigEndian.Uint32(take(4))
-	if err := takeZeroes(32 - 8); err != nil {
-		return fmt.Errorf("invalid timestamp padding: %w", err)
-	}
-	m.Identifier.Timestamp = binary.BigEndian.Uint64(take(8))
-	m.Identifier.ChainID = eth.ChainIDFromBytes32([32]byte(take(32)))
-	m.PayloadHash = topics[1]
-	return nil
 }
 
 type ChecksumArgs struct {
@@ -231,7 +200,7 @@ func (id *Identifier) UnmarshalJSON(input []byte) error {
 	id.Origin = dec.Origin
 	id.BlockNumber = uint64(dec.BlockNumber)
 	if dec.LogIndex > math.MaxUint32 {
-		return fmt.Errorf("%w: %d", errLogIndexTooLarge, dec.LogIndex)
+		return fmt.Errorf("log index too large: %d", dec.LogIndex)
 	}
 	id.LogIndex = uint32(dec.LogIndex)
 	id.Timestamp = uint64(dec.Timestamp)
@@ -271,11 +240,11 @@ func (lvl SafetyLevel) MarshalText() ([]byte, error) {
 
 func (lvl *SafetyLevel) UnmarshalText(text []byte) error {
 	if lvl == nil {
-		return errNilSafetyLevel
+		return errors.New("cannot unmarshal into nil SafetyLevel")
 	}
 	x := SafetyLevel(text)
 	if !x.Validate() {
-		return fmt.Errorf("%w: %q", errUnrecognizedSafetyLevel, text)
+		return fmt.Errorf("unrecognized safety level: %q", text)
 	}
 	*lvl = x
 	return nil
@@ -305,9 +274,6 @@ const (
 )
 
 type ExecutingDescriptor struct {
-	// ChainID of the executing message
-	ChainID eth.ChainID
-
 	// Timestamp is the timestamp of the executing message
 	Timestamp uint64
 
@@ -316,15 +282,51 @@ type ExecutingDescriptor struct {
 	Timeout uint64
 }
 
+func (ed *ExecutingDescriptor) AccessCheck(expiryWindow uint64, initMsgTimestamp uint64) error {
+	// Check upper-bound invariant, strictly
+	// (for access-lists we don't afford to check intra-timestamp dependencies)
+	if ed.Timestamp < initMsgTimestamp {
+		return fmt.Errorf("message broke timestamp invariant: exec: %d, init: %d, %w",
+			ed.Timestamp, initMsgTimestamp, ErrConflict)
+	}
+	if ed.Timestamp == initMsgTimestamp {
+		return fmt.Errorf("access-list check does not allow intra-timestamp (%d): %w", ed.Timestamp, ErrConflict)
+	}
+
+	// Check message expiry
+	expiryAt := initMsgTimestamp + expiryWindow
+	if expiryAt < initMsgTimestamp {
+		return fmt.Errorf("message timestamp too high, overflows: %d, %w",
+			initMsgTimestamp, ErrConflict)
+	}
+	if ed.Timestamp > expiryAt {
+		return fmt.Errorf("cannot message execute at %d, message expired at %d: %w",
+			ed.Timestamp, expiryAt, ErrConflict)
+	}
+	if ed.Timeout == 0 {
+		// If no timeout, then just checking the exact execution time was sufficient
+		return nil
+	}
+
+	// If a timeout is set, check if executing late is still within the expiry window
+	if ed.Timestamp+ed.Timeout < ed.Timestamp {
+		return fmt.Errorf("message timeout too high, overflows: %d, %w",
+			ed.Timestamp, ErrConflict)
+	}
+	if v := ed.Timestamp + ed.Timeout; v > expiryAt {
+		return fmt.Errorf("cannot execute message at timeout %d, expired at %d: %w",
+			v, expiryAt, ErrConflict)
+	}
+	return nil
+}
+
 type executingDescriptorMarshaling struct {
-	ChainID   eth.ChainID    `json:"chainID"`
 	Timestamp hexutil.Uint64 `json:"timestamp"`
 	Timeout   hexutil.Uint64 `json:"timeout,omitempty"`
 }
 
 func (ed ExecutingDescriptor) MarshalJSON() ([]byte, error) {
 	var enc executingDescriptorMarshaling
-	enc.ChainID = ed.ChainID
 	enc.Timestamp = hexutil.Uint64(ed.Timestamp)
 	enc.Timeout = hexutil.Uint64(ed.Timeout)
 	return json.Marshal(&enc)
@@ -335,16 +337,24 @@ func (ed *ExecutingDescriptor) UnmarshalJSON(input []byte) error {
 	if err := json.Unmarshal(input, &dec); err != nil {
 		return err
 	}
-	ed.ChainID = dec.ChainID
 	ed.Timestamp = uint64(dec.Timestamp)
 	ed.Timeout = uint64(dec.Timeout)
 	return nil
 }
 
+type ReferenceView struct {
+	Local eth.BlockID `json:"local"`
+	Cross eth.BlockID `json:"cross"`
+}
+
+func (v ReferenceView) String() string {
+	return fmt.Sprintf("View(local: %s, cross: %s)", v.Local, v.Cross)
+}
+
 type BlockSeal struct {
-	Hash      common.Hash `json:"hash"`
-	Number    uint64      `json:"number"`
-	Timestamp uint64      `json:"timestamp"`
+	Hash      common.Hash
+	Number    uint64
+	Timestamp uint64
 }
 
 func (s BlockSeal) String() string {
@@ -367,7 +377,7 @@ func (s BlockSeal) WithParent(parent eth.BlockID) (eth.BlockRef, error) {
 	// prevent parent attachment if the parent is not the previous block,
 	// and the block is not the genesis block
 	if s.Number != parent.Number+1 && s.Number != 0 {
-		return eth.BlockRef{}, fmt.Errorf("%w: parent %s to combine with %s", errInvalidParentBlock, parent, s)
+		return eth.BlockRef{}, fmt.Errorf("invalid parent block %s to combine with %s", parent, s)
 	}
 	return eth.BlockRef{
 		Hash:       s.Hash,
@@ -375,17 +385,6 @@ func (s BlockSeal) WithParent(parent eth.BlockID) (eth.BlockRef, error) {
 		ParentHash: parent.Hash,
 		Time:       s.Timestamp,
 	}, nil
-}
-
-// WithZeroParent returns [s] with a zero parent hash. This should only be used
-// where a BlockRef is required, but from the calling context it is guaranteed that
-// the parent hash is not needed.
-func (s BlockSeal) WithZeroParent() eth.BlockRef {
-	return eth.BlockRef{
-		Hash:   s.Hash,
-		Number: s.Number,
-		Time:   s.Timestamp,
-	}
 }
 
 func (s BlockSeal) ForceWithParent(parent eth.BlockID) eth.BlockRef {
@@ -485,9 +484,9 @@ type BlockReplacement struct {
 	Invalidated common.Hash  `json:"invalidated"`
 }
 
-// IndexingEvent is an event sent by the indexing node to the supervisor,
+// ManagedEvent is an event sent by the managed node to the supervisor,
 // to share an update. One of the fields will be non-null; different kinds of updates may be sent.
-type IndexingEvent struct {
+type ManagedEvent struct {
 	Reset                  *string              `json:"reset,omitempty"`
 	UnsafeBlock            *eth.BlockRef        `json:"unsafeBlock,omitempty"`
 	DerivationUpdate       *DerivedBlockRefPair `json:"derivationUpdate,omitempty"`
@@ -518,15 +517,6 @@ type Access struct {
 	LogIndex    uint32
 	ChainID     eth.ChainID
 	Checksum    MessageChecksum
-}
-
-func (acc Access) Query() ContainsQuery {
-	return ContainsQuery{
-		Timestamp: acc.Timestamp,
-		BlockNum:  acc.BlockNumber,
-		LogIdx:    acc.LogIndex,
-		Checksum:  acc.Checksum,
-	}
 }
 
 // lookupEntry encodes a lookup entry for an access-list
@@ -621,7 +611,7 @@ func ParseAccess(entries []common.Hash) ([]common.Hash, Access, error) {
 	entries = entries[1:]
 	if typeByte := entry[0]; typeByte == PrefixChainIDExtension {
 		if ([7]byte)(entry[1:8]) != ([7]byte{}) {
-			return nil, Access{}, fmt.Errorf("expected zero bytes: %w", errMalformedEntry)
+			return nil, Access{}, fmt.Errorf("expected zero bytes")
 		}
 		// The lower 8 bytes is set to the uint64 in the first entry.
 		// The upper 24 bytes are set with this extension entry.

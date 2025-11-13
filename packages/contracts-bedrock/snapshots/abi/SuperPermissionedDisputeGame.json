@@ -967,11 +967,6 @@
   },
   {
     "inputs": [],
-    "name": "BadExtraData",
-    "type": "error"
-  },
-  {
-    "inputs": [],
     "name": "BondTransferFailed",
     "type": "error"
   },
@@ -1028,11 +1023,6 @@
   {
     "inputs": [],
     "name": "GameNotResolved",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "GamePaused",
     "type": "error"
   },
   {

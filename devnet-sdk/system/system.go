@@ -8,7 +8,8 @@ import (
 
 	"github.com/ethereum-optimism/optimism/devnet-sdk/descriptors"
 	"github.com/ethereum-optimism/optimism/devnet-sdk/shell/env"
-	"github.com/ethereum-optimism/optimism/op-service/dial"
+	"github.com/ethereum-optimism/optimism/op-service/client"
+	"github.com/ethereum-optimism/optimism/op-service/sources"
 )
 
 type system struct {
@@ -68,7 +69,7 @@ func systemFromDevnet(dn *descriptors.DevnetEnvironment) (System, error) {
 	if slices.Contains(dn.Features, "interop") {
 		// TODO(14849): this will break as soon as we have a dependency set that
 		// doesn't include all L2s.
-		supervisorRPC := dn.L2[0].Services["supervisor"][0].Endpoints["rpc"]
+		supervisorRPC := dn.L2[0].Services["supervisor"].Endpoints["rpc"]
 		return &interopSystem{
 			system:        sys,
 			supervisorRPC: fmt.Sprintf("http://%s:%d", supervisorRPC.Host, supervisorRPC.Port),
@@ -101,10 +102,11 @@ func (i *interopSystem) Supervisor(ctx context.Context) (Supervisor, error) {
 		return i.supervisor, nil
 	}
 
-	supervisor, err := dial.DialSupervisorClientWithTimeout(ctx, nil, i.supervisorRPC)
+	cl, err := client.NewRPC(ctx, nil, i.supervisorRPC)
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial supervisor RPC: %w", err)
 	}
+	supervisor := sources.NewSupervisorClient(cl)
 	i.supervisor = supervisor
 	return supervisor, nil
 }

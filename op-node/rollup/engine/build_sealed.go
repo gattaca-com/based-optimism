@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"context"
 	"time"
 
 	"github.com/ethereum-optimism/optimism/op-service/eth"
@@ -25,10 +24,10 @@ func (ev BuildSealedEvent) String() string {
 	return "build-sealed"
 }
 
-func (e *EngineController) onBuildSealed(ctx context.Context, ev BuildSealedEvent) {
+func (eq *EngDeriver) onBuildSealed(ev BuildSealedEvent) {
 	// If a (pending) safe block, immediately process the block
 	if ev.DerivedFrom != (eth.L1BlockRef{}) {
-		e.emitter.Emit(ctx, PayloadProcessEvent{
+		eq.emitter.Emit(PayloadProcessEvent{
 			Concluding:   ev.Concluding,
 			DerivedFrom:  ev.DerivedFrom,
 			Envelope:     ev.Envelope,

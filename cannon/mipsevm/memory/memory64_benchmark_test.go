@@ -1,3 +1,6 @@
+//go:build cannon64
+// +build cannon64
+
 package memory
 
 import (
@@ -9,11 +12,9 @@ import (
 )
 
 const (
-	smallDataset              = 12_500_000
-	mediumDataset             = 100_000_000
-	largeDataset              = 400_000_000
-	testDefaultCodeRegionSize = 4096
-	testDefaultHeapSize       = 4096
+	smallDataset  = 12_500_000
+	mediumDataset = 100_000_000
+	largeDataset  = 400_000_000
 )
 
 func BenchmarkMemoryOperations(b *testing.B) {
@@ -38,7 +39,7 @@ func BenchmarkMemoryOperations(b *testing.B) {
 	for _, bm := range benchmarks {
 		b.Run("BinaryTree", func(b *testing.B) {
 			b.Run(bm.name, func(b *testing.B) {
-				m := NewBinaryTreeMemory(testDefaultCodeRegionSize, testDefaultHeapSize)
+				m := NewBinaryTreeMemory()
 				b.ResetTimer()
 				bm.fn(b, m)
 			})

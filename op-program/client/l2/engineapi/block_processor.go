@@ -61,9 +61,7 @@ func NewBlockProcessorFromPayloadAttributes(provider BlockDataProvider, parent c
 			d = provider.Config().BaseFeeChangeDenominator(header.Time)
 			e = provider.Config().ElasticityMultiplier()
 		}
-		if provider.Config().IsOptimismHolocene(header.Time) {
-			header.Extra = eip1559.EncodeOptimismExtraData(provider.Config(), header.Time, d, e, attrs.MinBaseFee)
-		}
+		header.Extra = eip1559.EncodeHoloceneExtraData(d, e)
 	}
 
 	return NewBlockProcessorFromHeader(provider, header)
@@ -167,13 +165,9 @@ func (b *BlockProcessor) Assemble() (*types.Block, types.Receipts, error) {
 		_requests := [][]byte{}
 		// EIP-6110 - no-op because we just ignore all deposit requests, so no need to parse logs
 		// EIP-7002
-		if err := core.ProcessWithdrawalQueue(&_requests, b.evm); err != nil {
-			return nil, nil, err
-		}
+		core.ProcessWithdrawalQueue(&_requests, b.evm)
 		// EIP-7251
-		if err := core.ProcessConsolidationQueue(&_requests, b.evm); err != nil {
-			return nil, nil, err
-		}
+		core.ProcessConsolidationQueue(&_requests, b.evm)
 	}
 
 	block, err := b.dataProvider.Engine().FinalizeAndAssemble(b.dataProvider, b.header, b.state, &body, b.receipts)

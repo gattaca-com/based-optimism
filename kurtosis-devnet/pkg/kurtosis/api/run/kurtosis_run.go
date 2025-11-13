@@ -11,8 +11,6 @@ import (
 	"github.com/ethereum-optimism/optimism/kurtosis-devnet/pkg/kurtosis/api/interfaces"
 	"github.com/ethereum-optimism/optimism/kurtosis-devnet/pkg/kurtosis/api/wrappers"
 	"github.com/kurtosis-tech/kurtosis/api/golang/core/lib/starlark_run_config"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/trace"
 )
 
 type KurtosisRunner struct {
@@ -20,7 +18,6 @@ type KurtosisRunner struct {
 	enclave     string
 	kurtosisCtx interfaces.KurtosisContextInterface
 	runHandlers []MessageHandler
-	tracer      trace.Tracer
 }
 
 type KurtosisRunnerOptions func(*KurtosisRunner)
@@ -50,9 +47,7 @@ func WithKurtosisRunnerRunHandlers(runHandlers ...MessageHandler) KurtosisRunner
 }
 
 func NewKurtosisRunner(opts ...KurtosisRunnerOptions) (*KurtosisRunner, error) {
-	r := &KurtosisRunner{
-		tracer: otel.Tracer("kurtosis-run"),
-	}
+	r := &KurtosisRunner{}
 	for _, opt := range opts {
 		opt(r)
 	}
@@ -68,9 +63,6 @@ func NewKurtosisRunner(opts ...KurtosisRunnerOptions) (*KurtosisRunner, error) {
 }
 
 func (r *KurtosisRunner) Run(ctx context.Context, packageName string, args io.Reader) error {
-	ctx, span := r.tracer.Start(ctx, fmt.Sprintf("run package %s", packageName))
-	defer span.End()
-
 	if r.dryRun {
 		fmt.Printf("Dry run mode enabled, would run kurtosis package %s in enclave %s\n",
 			packageName, r.enclave)
@@ -120,7 +112,7 @@ func (r *KurtosisRunner) Run(ctx context.Context, packageName string, args io.Re
 	runFinishedHandler := makeRunFinishedHandler(&isRunSuccessful)
 
 	// Combine custom handlers with default handler and run finished handler
-	handler := AllHandlers(append(r.runHandlers, newDefaultHandler(), runFinishedHandler)...)
+	handler := AllHandlers(append(r.runHandlers, defaultHandler, runFinishedHandler)...)
 
 	// Process the output stream
 	for responseLine := range stream {

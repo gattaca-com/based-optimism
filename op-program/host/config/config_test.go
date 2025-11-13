@@ -18,7 +18,6 @@ import (
 )
 
 var (
-	validL1ChainConfig   = params.SepoliaChainConfig
 	validRollupConfig    = chaincfg.OPSepolia()
 	validL2Genesis       = chainconfig.OPSepoliaChainConfig()
 	validL1Head          = common.Hash{0xaa}
@@ -235,9 +234,8 @@ func TestCustomL2ChainID(t *testing.T) {
 		require.Equal(t, cfg.L2ChainID, eth.ChainIDFromBig(validL2Genesis.ChainID))
 	})
 	t.Run("custom", func(t *testing.T) {
-		customL1ChainConfig := &params.ChainConfig{ChainID: big.NewInt(0x1212121212)}
-		customL2ChainConfig := &params.ChainConfig{ChainID: big.NewInt(0x2323232323)}
-		cfg := NewSingleChainConfig(validRollupConfig, customL1ChainConfig, customL2ChainConfig, validL1Head, validL2Head, validL2OutputRoot, validL2Claim, validL2ClaimBlockNum)
+		customChainConfig := &params.ChainConfig{ChainID: big.NewInt(0x1212121212)}
+		cfg := NewSingleChainConfig(validRollupConfig, customChainConfig, validL1Head, validL2Head, validL2OutputRoot, validL2Claim, validL2ClaimBlockNum)
 		require.Equal(t, cfg.L2ChainID, boot.CustomChainIDIndicator)
 	})
 }
@@ -298,7 +296,7 @@ func TestDBFormat(t *testing.T) {
 }
 
 func validConfig() *Config {
-	cfg := NewSingleChainConfig(validRollupConfig, validL2Genesis, validL1ChainConfig, validL1Head, validL2Head, validL2OutputRoot, validL2Claim, validL2ClaimBlockNum)
+	cfg := NewSingleChainConfig(validRollupConfig, validL2Genesis, validL1Head, validL2Head, validL2OutputRoot, validL2Claim, validL2ClaimBlockNum)
 	cfg.DataDir = "/tmp/configTest"
 	return cfg
 }

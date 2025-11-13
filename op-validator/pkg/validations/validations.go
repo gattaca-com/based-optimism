@@ -6,8 +6,6 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/standard"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -84,17 +82,9 @@ func (v *BaseValidator) Validate(ctx context.Context, input BaseValidatorInput) 
 }
 
 func NewV180Validator(client *rpc.Client) *BaseValidator {
-	return newBaseValidator(client, standard.ContractsV180Tag)
+	return newBaseValidator(client, VersionV180)
 }
 
 func NewV200Validator(client *rpc.Client) *BaseValidator {
-	return newBaseValidator(client, standard.ContractsV200Tag)
-}
-
-func NewV300Validator(client *rpc.Client) *BaseValidator {
-	return newBaseValidator(client, standard.ContractsV300Tag)
-}
-
-func NewV400Validator(client *rpc.Client) *BaseValidator {
-	return newBaseValidator(client, standard.ContractsV400Tag)
+	return newBaseValidator(client, VersionV200)
 }

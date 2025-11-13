@@ -10,7 +10,6 @@
 !op-program/
 !op-service/
 !op-supervisor/
-!op-test-sequencer
 
 **/bin
 **/testdata

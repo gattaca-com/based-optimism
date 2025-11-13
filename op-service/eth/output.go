@@ -37,9 +37,9 @@ type Output interface {
 }
 
 type OutputV0 struct {
-	StateRoot                Bytes32     `json:"stateRoot"`
-	MessagePasserStorageRoot Bytes32     `json:"messagePasserStorageRoot"`
-	BlockHash                common.Hash `json:"blockHash"`
+	StateRoot                Bytes32
+	MessagePasserStorageRoot Bytes32
+	BlockHash                common.Hash
 }
 
 func (o *OutputV0) Version() Bytes32 {

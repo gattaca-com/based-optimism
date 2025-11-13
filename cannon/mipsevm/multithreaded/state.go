@@ -70,8 +70,6 @@ type State struct {
 
 	// LastHint is optional metadata, and not part of the VM state itself.
 	LastHint hexutil.Bytes
-
-	UseLargeICache bool
 }
 
 var _ mipsevm.FPVMState = (*State)(nil)
@@ -105,9 +103,9 @@ func CreateInitialState(pc, heapStart Word) *State {
 	return state
 }
 
-func (s *State) CreateVM(logger log.Logger, po mipsevm.PreimageOracle, stdOut, stdErr io.Writer, meta mipsevm.Metadata, features mipsevm.FeatureToggles) mipsevm.FPVM {
+func (s *State) CreateVM(logger log.Logger, po mipsevm.PreimageOracle, stdOut, stdErr io.Writer, meta mipsevm.Metadata) mipsevm.FPVM {
 	logger.Info("Using cannon multithreaded VM", "is32", arch.IsMips32)
-	return NewInstrumentedState(s, po, stdOut, stdErr, logger, meta, features)
+	return NewInstrumentedState(s, po, stdOut, stdErr, logger, meta)
 }
 
 func (s *State) GetCurrentThread() *ThreadState {
@@ -335,11 +333,7 @@ func (s *State) Serialize(out io.Writer) error {
 
 func (s *State) Deserialize(in io.Reader) error {
 	bin := serialize.NewBinaryReader(in)
-	if s.UseLargeICache {
-		s.Memory = memory.NewMemoryWithLargeRegions()
-	} else {
-		s.Memory = memory.NewMemory()
-	}
+	s.Memory = memory.NewMemory()
 	if err := s.Memory.Deserialize(in); err != nil {
 		return err
 	}

@@ -20,6 +20,7 @@ import (
 	opmetrics "github.com/ethereum-optimism/optimism/op-service/metrics"
 	"github.com/ethereum-optimism/optimism/op-service/oppprof"
 	oprpc "github.com/ethereum-optimism/optimism/op-service/rpc"
+	"github.com/ethereum-optimism/optimism/op-service/sources"
 	"github.com/ethereum-optimism/optimism/op-service/sources/batching"
 	"github.com/ethereum-optimism/optimism/op-service/txmgr"
 
@@ -147,11 +148,12 @@ func (ps *ProposerService) initRPCClients(ctx context.Context, cfg *CLIConfig) e
 	if len(cfg.SupervisorRpcs) != 0 {
 		var clients []source.SupervisorClient
 		for _, url := range cfg.SupervisorRpcs {
-			cl, err := dial.DialSupervisorClientWithTimeout(ctx, ps.Log, url,
-				client.WithRPCRecorder(ps.Metrics.NewRecorder("supervisor")))
+			supervisorRpc, err := dial.DialRPCClientWithTimeout(ctx, dial.DefaultDialTimeout, ps.Log, url)
 			if err != nil {
 				return fmt.Errorf("failed to dial supervisor RPC client (%v): %w", url, err)
 			}
+			cl := sources.NewSupervisorClient(client.NewBaseRPCClient(supervisorRpc,
+				client.WithRPCRecorder(ps.Metrics.NewRecorder("supervisor"))))
 			clients = append(clients, cl)
 		}
 		ps.ProposalSource = source.NewSupervisorProposalSource(ps.Log, clients...)

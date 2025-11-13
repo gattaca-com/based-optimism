@@ -1,5 +1,4 @@
-# nproc is for linux, sysctl for Mac and then fallback to 4 if neither is available
-num_cores := $(shell nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
+num_cores := $(shell nproc)
 
 # Generally, JUNIT_FILE is set in CI but may be specified to an arbitrary file location to emulate CI locally
 # If JUNIT_FILE is set, JSON_LOG_FILE should also be set
@@ -40,7 +39,8 @@ test-fault-proofs: pre-test
 .PHONY: test-faultproofs
 
 cannon-prestates:
-	make -C .. cannon-prestates
+	make -C .. cannon-prestate
+	make -C .. cannon-prestate-mt64
 .PHONY: cannon-prestates
 
 
@@ -65,13 +65,3 @@ fuzz:
 		"go test -run NOTAREALTEST -tags cgo_test -v -fuzztime 10s -fuzz FuzzFastLzGethSolidity ./opgeth" \
 		"go test -run NOTAREALTEST -tags cgo_test -v -fuzztime 10s -fuzz FuzzFastLzCgo ./opgeth" \
 	| parallel -j 8 {}
-
-ifndef CONTRACT
-gen-binding:
-	$(error CONTRACT is required, usage: make gen-binding CONTRACT=OPContractsManager)
-else
-gen-binding:
-	cd ../packages/contracts-bedrock && just build
-	./scripts/gen-binding.sh $(CONTRACT)
-endif
-.PHONY: gen-binding

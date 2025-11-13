@@ -3,9 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
-	"strings"
 
-	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/standard"
+	"github.com/ethereum-optimism/optimism/op-validator/pkg/validations"
 
 	oplog "github.com/ethereum-optimism/optimism/op-service/log"
 	"github.com/ethereum-optimism/optimism/op-validator/pkg/service"
@@ -32,10 +31,9 @@ func main() {
 			Name:  "validate",
 			Usage: "Run validation for a specific version",
 			Subcommands: []*cli.Command{
-				versionCmd(standard.ContractsV180Tag),
-				versionCmd(standard.ContractsV200Tag),
-				versionCmd(standard.ContractsV300Tag),
-				versionCmd(standard.ContractsV400Tag),
+				versionCmd(validations.VersionV180),
+				versionCmd(validations.VersionV200),
+				versionCmd(validations.VersionV300),
 			},
 		},
 	}
@@ -51,7 +49,7 @@ func main() {
 
 func versionCmd(version string) *cli.Command {
 	return &cli.Command{
-		Name:  strings.Replace(version, "op-contracts/", "", 1),
+		Name:  version,
 		Usage: fmt.Sprintf("Run validation for %s", version),
 		Flags: append(service.ValidateFlags, oplog.CLIFlags(EnvVarPrefix)...),
 		Action: func(cliCtx *cli.Context) error {

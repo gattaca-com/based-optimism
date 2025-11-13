@@ -266,8 +266,8 @@ func TestMixedDepositValidity(t *testing.T) {
 	}
 }
 
-func TestMixedWithdrawalValidity_Default(t *testing.T) {
-	testMixedWithdrawalValidity(t, config.DefaultAllocType)
+func TestMixedWithdrawalValidity_Standard(t *testing.T) {
+	testMixedWithdrawalValidity(t, config.AllocTypeStandard)
 }
 
 // TestMixedWithdrawalValidity makes a number of withdrawal transactions and ensures ones with modified parameters are

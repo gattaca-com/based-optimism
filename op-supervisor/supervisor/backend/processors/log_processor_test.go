@@ -12,6 +12,7 @@ import (
 
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-service/predeploys"
+	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/backend/depset"
 	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/types"
 )
 
@@ -25,10 +26,15 @@ func TestLogProcessor(t *testing.T) {
 		Hash:       common.Hash{0x11},
 		Time:       1111,
 	}
+	depSet := &testDepSet{
+		mapping: map[eth.ChainID]types.ChainIndex{
+			eth.ChainIDFromUInt64(100): 4,
+		},
+	}
 
 	t.Run("NoOutputWhenLogsAreEmpty", func(t *testing.T) {
 		store := &stubLogStorage{}
-		processor := NewLogProcessor(logProcessorChainID, store)
+		processor := NewLogProcessor(logProcessorChainID, store, depSet)
 
 		err := processor.ProcessLogs(ctx, block1, ethTypes.Receipts{})
 		require.NoError(t, err)
@@ -62,7 +68,7 @@ func TestLogProcessor(t *testing.T) {
 			},
 		}
 		store := &stubLogStorage{}
-		processor := NewLogProcessor(logProcessorChainID, store)
+		processor := NewLogProcessor(logProcessorChainID, store, depSet)
 
 		err := processor.ProcessLogs(ctx, block1, rcpts)
 		require.NoError(t, err)
@@ -70,19 +76,19 @@ func TestLogProcessor(t *testing.T) {
 			{
 				parent:  block1.ParentID(),
 				logIdx:  0,
-				logHash: LogToLogHash(rcpts[0].Logs[0]),
+				logHash: logToLogHash(rcpts[0].Logs[0]),
 				execMsg: nil,
 			},
 			{
 				parent:  block1.ParentID(),
 				logIdx:  0,
-				logHash: LogToLogHash(rcpts[0].Logs[1]),
+				logHash: logToLogHash(rcpts[0].Logs[1]),
 				execMsg: nil,
 			},
 			{
 				parent:  block1.ParentID(),
 				logIdx:  0,
-				logHash: LogToLogHash(rcpts[1].Logs[0]),
+				logHash: logToLogHash(rcpts[1].Logs[0]),
 				execMsg: nil,
 			},
 		}
@@ -111,15 +117,15 @@ func TestLogProcessor(t *testing.T) {
 			},
 		}
 		execMsg := &types.ExecutingMessage{
-			ChainID:   eth.ChainIDFromUInt64(4),
+			Chain:     4,
 			BlockNum:  6,
 			LogIdx:    8,
 			Timestamp: 10,
-			Checksum:  types.MessageChecksum{0xaa},
+			Hash:      common.Hash{0xaa},
 		}
 		store := &stubLogStorage{}
-		processor := NewLogProcessor(eth.ChainID{4}, store).(*logProcessor)
-		processor.eventDecoder = func(l *ethTypes.Log) (*types.ExecutingMessage, error) {
+		processor := NewLogProcessor(eth.ChainID{4}, store, depSet).(*logProcessor)
+		processor.eventDecoder = func(l *ethTypes.Log, translator depset.ChainIndexFromID) (*types.ExecutingMessage, error) {
 			require.Equal(t, rcpts[0].Logs[0], l)
 			return execMsg, nil
 		}
@@ -130,7 +136,7 @@ func TestLogProcessor(t *testing.T) {
 			{
 				parent:  block1.ParentID(),
 				logIdx:  0,
-				logHash: LogToLogHash(rcpts[0].Logs[0]),
+				logHash: logToLogHash(rcpts[0].Logs[0]),
 				execMsg: execMsg,
 			},
 		}
@@ -181,7 +187,7 @@ func TestToLogHash(t *testing.T) {
 		func(l *ethTypes.Log) { l.Index = 98 },
 		func(l *ethTypes.Log) { l.Removed = true },
 	}
-	refHash := LogToLogHash(mkLog())
+	refHash := logToLogHash(mkLog())
 	// The log hash is stored in the database so test that it matches the actual value.
 	// If this changes, compatibility with existing databases may be affected
 	expectedRefHash := common.HexToHash("0x4e1dc08fddeb273275f787762cdfe945cf47bb4e80a1fabbc7a825801e81b73f")
@@ -191,14 +197,14 @@ func TestToLogHash(t *testing.T) {
 	for i, mod := range relevantMods {
 		l := mkLog()
 		mod(l)
-		hash := LogToLogHash(l)
+		hash := logToLogHash(l)
 		require.NotEqualf(t, refHash, hash, "expected relevant modification %v to affect the hash but it did not", i)
 	}
 	// Check that the hash is not changed when any data it should not include changes
 	for i, mod := range irrelevantMods {
 		l := mkLog()
 		mod(l)
-		hash := LogToLogHash(l)
+		hash := logToLogHash(l)
 		require.Equal(t, refHash, hash, "expected irrelevant modification %v to not affect the hash but it did", i)
 	}
 }

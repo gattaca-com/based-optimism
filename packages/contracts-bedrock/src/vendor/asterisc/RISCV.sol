@@ -285,44 +285,34 @@ contract RISCV is IBigStepper {
                 out := 0
             }
             function stateOffsetPreimageKey() -> out {
-                out := 32 // 0 + 32
-                    //                out := add(stateOffsetMemRoot(), stateSizeMemRoot())
+                out := add(stateOffsetMemRoot(), stateSizeMemRoot())
             }
             function stateOffsetPreimageOffset() -> out {
-                out := 64 // 32 + 32
-                    //                out := add(stateOffsetPreimageKey(), stateSizePreimageKey())
+                out := add(stateOffsetPreimageKey(), stateSizePreimageKey())
             }
             function stateOffsetPC() -> out {
-                out := 72 // 64 + 8
-                    //                out := add(stateOffsetPreimageOffset(), stateSizePreimageOffset())
+                out := add(stateOffsetPreimageOffset(), stateSizePreimageOffset())
             }
             function stateOffsetExitCode() -> out {
-                out := 80 // 72 + 8
-                    //                out := add(stateOffsetPC(), stateSizePC())
+                out := add(stateOffsetPC(), stateSizePC())
             }
             function stateOffsetExited() -> out {
-                out := 81 // 80 + 1
-                    //                out := add(stateOffsetExitCode(), stateSizeExitCode())
+                out := add(stateOffsetExitCode(), stateSizeExitCode())
             }
             function stateOffsetStep() -> out {
-                out := 82 // 81 + 1
-                    //                out := add(stateOffsetExited(), stateSizeExited())
+                out := add(stateOffsetExited(), stateSizeExited())
             }
             function stateOffsetHeap() -> out {
-                out := 90 // 82 + 8
-                    //                out := add(stateOffsetStep(), stateSizeStep())
+                out := add(stateOffsetStep(), stateSizeStep())
             }
             function stateOffsetLoadReservation() -> out {
-                out := 98 // 90 + 8
-                    //                out := add(stateOffsetHeap(), stateSizeHeap())
+                out := add(stateOffsetHeap(), stateSizeHeap())
             }
             function stateOffsetRegisters() -> out {
-                out := 106 // 98 + 8
-                    //                out := add(stateOffsetLoadReservation(), stateSizeLoadReservation())
+                out := add(stateOffsetLoadReservation(), stateSizeLoadReservation())
             }
             function stateSize() -> out {
-                out := 362 // 106 + 256
-                    //                out := add(stateOffsetRegisters(), stateSizeRegisters())
+                out := add(stateOffsetRegisters(), stateSizeRegisters())
             }
 
             //
@@ -355,13 +345,6 @@ contract RISCV is IBigStepper {
                 out := 548
             }
             if iszero(eq(_proof.offset, proofContentOffset())) { revert(0, 0) }
-
-            if mod(calldataload(sub(proofContentOffset(), 32)), mul(60, 32)) {
-                // proof offset must be stateContentOffset+paddedStateSize+32
-                // proof size: 64-5+1=60 * 32 byte leaf,
-                // so the proofSize must be a multiple of 60*32
-                revert(0, 0)
-            }
 
             //
             // State loading
@@ -755,8 +738,6 @@ contract RISCV is IBigStepper {
             }
 
             function storeMem(addr, size, value, proofIndexL, proofIndexR) {
-                if gt(size, 8) { revertWithCode(0xbad512e8) } // cannot store more than 8 bytes
-
                 storeMemUnaligned(addr, size, u64ToU256(value), proofIndexL, proofIndexR)
             }
 
@@ -907,7 +888,7 @@ contract RISCV is IBigStepper {
 
                     let errCode := 0
                     // ensure MAP_ANONYMOUS is set and fd == -1
-                    switch or(iszero(and(flags, 0x20)), iszero(eq(fd, u64Mask())))
+                    switch or(iszero(and(flags, 0x20)), not(eq(fd, u64Mask())))
                     case 1 {
                         addr := u64Mask()
                         errCode := toU64(0x4d)
@@ -1166,10 +1147,6 @@ contract RISCV is IBigStepper {
                 let pc_ := _pc
                 // 000_0011: memory loading
                 // LB, LH, LW, LD, LBU, LHU, LWU
-
-                // bits[14:12] set to 111 are reserved
-                if eq64(funct3, toU64(0x7)) { revertWithCode(0xbadc0de) }
-
                 let imm := parseImmTypeI(instr)
                 let signed := iszero64(and64(funct3, toU64(4))) // 4 = 100 -> bitflag
                 let size := shl64(and64(funct3, toU64(3)), toU64(1)) // 3 = 11 -> 1, 2, 4, 8 bytes size
@@ -1229,10 +1206,6 @@ contract RISCV is IBigStepper {
                     // So it's really 13 bits with a hardcoded 0 bit.
                     _pc := add64(_pc, imm)
                 }
-
-                // The PC must be aligned to 4 bytes.
-                if and64(_pc, toU64(3)) { revertWithCode(0xbad10ad0) } // target not aligned with 4 bytes
-
                 // not like the other opcodes: nothing to write to rd register, and PC has already changed
                 setPC(_pc)
             }
@@ -1274,7 +1247,6 @@ contract RISCV is IBigStepper {
                         // 010000 = SRAI
                         rdValue := sar64(and64(imm, toU64(0x3F)), rs1Value) // lower 6 bits in 64 bit mode
                     }
-                    default { revertWithCode(0xbadc0de) }
                 }
                 case 6 {
                     // 110 = ORI
@@ -1284,7 +1256,6 @@ contract RISCV is IBigStepper {
                     // 111 = ANDI
                     rdValue := and64(rs1Value, imm)
                 }
-                default { revertWithCode(0xbadc0de) }
                 setRegister(rd, rdValue)
                 setPC(add64(_pc, toU64(4)))
             }
@@ -1300,15 +1271,9 @@ contract RISCV is IBigStepper {
                 }
                 case 1 {
                     // 001 = SLLIW
-
-                    // SLLIW where imm[5] != 0 is reserved
-                    if and64(imm, toU64(0x20)) { revertWithCode(0xbadc0de) }
                     rdValue := mask32Signed64(shl64(and64(imm, toU64(0x1F)), rs1Value))
                 }
                 case 5 {
-                    // SRLIW and SRAIW where imm[5] != 0 is reserved
-                    if and64(imm, toU64(0x20)) { revertWithCode(0xbadc0de) }
-
                     // 101 = SR~
                     let shamt := and64(imm, toU64(0x1F))
                     switch shr64(toU64(5), imm)
@@ -1321,9 +1286,7 @@ contract RISCV is IBigStepper {
                         // 0100000 = SRAIW
                         rdValue := signExtend64(shr64(shamt, and64(rs1Value, u32Mask())), sub64(toU64(31), shamt))
                     }
-                    default { revertWithCode(0xbadc0de) }
                 }
-                default { revertWithCode(0xbadc0de) }
                 setRegister(rd, rdValue)
                 setPC(add64(_pc, toU64(4)))
             }
@@ -1377,7 +1340,6 @@ contract RISCV is IBigStepper {
                         case 0 { rdValue := rs1Value }
                         default { rdValue := mod64(rs1Value, rs2Value) }
                     }
-                    default { revertWithCode(0xbadc0de) }
                 }
                 default {
                     switch funct3
@@ -1392,7 +1354,6 @@ contract RISCV is IBigStepper {
                             // 0100000 = SUB
                             rdValue := sub64(rs1Value, rs2Value)
                         }
-                        default { revertWithCode(0xbadc0de) }
                     }
                     case 1 {
                         // 001 = SLL
@@ -1422,7 +1383,6 @@ contract RISCV is IBigStepper {
                             // 0100000 = SRA
                             rdValue := sar64(and64(rs2Value, toU64(0x3F)), rs1Value) // arithmetic: sign bit is extended
                         }
-                        default { revertWithCode(0xbadc0de) }
                     }
                     case 6 {
                         // 110 = OR
@@ -1432,7 +1392,6 @@ contract RISCV is IBigStepper {
                         // 111 = AND
                         rdValue := and64(rs1Value, rs2Value)
                     }
-                    default { revertWithCode(0xbadc0de) }
                 }
                 setRegister(rd, rdValue)
                 setPC(add64(_pc, toU64(4)))
@@ -1440,7 +1399,7 @@ contract RISCV is IBigStepper {
             case 0x3B {
                 // 011_1011: register arithmetic and logic in 32 bits
                 let rs1Value := getRegister(rs1)
-                let rs2Value := and64(getRegister(rs2), u32Mask())
+                let rs2Value := getRegister(rs2)
                 let rdValue := 0
                 switch funct7
                 case 1 {
@@ -1482,7 +1441,6 @@ contract RISCV is IBigStepper {
                             rdValue := mask32Signed64(mod64(and64(rs1Value, u32Mask()), and64(rs2Value, u32Mask())))
                         }
                     }
-                    default { revertWithCode(0xbadc0de) }
                 }
                 default {
                     switch funct3
@@ -1497,7 +1455,6 @@ contract RISCV is IBigStepper {
                             // 0100000 = SUBW
                             rdValue := mask32Signed64(sub64(and64(rs1Value, u32Mask()), and64(rs2Value, u32Mask())))
                         }
-                        default { revertWithCode(0xbadc0de) }
                     }
                     case 1 {
                         // 001 = SLLW
@@ -1515,9 +1472,7 @@ contract RISCV is IBigStepper {
                             // 0100000 = SRAW
                             rdValue := signExtend64(shr64(shamt, and64(rs1Value, u32Mask())), sub64(toU64(31), shamt))
                         }
-                        default { revertWithCode(0xbadc0de) }
                     }
-                    default { revertWithCode(0xbadc0de) }
                 }
                 setRegister(rd, rdValue)
                 setPC(add64(_pc, toU64(4)))
@@ -1541,13 +1496,7 @@ contract RISCV is IBigStepper {
                 let imm := parseImmTypeJ(instr)
                 let rdValue := add64(_pc, toU64(4))
                 setRegister(rd, rdValue)
-
-                let newPC := add64(_pc, signExtend64(shl64(toU64(1), imm), toU64(20)))
-                if and64(newPC, toU64(3)) {
-                    // quick target alignment check
-                    revertWithCode(0xbad10ad0) // target not aligned with 4 bytes
-                }
-                setPC(newPC) // signed offset in multiples of 2
+                setPC(add64(_pc, signExtend64(shl64(toU64(1), imm), toU64(20)))) // signed offset in multiples of 2
                     // bytes (last bit is there, but ignored)
             }
             case 0x67 {
@@ -1556,13 +1505,8 @@ contract RISCV is IBigStepper {
                 let imm := parseImmTypeI(instr)
                 let rdValue := add64(_pc, toU64(4))
                 setRegister(rd, rdValue)
-
-                let newPC := and64(add64(rs1Value, signExtend64(imm, toU64(11))), xor64(u64Mask(), toU64(1)))
-                if and64(newPC, toU64(3)) {
-                    // quick target alignment check
-                    revertWithCode(0xbad10ad0) // target not aligned with 4 bytes
-                }
-                setPC(newPC) // least significant bit is set to 0
+                setPC(and64(add64(rs1Value, signExtend64(imm, toU64(11))), xor64(u64Mask(), toU64(1)))) // least
+                    // significant bit is set to 0
             }
             case 0x73 {
                 // 111_0011: environment things
@@ -1604,7 +1548,7 @@ contract RISCV is IBigStepper {
                 if or(lt64(size, toU64(4)), gt64(size, toU64(8))) { revertWithCode(0xbada70) } // bad AMO size
 
                 let addr := getRegister(rs1)
-                if mod64(addr, size) {
+                if and64(addr, toU64(3)) {
                     // quick addr alignment check
                     revertWithCode(0xbad10ad0) // addr not aligned with 4 bytes
                 }

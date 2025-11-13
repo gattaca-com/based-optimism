@@ -115,10 +115,6 @@ func NewSpanChannelOut(targetOutputSize uint64, compressionAlgo CompressionAlgo,
 	return c, nil
 }
 
-func (co *SpanChannelOut) DiscardCompressor() {
-	co.compressor = nil
-}
-
 func (co *SpanChannelOut) Reset() error {
 	co.closed = false
 	co.full = nil

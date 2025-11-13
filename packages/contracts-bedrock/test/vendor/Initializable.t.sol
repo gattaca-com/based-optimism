@@ -12,16 +12,14 @@ import { Process } from "scripts/libraries/Process.sol";
 import { LibString } from "@solady/utils/LibString.sol";
 import { GameType, Hash, Proposal } from "src/dispute/lib/Types.sol";
 import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
-import { DevFeatures } from "src/libraries/DevFeatures.sol";
 
 // Interfaces
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
-import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { IResourceMetering } from "interfaces/L1/IResourceMetering.sol";
+import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
 import { ProtocolVersion } from "interfaces/L1/IProtocolVersions.sol";
 import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
-import { IOptimismPortalInterop } from "interfaces/L1/IOptimismPortalInterop.sol";
 
 /// @title Initializer_Test
 /// @dev Ensures that the `initialize()` function on contracts cannot be called more than
@@ -61,7 +59,7 @@ contract Initializer_Test is CommonTest {
             InitializeableContract({
                 name: "SuperchainConfigImpl",
                 target: EIP1967Helper.getImplementation(address(superchainConfig)),
-                initCalldata: abi.encodeCall(superchainConfig.initialize, (address(0)))
+                initCalldata: abi.encodeCall(superchainConfig.initialize, (address(0), false))
             })
         );
         // SuperchainConfigProxy
@@ -69,7 +67,7 @@ contract Initializer_Test is CommonTest {
             InitializeableContract({
                 name: "SuperchainConfigProxy",
                 target: address(superchainConfig),
-                initCalldata: abi.encodeCall(superchainConfig.initialize, (address(0)))
+                initCalldata: abi.encodeCall(superchainConfig.initialize, (address(0), false))
             })
         );
         // L1CrossDomainMessengerImpl
@@ -77,7 +75,7 @@ contract Initializer_Test is CommonTest {
             InitializeableContract({
                 name: "L1CrossDomainMessengerImpl",
                 target: addressManager.getAddress("OVM_L1CrossDomainMessenger"),
-                initCalldata: abi.encodeCall(l1CrossDomainMessenger.initialize, (systemConfig, optimismPortal2))
+                initCalldata: abi.encodeCall(l1CrossDomainMessenger.initialize, (superchainConfig, optimismPortal2))
             })
         );
         // L1CrossDomainMessengerProxy
@@ -85,7 +83,7 @@ contract Initializer_Test is CommonTest {
             InitializeableContract({
                 name: "L1CrossDomainMessengerProxy",
                 target: address(l1CrossDomainMessenger),
-                initCalldata: abi.encodeCall(l1CrossDomainMessenger.initialize, (systemConfig, optimismPortal2))
+                initCalldata: abi.encodeCall(l1CrossDomainMessenger.initialize, (superchainConfig, optimismPortal2))
             })
         );
         // DisputeGameFactoryImpl
@@ -109,7 +107,7 @@ contract Initializer_Test is CommonTest {
             InitializeableContract({
                 name: "DelayedWETHImpl",
                 target: EIP1967Helper.getImplementation(address(delayedWeth)),
-                initCalldata: abi.encodeCall(delayedWeth.initialize, (ISystemConfig(address(0))))
+                initCalldata: abi.encodeCall(delayedWeth.initialize, (address(0), ISuperchainConfig(address(0))))
             })
         );
         // DelayedWETHProxy
@@ -117,51 +115,29 @@ contract Initializer_Test is CommonTest {
             InitializeableContract({
                 name: "DelayedWETHProxy",
                 target: address(delayedWeth),
-                initCalldata: abi.encodeCall(delayedWeth.initialize, (ISystemConfig(address(0))))
+                initCalldata: abi.encodeCall(delayedWeth.initialize, (address(0), ISuperchainConfig(address(0))))
             })
         );
-
-        if (isDevFeatureEnabled(DevFeatures.OPTIMISM_PORTAL_INTEROP)) {
-            // OptimismPortal2Impl
-            contracts.push(
-                InitializeableContract({
-                    name: "OptimismPortal2Impl",
-                    target: EIP1967Helper.getImplementation(address(optimismPortal2)),
-                    initCalldata: abi.encodeCall(
-                        IOptimismPortalInterop(payable(optimismPortal2)).initialize,
-                        (systemConfig, anchorStateRegistry, ethLockbox)
-                    )
-                })
-            );
-            // OptimismPortal2Proxy
-            contracts.push(
-                InitializeableContract({
-                    name: "OptimismPortal2Proxy",
-                    target: address(optimismPortal2),
-                    initCalldata: abi.encodeCall(
-                        IOptimismPortalInterop(payable(optimismPortal2)).initialize,
-                        (systemConfig, anchorStateRegistry, ethLockbox)
-                    )
-                })
-            );
-        } else {
-            // OptimismPortal2Impl
-            contracts.push(
-                InitializeableContract({
-                    name: "OptimismPortal2Impl",
-                    target: EIP1967Helper.getImplementation(address(optimismPortal2)),
-                    initCalldata: abi.encodeCall(optimismPortal2.initialize, (systemConfig, anchorStateRegistry))
-                })
-            );
-            // OptimismPortal2Proxy
-            contracts.push(
-                InitializeableContract({
-                    name: "OptimismPortal2Proxy",
-                    target: address(optimismPortal2),
-                    initCalldata: abi.encodeCall(optimismPortal2.initialize, (systemConfig, anchorStateRegistry))
-                })
-            );
-        }
+        // OptimismPortal2Impl
+        contracts.push(
+            InitializeableContract({
+                name: "OptimismPortal2Impl",
+                target: EIP1967Helper.getImplementation(address(optimismPortal2)),
+                initCalldata: abi.encodeCall(
+                    optimismPortal2.initialize, (systemConfig, superchainConfig, anchorStateRegistry, ethLockbox)
+                )
+            })
+        );
+        // OptimismPortal2Proxy
+        contracts.push(
+            InitializeableContract({
+                name: "OptimismPortal2Proxy",
+                target: address(optimismPortal2),
+                initCalldata: abi.encodeCall(
+                    optimismPortal2.initialize, (systemConfig, superchainConfig, anchorStateRegistry, ethLockbox)
+                )
+            })
+        );
 
         // SystemConfigImpl
         contracts.push(
@@ -193,8 +169,7 @@ contract Initializer_Test is CommonTest {
                             optimismPortal: address(0),
                             optimismMintableERC20Factory: address(0)
                         }),
-                        0,
-                        ISuperchainConfig(address(0))
+                        0
                     )
                 )
             })
@@ -229,8 +204,7 @@ contract Initializer_Test is CommonTest {
                             optimismPortal: address(0),
                             optimismMintableERC20Factory: address(0)
                         }),
-                        0,
-                        ISuperchainConfig(address(0))
+                        0
                     )
                 )
             })
@@ -260,7 +234,7 @@ contract Initializer_Test is CommonTest {
             InitializeableContract({
                 name: "L1StandardBridgeImpl",
                 target: EIP1967Helper.getImplementation(address(l1StandardBridge)),
-                initCalldata: abi.encodeCall(l1StandardBridge.initialize, (l1CrossDomainMessenger, systemConfig))
+                initCalldata: abi.encodeCall(l1StandardBridge.initialize, (l1CrossDomainMessenger, superchainConfig))
             })
         );
         // L1StandardBridgeProxy
@@ -268,7 +242,7 @@ contract Initializer_Test is CommonTest {
             InitializeableContract({
                 name: "L1StandardBridgeProxy",
                 target: address(l1StandardBridge),
-                initCalldata: abi.encodeCall(l1StandardBridge.initialize, (l1CrossDomainMessenger, systemConfig))
+                initCalldata: abi.encodeCall(l1StandardBridge.initialize, (l1CrossDomainMessenger, superchainConfig))
             })
         );
         // L1ERC721BridgeImpl
@@ -276,7 +250,7 @@ contract Initializer_Test is CommonTest {
             InitializeableContract({
                 name: "L1ERC721BridgeImpl",
                 target: EIP1967Helper.getImplementation(address(l1ERC721Bridge)),
-                initCalldata: abi.encodeCall(l1ERC721Bridge.initialize, (l1CrossDomainMessenger, systemConfig))
+                initCalldata: abi.encodeCall(l1ERC721Bridge.initialize, (l1CrossDomainMessenger, superchainConfig))
             })
         );
         // L1ERC721BridgeProxy
@@ -284,7 +258,7 @@ contract Initializer_Test is CommonTest {
             InitializeableContract({
                 name: "L1ERC721BridgeProxy",
                 target: address(l1ERC721Bridge),
-                initCalldata: abi.encodeCall(l1ERC721Bridge.initialize, (l1CrossDomainMessenger, systemConfig))
+                initCalldata: abi.encodeCall(l1ERC721Bridge.initialize, (l1CrossDomainMessenger, superchainConfig))
             })
         );
         // OptimismMintableERC20FactoryImpl
@@ -327,7 +301,7 @@ contract Initializer_Test is CommonTest {
                 initCalldata: abi.encodeCall(
                     anchorStateRegistry.initialize,
                     (
-                        ISystemConfig(address(0)),
+                        ISuperchainConfig(address(0)),
                         IDisputeGameFactory(address(0)),
                         Proposal({ root: Hash.wrap(bytes32(0)), l2SequenceNumber: 0 }),
                         GameType.wrap(uint32(deploy.cfg().respectedGameType()))
@@ -343,7 +317,7 @@ contract Initializer_Test is CommonTest {
                 initCalldata: abi.encodeCall(
                     anchorStateRegistry.initialize,
                     (
-                        ISystemConfig(address(0)),
+                        ISuperchainConfig(address(0)),
                         IDisputeGameFactory(address(0)),
                         Proposal({ root: Hash.wrap(bytes32(0)), l2SequenceNumber: 0 }),
                         GameType.wrap(uint32(deploy.cfg().respectedGameType()))
@@ -357,7 +331,9 @@ contract Initializer_Test is CommonTest {
             InitializeableContract({
                 name: "ETHLockboxImpl",
                 target: EIP1967Helper.getImplementation(address(ethLockbox)),
-                initCalldata: abi.encodeCall(ethLockbox.initialize, (ISystemConfig(address(0)), new IOptimismPortal2[](0)))
+                initCalldata: abi.encodeCall(
+                    ethLockbox.initialize, (ISuperchainConfig(address(0)), new IOptimismPortal2[](0))
+                )
             })
         );
 
@@ -366,7 +342,9 @@ contract Initializer_Test is CommonTest {
             InitializeableContract({
                 name: "ETHLockboxProxy",
                 target: address(ethLockbox),
-                initCalldata: abi.encodeCall(ethLockbox.initialize, (ISystemConfig(address(0)), new IOptimismPortal2[](0)))
+                initCalldata: abi.encodeCall(
+                    ethLockbox.initialize, (ISuperchainConfig(address(0)), new IOptimismPortal2[](0))
+                )
             })
         );
     }
@@ -378,7 +356,7 @@ contract Initializer_Test is CommonTest {
     function test_cannotReinitialize_succeeds() public {
         // Collect exclusions.
         uint256 j;
-        string[] memory excludes = new string[](11);
+        string[] memory excludes = new string[](8);
         // Contract is currently not being deployed as part of the standard deployment script.
         excludes[j++] = "src/L2/OptimismSuperchainERC20.sol";
         // Periphery contracts don't get deployed as part of the standard deployment script.
@@ -389,15 +367,11 @@ contract Initializer_Test is CommonTest {
         //       contracts and instead simply deploys them anonymously. Means that functions like "getInitializedSlot"
         //       don't work properly. Remove these exclusions once the deployment script is fixed.
         excludes[j++] = "src/dispute/FaultDisputeGame.sol";
-        excludes[j++] = "src/dispute/v2/FaultDisputeGameV2.sol";
-        excludes[j++] = "src/dispute/v2/PermissionedDisputeGameV2.sol";
         excludes[j++] = "src/dispute/SuperFaultDisputeGame.sol";
         excludes[j++] = "src/dispute/PermissionedDisputeGame.sol";
         excludes[j++] = "src/dispute/SuperPermissionedDisputeGame.sol";
         // TODO: Eventually remove this exclusion. Same reason as above dispute contracts.
         excludes[j++] = "src/L1/OPContractsManager.sol";
-        // TODO: Eventually remove this exclusion. Same reason as above dispute contracts.
-        excludes[j++] = "src/L1/OptimismPortalInterop.sol";
         // L2 contract initialization is tested in Predeploys.t.sol
         excludes[j++] = "src/L2/*";
 

@@ -13,7 +13,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/consensus/misc/eip4844"
 )
 
 type pectraBlobScheduleTestCfg struct {
@@ -83,7 +82,7 @@ func testPectraBlobSchedule(gt *testing.T, testCfg *helpers.TestCfg[any]) {
 	sequencer.ActBuildToL1HeadUnsafe(t)
 
 	cancunBBF1 := eth.CalcBlobFeeCancun(*l1_1.ExcessBlobGas)
-	pragueBBF1 := eip4844.CalcBlobFee(env.Sd.L1Cfg.Config, l1_1)
+	pragueBBF1 := eth.CalcBlobFeeDefault(l1_1)
 	// Make sure they differ.
 	require.Less(t, pragueBBF1.Uint64(), cancunBBF1.Uint64())
 	opts := &bind.CallOpts{}
@@ -114,7 +113,7 @@ func testPectraBlobSchedule(gt *testing.T, testCfg *helpers.TestCfg[any]) {
 	sequencer.ActBuildToL1HeadUnsafe(t)
 
 	cancunBBF2 := eth.CalcBlobFeeCancun(*l1_2.ExcessBlobGas)
-	pragueBBF2 := eip4844.CalcBlobFee(env.Sd.L1Cfg.Config, l1_2)
+	pragueBBF2 := eth.CalcBlobFeeDefault(l1_2)
 	require.Less(t, pragueBBF2.Uint64(), cancunBBF2.Uint64())
 	bbf2, err := l1Block.BlobBaseFee(opts)
 	require.NoError(t, err)

@@ -14,8 +14,10 @@ func mockL1BlockRef(num uint64) eth.L1BlockRef {
 	return eth.L1BlockRef{Number: num, Hash: common.Hash{byte(num)}, ParentHash: common.Hash{byte(num - 1)}}
 }
 
-func newL1Head(l1Tracker *L1Tracker, head eth.L1BlockRef) {
-	l1Tracker.OnL1Unsafe(head)
+func newL1HeadEvent(l1Tracker *L1Tracker, head eth.L1BlockRef) {
+	l1Tracker.OnEvent(L1UnsafeEvent{
+		L1Unsafe: head,
+	})
 }
 
 func TestCachingHeadReorg(t *testing.T) {
@@ -33,21 +35,21 @@ func TestCachingHeadReorg(t *testing.T) {
 
 	// from cache
 	l1Head = mockL1BlockRef(100)
-	newL1Head(l1Tracker, l1Head)
+	newL1HeadEvent(l1Tracker, l1Head)
 	ret, err = l1Tracker.L1BlockRefByNumber(ctx, 100)
 	require.NoError(t, err)
 	require.Equal(t, l1Head, ret)
 
 	// from cache
 	l1Head = mockL1BlockRef(101)
-	newL1Head(l1Tracker, l1Head)
+	newL1HeadEvent(l1Tracker, l1Head)
 	ret, err = l1Tracker.L1BlockRefByNumber(ctx, 101)
 	require.NoError(t, err)
 	require.Equal(t, l1Head, ret)
 
 	// from cache
 	l1Head = mockL1BlockRef(102)
-	newL1Head(l1Tracker, l1Head)
+	newL1HeadEvent(l1Tracker, l1Head)
 	ret, err = l1Tracker.L1BlockRefByNumber(ctx, 102)
 	require.NoError(t, err)
 	require.Equal(t, l1Head, ret)
@@ -55,7 +57,7 @@ func TestCachingHeadReorg(t *testing.T) {
 	// trigger a reorg of block 102
 	l1Head = mockL1BlockRef(102)
 	l1Head.Hash = common.Hash{0xde, 0xad, 0xbe, 0xef}
-	newL1Head(l1Tracker, l1Head)
+	newL1HeadEvent(l1Tracker, l1Head)
 	ret, err = l1Tracker.L1BlockRefByNumber(ctx, 102)
 	require.NoError(t, err)
 	require.Equal(t, l1Head, ret)
@@ -81,28 +83,28 @@ func TestCachingHeadRewind(t *testing.T) {
 
 	// from cache
 	l1Head = mockL1BlockRef(100)
-	newL1Head(l1Tracker, l1Head)
+	newL1HeadEvent(l1Tracker, l1Head)
 	ret, err = l1Tracker.L1BlockRefByNumber(ctx, 100)
 	require.NoError(t, err)
 	require.Equal(t, l1Head, ret)
 
 	// from cache
 	l1Head = mockL1BlockRef(101)
-	newL1Head(l1Tracker, l1Head)
+	newL1HeadEvent(l1Tracker, l1Head)
 	ret, err = l1Tracker.L1BlockRefByNumber(ctx, 101)
 	require.NoError(t, err)
 	require.Equal(t, l1Head, ret)
 
 	// from cache
 	l1Head = mockL1BlockRef(102)
-	newL1Head(l1Tracker, l1Head)
+	newL1HeadEvent(l1Tracker, l1Head)
 	ret, err = l1Tracker.L1BlockRefByNumber(ctx, 102)
 	require.NoError(t, err)
 	require.Equal(t, l1Head, ret)
 
 	// 101 is the new head, invalidating 102
 	l1Head = mockL1BlockRef(101)
-	newL1Head(l1Tracker, l1Head)
+	newL1HeadEvent(l1Tracker, l1Head)
 	ret, err = l1Tracker.L1BlockRefByNumber(ctx, 101)
 	require.NoError(t, err)
 	require.Equal(t, l1Head, ret)
@@ -136,21 +138,21 @@ func TestCachingChainShorteningReorg(t *testing.T) {
 
 	// from cache
 	l1Head = mockL1BlockRef(100)
-	newL1Head(l1Tracker, l1Head)
+	newL1HeadEvent(l1Tracker, l1Head)
 	ret, err = l1Tracker.L1BlockRefByNumber(ctx, 100)
 	require.NoError(t, err)
 	require.Equal(t, l1Head, ret)
 
 	// from cache
 	l1Head = mockL1BlockRef(101)
-	newL1Head(l1Tracker, l1Head)
+	newL1HeadEvent(l1Tracker, l1Head)
 	ret, err = l1Tracker.L1BlockRefByNumber(ctx, 101)
 	require.NoError(t, err)
 	require.Equal(t, l1Head, ret)
 
 	// from cache
 	l1Head = mockL1BlockRef(102)
-	newL1Head(l1Tracker, l1Head)
+	newL1HeadEvent(l1Tracker, l1Head)
 	ret, err = l1Tracker.L1BlockRefByNumber(ctx, 102)
 	require.NoError(t, err)
 	require.Equal(t, l1Head, ret)
@@ -158,7 +160,7 @@ func TestCachingChainShorteningReorg(t *testing.T) {
 	// trigger a reorg of block 101, invalidating the following cache elements (102)
 	l1Head = mockL1BlockRef(101)
 	l1Head.Hash = common.Hash{0xde, 0xad, 0xbe, 0xef}
-	newL1Head(l1Tracker, l1Head)
+	newL1HeadEvent(l1Tracker, l1Head)
 	ret, err = l1Tracker.L1BlockRefByNumber(ctx, 101)
 	require.NoError(t, err)
 	require.Equal(t, l1Head, ret)
@@ -178,21 +180,21 @@ func TestCachingDeepReorg(t *testing.T) {
 
 	// from cache
 	l1Head := mockL1BlockRef(100)
-	newL1Head(l1Tracker, l1Head)
+	newL1HeadEvent(l1Tracker, l1Head)
 	ret, err := l1Tracker.L1BlockRefByNumber(ctx, 100)
 	require.NoError(t, err)
 	require.Equal(t, l1Head, ret)
 
 	// from cache
 	l1Head = mockL1BlockRef(101)
-	newL1Head(l1Tracker, l1Head)
+	newL1HeadEvent(l1Tracker, l1Head)
 	ret, err = l1Tracker.L1BlockRefByNumber(ctx, 101)
 	require.NoError(t, err)
 	require.Equal(t, l1Head, ret)
 
 	// from cache
 	l1Head = mockL1BlockRef(102)
-	newL1Head(l1Tracker, l1Head)
+	newL1HeadEvent(l1Tracker, l1Head)
 	ret, err = l1Tracker.L1BlockRefByNumber(ctx, 102)
 	require.NoError(t, err)
 	require.Equal(t, l1Head, ret)
@@ -201,7 +203,7 @@ func TestCachingDeepReorg(t *testing.T) {
 	parentHash := common.Hash{0xde, 0xad, 0xbe, 0xef}
 	l1Head = mockL1BlockRef(102)
 	l1Head.ParentHash = parentHash
-	newL1Head(l1Tracker, l1Head)
+	newL1HeadEvent(l1Tracker, l1Head)
 	ret, err = l1Tracker.L1BlockRefByNumber(ctx, 102)
 	require.NoError(t, err)
 	require.Equal(t, l1Head, ret)
@@ -228,21 +230,21 @@ func TestCachingSkipAhead(t *testing.T) {
 
 	// from cache
 	l1Head := mockL1BlockRef(100)
-	newL1Head(l1Tracker, l1Head)
+	newL1HeadEvent(l1Tracker, l1Head)
 	ret, err := l1Tracker.L1BlockRefByNumber(ctx, 100)
 	require.NoError(t, err)
 	require.Equal(t, l1Head, ret)
 
 	// from cache
 	l1Head = mockL1BlockRef(101)
-	newL1Head(l1Tracker, l1Head)
+	newL1HeadEvent(l1Tracker, l1Head)
 	ret, err = l1Tracker.L1BlockRefByNumber(ctx, 101)
 	require.NoError(t, err)
 	require.Equal(t, l1Head, ret)
 
 	// head jumps ahead from 101->103, invalidating the entire cache
 	l1Head = mockL1BlockRef(103)
-	newL1Head(l1Tracker, l1Head)
+	newL1HeadEvent(l1Tracker, l1Head)
 	ret, err = l1Tracker.L1BlockRefByNumber(ctx, 103)
 	require.NoError(t, err)
 	require.Equal(t, mockL1BlockRef(103), ret)
@@ -264,7 +266,7 @@ func TestCacheSizeEviction(t *testing.T) {
 	// insert 1000 elements into the cache
 	for idx := 1000; idx < 2000; idx++ {
 		l1Head := mockL1BlockRef(uint64(idx))
-		newL1Head(l1Tracker, l1Head)
+		newL1HeadEvent(l1Tracker, l1Head)
 	}
 
 	// request each element from cache
@@ -276,7 +278,7 @@ func TestCacheSizeEviction(t *testing.T) {
 
 	// insert 1001st element, removing the first
 	l1Head := mockL1BlockRef(2000)
-	newL1Head(l1Tracker, l1Head)
+	newL1HeadEvent(l1Tracker, l1Head)
 
 	// request first element, which now requires a live fetch instead
 	l1Fetcher.ExpectL1BlockRefByNumber(1000, mockL1BlockRef(1000), nil)

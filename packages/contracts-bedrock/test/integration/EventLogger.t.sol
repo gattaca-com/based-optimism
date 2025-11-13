@@ -13,9 +13,7 @@ import { ICrossL2Inbox, Identifier as ImplIdentifier } from "interfaces/L2/ICros
 import { VmSafe } from "forge-std/Vm.sol";
 import { CrossL2Inbox } from "src/L2/CrossL2Inbox.sol";
 
-/// @title EventLogger_TestInit
-/// @notice Reusable test initialization for `EventLogger` tests.
-contract EventLogger_TestInit is Test {
+contract EventLogger_Initializer is Test {
     event ExecutingMessage(bytes32 indexed msgHash, ImplIdentifier id);
 
     EventLogger eventLogger;
@@ -30,9 +28,7 @@ contract EventLogger_TestInit is Test {
     }
 }
 
-/// @title EventLogger_EmitLog_Test
-/// @notice Tests the `emitLog` function of the `EventLogger` contract.
-contract EventLogger_EmitLog_Test is EventLogger_TestInit {
+contract EventLoggerTest is EventLogger_Initializer {
     /// @notice Test logging
     function test_emitLog_succeeds(
         uint256 topicCount,
@@ -91,11 +87,7 @@ contract EventLogger_EmitLog_Test is EventLogger_TestInit {
         vm.expectRevert(empty);
         eventLogger.emitLog(topics, empty);
     }
-}
 
-/// @title EventLogger_ValidateMessage_Test
-/// @notice Tests the `validateMessage` function of the `EventLogger` contract.
-contract EventLogger_ValidateMessage_Test is EventLogger_TestInit {
     /// @notice It should succeed with any Identifier
     /// forge-config: default.isolate = true
     function test_validateMessage_succeeds(

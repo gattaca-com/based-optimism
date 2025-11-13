@@ -49,7 +49,8 @@ type CLIConfig struct {
 	// L2OOAddress is the L2OutputOracle contract address.
 	L2OOAddress string
 
-	// PollInterval is the delay between periodic checks on whether it is time to load an output root and propose it.
+	// PollInterval is the delay between querying L2 for more transaction
+	// and creating a new batch.
 	PollInterval time.Duration
 
 	// AllowNonFinalized can be set to true to propose outputs

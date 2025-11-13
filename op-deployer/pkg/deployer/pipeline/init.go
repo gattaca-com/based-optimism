@@ -5,10 +5,9 @@ import (
 	"crypto/rand"
 	"fmt"
 
-	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/opcm"
+	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/standard"
 	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/state"
 
-	"github.com/ethereum-optimism/optimism/op-chain-ops/addresses"
 	"github.com/ethereum-optimism/optimism/op-chain-ops/script"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -26,26 +25,50 @@ func InitLiveStrategy(ctx context.Context, env *Env, intent *state.Intent, st *s
 		return err
 	}
 
-	hasPredeployedOPCM := intent.OPCMAddress != nil
+	opcmAddress, opcmAddrErr := standard.ManagerImplementationAddrFor(intent.L1ChainID, intent.L1ContractsLocator.Tag)
+	hasPredeployedOPCM := opcmAddrErr == nil
+	isL1Tag := intent.L1ContractsLocator.IsTag()
+	isL2Tag := intent.L2ContractsLocator.IsTag()
 
-	if hasPredeployedOPCM {
+	if isL1Tag && !standard.IsSupportedL1Version(intent.L1ContractsLocator.Tag) {
+		return fmt.Errorf("unsupported L1 version: %s", intent.L1ContractsLocator.Tag)
+	}
+
+	if isL2Tag && !standard.IsSupportedL2Version(intent.L2ContractsLocator.Tag) {
+		return fmt.Errorf("unsupported L2 version: %s", intent.L2ContractsLocator.Tag)
+	}
+
+	isStandardIntent := intent.ConfigType == state.IntentTypeStandard ||
+		intent.ConfigType == state.IntentTypeStandardOverrides
+	if isL1Tag && hasPredeployedOPCM && isStandardIntent {
 		if intent.SuperchainConfigProxy != nil {
-			return fmt.Errorf("cannot set superchain config proxy for predeployed OPCM")
+			return fmt.Errorf("cannot set superchain config proxy for standard intent")
 		}
 
-		if intent.SuperchainRoles != nil {
-			return fmt.Errorf("cannot set superchain roles for predeployed OPCM")
-		}
-
-		superDeployment, superRoles, err := PopulateSuperchainState(env.L1ScriptHost, *intent.OPCMAddress)
+		stdRoles, err := state.GetStandardSuperchainRoles(intent.L1ChainID)
 		if err != nil {
-			return fmt.Errorf("error populating superchain state: %w", err)
+			return fmt.Errorf("error getting superchain roles: %w", err)
 		}
-		st.SuperchainDeployment = superDeployment
-		st.SuperchainRoles = superRoles
-		if st.ImplementationsDeployment == nil {
-			st.ImplementationsDeployment = &addresses.ImplementationsContracts{
-				OpcmImpl: *intent.OPCMAddress,
+
+		if *intent.SuperchainRoles == *stdRoles {
+			superCfg, err := standard.SuperchainFor(intent.L1ChainID)
+			if err != nil {
+				return fmt.Errorf("error getting superchain config: %w", err)
+			}
+
+			proxyAdmin, err := standard.SuperchainProxyAdminAddrFor(intent.L1ChainID)
+			if err != nil {
+				return fmt.Errorf("error getting superchain proxy admin address: %w", err)
+			}
+
+			st.SuperchainDeployment = &state.SuperchainDeployment{
+				ProxyAdminAddress:            proxyAdmin,
+				ProtocolVersionsProxyAddress: superCfg.ProtocolVersionsAddr,
+				SuperchainConfigProxyAddress: superCfg.SuperchainConfigAddr,
+			}
+
+			st.ImplementationsDeployment = &state.ImplementationsDeployment{
+				OpcmAddress: opcmAddress,
 			}
 		}
 	}
@@ -123,32 +146,4 @@ func InitGenesisStrategy(env *Env, intent *state.Intent, st *state.State) error 
 
 func immutableErr(field string, was, is any) error {
 	return fmt.Errorf("%s is immutable: was %v, is %v", field, was, is)
-}
-
-func PopulateSuperchainState(host *script.Host, opcmAddr common.Address) (*addresses.SuperchainContracts, *addresses.SuperchainRoles, error) {
-	readScript, err := opcm.NewReadSuperchainDeploymentScript(host)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error generating read superchain deployment script: %w", err)
-	}
-
-	out, err := readScript.Run(opcm.ReadSuperchainDeploymentInput{
-		OPCMAddress: opcmAddr,
-	})
-	if err != nil {
-		return nil, nil, fmt.Errorf("error reading superchain deployment: %w", err)
-	}
-
-	deployment := &addresses.SuperchainContracts{
-		SuperchainProxyAdminImpl: out.SuperchainProxyAdmin,
-		SuperchainConfigProxy:    out.SuperchainConfigProxy,
-		SuperchainConfigImpl:     out.SuperchainConfigImpl,
-		ProtocolVersionsProxy:    out.ProtocolVersionsProxy,
-		ProtocolVersionsImpl:     out.ProtocolVersionsImpl,
-	}
-	roles := &addresses.SuperchainRoles{
-		SuperchainProxyAdminOwner: out.SuperchainProxyAdminOwner,
-		SuperchainGuardian:        out.Guardian,
-		ProtocolVersionsOwner:     out.ProtocolVersionsOwner,
-	}
-	return deployment, roles, nil
 }

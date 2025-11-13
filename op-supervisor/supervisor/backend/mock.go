@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"errors"
 	"io"
 	"sync/atomic"
 
@@ -26,14 +27,14 @@ func NewMockBackend() *MockBackend {
 
 func (m *MockBackend) Start(ctx context.Context) error {
 	if !m.started.CompareAndSwap(false, true) {
-		return errAlreadyStarted
+		return errors.New("already started")
 	}
 	return nil
 }
 
 func (m *MockBackend) Stop(ctx context.Context) error {
 	if !m.started.CompareAndSwap(true, false) {
-		return errAlreadyStopped
+		return errors.New("already stopped")
 	}
 	return nil
 }
@@ -53,10 +54,6 @@ func (m *MockBackend) CheckAccessList(ctx context.Context, inboxEntries []common
 
 func (m *MockBackend) LocalUnsafe(ctx context.Context, chainID eth.ChainID) (eth.BlockID, error) {
 	return eth.BlockID{}, nil
-}
-
-func (m *MockBackend) LocalSafe(ctx context.Context, chainID eth.ChainID) (result types.DerivedIDPair, err error) {
-	return types.DerivedIDPair{}, nil
 }
 
 func (m *MockBackend) CrossSafe(ctx context.Context, chainID eth.ChainID) (types.DerivedIDPair, error) {
@@ -81,18 +78,6 @@ func (m *MockBackend) SuperRootAtTimestamp(ctx context.Context, timestamp hexuti
 
 func (m *MockBackend) SyncStatus(ctx context.Context) (eth.SupervisorSyncStatus, error) {
 	return eth.SupervisorSyncStatus{}, nil
-}
-
-func (m *MockBackend) Rewind(ctx context.Context, chain eth.ChainID, block eth.BlockID) error {
-	return nil
-}
-
-func (m *MockBackend) SetFailsafeEnabled(ctx context.Context, enabled bool) error {
-	return nil
-}
-
-func (m *MockBackend) GetFailsafeEnabled(ctx context.Context) (bool, error) {
-	return false, nil
 }
 
 func (m *MockBackend) Close() error {

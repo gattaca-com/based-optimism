@@ -15,22 +15,16 @@ import { Types } from "src/libraries/Types.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 
-/// @title SequencerFeeVault_TestInit
-/// @notice Reusable test initialization for `SequencerFeeVault` tests.
-contract SequencerFeeVault_TestInit is CommonTest {
+contract SequencerFeeVault_Test is CommonTest {
     address recipient;
 
     /// @dev Sets up the test suite.
-    function setUp() public virtual override {
+    function setUp() public override {
         super.setUp();
         recipient = deploy.cfg().sequencerFeeVaultRecipient();
     }
-}
 
-/// @title SequencerFeeVault_Constructor_Test
-/// @notice Tests the `constructor` function of the `SequencerFeeVault` contract.
-contract SequencerFeeVault_Constructor_Test is SequencerFeeVault_TestInit {
-    /// @notice Tests that the l1 fee wallet is correct.
+    /// @dev Tests that the l1 fee wallet is correct.
     function test_constructor_succeeds() external view {
         assertEq(sequencerFeeVault.l1FeeWallet(), recipient);
         assertEq(sequencerFeeVault.RECIPIENT(), recipient);
@@ -40,12 +34,8 @@ contract SequencerFeeVault_Constructor_Test is SequencerFeeVault_TestInit {
         assertEq(uint8(sequencerFeeVault.WITHDRAWAL_NETWORK()), uint8(Types.WithdrawalNetwork.L1));
         assertEq(uint8(sequencerFeeVault.withdrawalNetwork()), uint8(Types.WithdrawalNetwork.L1));
     }
-}
 
-/// @title SequencerFeeVault_Receive_Test
-/// @notice Tests the `receive` function of the `SequencerFeeVault` contract.
-contract SequencerFeeVault_Receive_Test is SequencerFeeVault_TestInit {
-    /// @notice Tests that the fee vault is able to receive ETH.
+    /// @dev Tests that the fee vault is able to receive ETH.
     function test_receive_succeeds() external {
         uint256 balance = address(sequencerFeeVault).balance;
 
@@ -55,38 +45,9 @@ contract SequencerFeeVault_Receive_Test is SequencerFeeVault_TestInit {
         assertEq(success, true);
         assertEq(address(sequencerFeeVault).balance, balance + 100);
     }
-}
 
-/// @title SequencerFeeVault_Withdraw_Test
-/// @notice Tests the `withdraw` function of the `SequencerFeeVault` contract.
-contract SequencerFeeVault_Withdraw_Test is SequencerFeeVault_TestInit {
-    /// @notice Helper function to set up L2 withdrawal configuration.
-    function _setupL2Withdrawal() internal {
-        // Alter the deployment to use WithdrawalNetwork.L2
-        vm.etch(
-            EIP1967Helper.getImplementation(Predeploys.SEQUENCER_FEE_WALLET),
-            address(
-                DeployUtils.create1({
-                    _name: "SequencerFeeVault",
-                    _args: DeployUtils.encodeConstructor(
-                        abi.encodeCall(
-                            ISequencerFeeVault.__constructor__,
-                            (
-                                deploy.cfg().sequencerFeeVaultRecipient(),
-                                deploy.cfg().sequencerFeeVaultMinimumWithdrawalAmount(),
-                                Types.WithdrawalNetwork.L2
-                            )
-                        )
-                    )
-                })
-            ).code
-        );
-
-        recipient = deploy.cfg().sequencerFeeVaultRecipient();
-    }
-
-    /// @notice Tests that `withdraw` reverts if the balance is less than the minimum withdrawal
-    ///         amount.
+    /// @dev Tests that `withdraw` reverts if the balance is less than the minimum
+    ///      withdrawal amount.
     function test_withdraw_notEnough_reverts() external {
         assert(address(sequencerFeeVault).balance < sequencerFeeVault.MIN_WITHDRAWAL_AMOUNT());
 
@@ -94,7 +55,7 @@ contract SequencerFeeVault_Withdraw_Test is SequencerFeeVault_TestInit {
         sequencerFeeVault.withdraw();
     }
 
-    /// @notice Tests that `withdraw` successfully initiates a withdrawal to L1.
+    /// @dev Tests that `withdraw` successfully initiates a withdrawal to L1.
     function test_withdraw_toL1_succeeds() external {
         uint256 amount = sequencerFeeVault.MIN_WITHDRAWAL_AMOUNT() + 1;
         vm.deal(address(sequencerFeeVault), amount);
@@ -138,11 +99,41 @@ contract SequencerFeeVault_Withdraw_Test is SequencerFeeVault_TestInit {
         assertEq(address(sequencerFeeVault).balance, 0);
         assertEq(Predeploys.L2_TO_L1_MESSAGE_PASSER.balance, amount);
     }
+}
 
-    /// @notice Tests that `withdraw` successfully initiates a withdrawal to L2.
+contract SequencerFeeVault_L2Withdrawal_Test is CommonTest {
+    /// @dev a cache for the config fee recipient
+    address recipient;
+
+    /// @dev Sets up the test suite.
+    function setUp() public override {
+        super.setUp();
+
+        // Alter the deployment to use WithdrawalNetwork.L2
+        vm.etch(
+            EIP1967Helper.getImplementation(Predeploys.SEQUENCER_FEE_WALLET),
+            address(
+                DeployUtils.create1({
+                    _name: "SequencerFeeVault",
+                    _args: DeployUtils.encodeConstructor(
+                        abi.encodeCall(
+                            ISequencerFeeVault.__constructor__,
+                            (
+                                deploy.cfg().sequencerFeeVaultRecipient(),
+                                deploy.cfg().sequencerFeeVaultMinimumWithdrawalAmount(),
+                                Types.WithdrawalNetwork.L2
+                            )
+                        )
+                    )
+                })
+            ).code
+        );
+
+        recipient = deploy.cfg().sequencerFeeVaultRecipient();
+    }
+
+    /// @dev Tests that `withdraw` successfully initiates a withdrawal to L2.
     function test_withdraw_toL2_succeeds() external {
-        _setupL2Withdrawal();
-
         uint256 amount = sequencerFeeVault.MIN_WITHDRAWAL_AMOUNT() + 1;
         vm.deal(address(sequencerFeeVault), amount);
 
@@ -167,11 +158,9 @@ contract SequencerFeeVault_Withdraw_Test is SequencerFeeVault_TestInit {
         assertEq(recipient.balance, amount);
     }
 
-    /// @notice Tests that `withdraw` fails if the Recipient reverts. This also serves to simulate
-    ///         a situation where insufficient gas is provided to the RECIPIENT.
+    /// @dev Tests that `withdraw` fails if the Recipient reverts. This also serves to simulate
+    ///     a situation where insufficient gas is provided to the RECIPIENT.
     function test_withdraw_toL2recipientReverts_fails() external {
-        _setupL2Withdrawal();
-
         uint256 amount = sequencerFeeVault.MIN_WITHDRAWAL_AMOUNT();
 
         vm.deal(address(sequencerFeeVault), amount);

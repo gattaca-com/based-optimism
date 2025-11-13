@@ -7,8 +7,10 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/stretchr/testify/require"
+	"github.com/ethereum-optimism/optimism/op-e2e/config"
+	"github.com/ethereum-optimism/optimism/op-proposer/proposer/source"
 
+	"github.com/ethereum-optimism/optimism/op-service/sources/batching"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -19,16 +21,13 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ethereum-optimism/optimism/op-e2e/bindings"
-	"github.com/ethereum-optimism/optimism/op-e2e/config"
 	"github.com/ethereum-optimism/optimism/op-proposer/metrics"
 	"github.com/ethereum-optimism/optimism/op-proposer/proposer"
-	"github.com/ethereum-optimism/optimism/op-proposer/proposer/source"
 	"github.com/ethereum-optimism/optimism/op-service/dial"
-	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-service/sources"
-	"github.com/ethereum-optimism/optimism/op-service/sources/batching"
 	"github.com/ethereum-optimism/optimism/op-service/txmgr"
 )
 
@@ -41,7 +40,6 @@ type ProposerCfg struct {
 	ProposerKey            *ecdsa.PrivateKey
 	AllowNonFinalized      bool
 	AllocType              config.AllocType
-	ChainID                eth.ChainID
 }
 
 type L2Proposer struct {
@@ -59,12 +57,7 @@ type L2Proposer struct {
 }
 
 type fakeTxMgr struct {
-	from    common.Address
-	chainID eth.ChainID
-}
-
-func (f fakeTxMgr) ChainID() eth.ChainID {
-	return f.chainID
+	from common.Address
 }
 
 func (f fakeTxMgr) From() common.Address {
@@ -110,12 +103,11 @@ func NewL2Proposer(t Testing, log log.Logger, cfg *ProposerCfg, l1 *ethclient.Cl
 	}
 	rollupProvider, err := dial.NewStaticL2RollupProviderFromExistingRollup(rollupCl)
 	require.NoError(t, err)
-
 	driverSetup := proposer.DriverSetup{
 		Log:            log,
 		Metr:           metrics.NoopMetrics,
 		Cfg:            proposerConfig,
-		Txmgr:          fakeTxMgr{from: crypto.PubkeyToAddress(cfg.ProposerKey.PublicKey), chainID: cfg.ChainID},
+		Txmgr:          fakeTxMgr{from: crypto.PubkeyToAddress(cfg.ProposerKey.PublicKey)},
 		L1Client:       l1,
 		Multicaller:    batching.NewMultiCaller(l1.Client(), batching.DefaultBatchSize),
 		ProposalSource: source.NewRollupProposalSource(rollupProvider),

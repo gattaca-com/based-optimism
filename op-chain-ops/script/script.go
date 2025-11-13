@@ -358,7 +358,6 @@ func (h *Host) Call(from common.Address, to common.Address, input []byte, gas ui
 			// an unexpected panic and we should re-raise it.
 			rStr, ok := r.(string)
 			if !ok || !strings.Contains(strings.ToLower(rStr), "revision id 1") {
-				fmt.Println("panic", rStr)
 				panic(r)
 			}
 
@@ -453,7 +452,7 @@ func (h *Host) SetNonce(addr common.Address, nonce uint64) {
 	h.state.SetNonce(addr, nonce, tracing.NonceChangeUnspecified)
 }
 
-// GetNonce returns an account's nonce from state.
+// GetNonce returs an account's nonce from state.
 func (h *Host) GetNonce(addr common.Address) uint64 {
 	return h.state.GetNonce(addr)
 }
@@ -607,11 +606,7 @@ func (h *Host) handleRevertErr(addr common.Address, err error, revertMsg string,
 
 // onFault is a trace-hook, catches things more generic than regular EVM reverts.
 func (h *Host) onFault(pc uint64, op byte, gas, cost uint64, scope tracing.OpContext, depth int, err error) {
-	var byte4 string
-	if len(scope.CallInput()) >= 4 {
-		byte4 = hexutil.Encode(scope.CallInput()[:4])
-	}
-	h.log.Warn("Fault", "addr", scope.Address(), "label", h.labels[scope.Address()], "err", err, "depth", depth, "op", op, "byte4", byte4)
+	h.log.Warn("Fault", "addr", scope.Address(), "label", h.labels[scope.Address()], "err", err, "depth", depth)
 }
 
 // unwindCallstack is a helper to remove call-stack entries.

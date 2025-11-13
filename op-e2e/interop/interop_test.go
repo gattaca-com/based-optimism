@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum-optimism/optimism/op-challenger/game/fault/contracts/metrics"
 	"github.com/ethereum-optimism/optimism/op-service/dial"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
+	oplog "github.com/ethereum-optimism/optimism/op-service/log"
 	"github.com/ethereum-optimism/optimism/op-service/sources/batching"
 	"github.com/ethereum-optimism/optimism/op-service/testlog"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -233,7 +234,7 @@ func TestInterop_EmitLogs(t *testing.T) {
 		accessList := types.EncodeAccessList(accessEntries)
 
 		timestamp := uint64(time.Now().Unix())
-		ed := types.ExecutingDescriptor{Timestamp: timestamp, ChainID: eth.ChainIDFromBig(s2.ChainID(chainB))}
+		ed := types.ExecutingDescriptor{Timestamp: timestamp}
 		ctx = context.Background()
 		err = supervisor.CheckAccessList(ctx, accessList, types.CrossSafe, ed)
 		require.NoError(t, err, "logsA must all be cross-safe")
@@ -252,6 +253,8 @@ func TestInterop_EmitLogs(t *testing.T) {
 
 func TestInteropBlockBuilding(t *testing.T) {
 	t.Parallel()
+	logger := testlog.Logger(t, log.LevelInfo)
+	oplog.SetGlobalLogHandler(logger.Handler())
 
 	test := func(t *testing.T, s2 SuperSystem) {
 		ids := s2.L2IDs()
@@ -326,10 +329,10 @@ func TestInteropBlockBuilding(t *testing.T) {
 				_, err := s2.ValidateMessage(ctx, chainB, "Alice", identifier, invalidPayloadHash, gethCore.ErrTxFilteredOut)
 				require.ErrorContains(t, err, gethCore.ErrTxFilteredOut.Error())
 			} else {
-				// The miner will include the tx in the block if mempool filtering is disabled, because interop checks don't happen during block building
-				// this includes invalid interop messages
+				// We expect the miner to be unable to include this tx, and confirmation to thus time out, if mempool filtering is disabled.
 				_, err := s2.ValidateMessage(ctx, chainB, "Alice", identifier, invalidPayloadHash, nil)
-				require.NoError(t, err)
+				require.ErrorIs(t, err, ctx.Err())
+				require.ErrorIs(t, ctx.Err(), context.DeadlineExceeded)
 			}
 		}
 
@@ -364,7 +367,6 @@ func TestInteropBlockBuilding(t *testing.T) {
 }
 
 func TestMultiNode(t *testing.T) {
-	t.Skip() // TODO(#16174): Decide on future of multi-node support
 	t.Parallel()
 	test := func(t *testing.T, s2 SuperSystem) {
 		supervisor := s2.SupervisorClient()
@@ -425,7 +427,7 @@ func TestProposals(t *testing.T) {
 		require.NotNil(t, proposer.DisputeGameFactoryAddr)
 		gameFactoryAddr := *proposer.DisputeGameFactoryAddr
 
-		rpcClient, err := dial.DialRPCClientWithTimeout(context.Background(), logger, s2.L1().UserRPC().RPC())
+		rpcClient, err := dial.DialRPCClientWithTimeout(context.Background(), time.Minute, logger, s2.L1().UserRPC().RPC())
 		require.NoError(t, err)
 		caller := batching.NewMultiCaller(rpcClient, batching.DefaultBatchSize)
 		factory := contracts.NewDisputeGameFactoryContract(metrics.NoopContractMetrics, gameFactoryAddr, caller)
@@ -438,12 +440,6 @@ func TestProposals(t *testing.T) {
 			t.Logf("Current game count: %v", count)
 			return count > 0
 		}, 5*time.Minute, time.Second)
-
-		head, err := ethClient.BlockByNumber(context.Background(), nil)
-		require.NoError(t, err)
-		game, err := factory.GetGame(context.Background(), 0, head.Hash())
-		require.NoError(t, err)
-		require.Equal(t, uint32(4) /* super permissionless */, game.GameType)
 	}
 	setupAndRun(t, SuperSystemConfig{}, test)
 }

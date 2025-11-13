@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { Identifier } from "interfaces/L2/ICrossL2Inbox.sol";
+struct Identifier {
+    address origin;
+    uint256 blockNumber;
+    uint256 logIndex;
+    uint256 timestamp;
+    uint256 chainId;
+}
 
 /// @title IL2ToL2CrossDomainMessenger
 /// @notice Interface for the L2ToL2CrossDomainMessenger contract.
@@ -47,10 +53,7 @@ interface IL2ToL2CrossDomainMessenger {
     /// @param source       Chain ID of the source chain.
     /// @param messageNonce Nonce associated with the messsage sent
     /// @param messageHash  Hash of the message that was relayed.
-    /// @param returnDataHash Hash of the return data from the message that was relayed.
-    event RelayedMessage(
-        uint256 indexed source, uint256 indexed messageNonce, bytes32 indexed messageHash, bytes32 returnDataHash
-    );
+    event RelayedMessage(uint256 indexed source, uint256 indexed messageNonce, bytes32 indexed messageHash);
 
     function version() external view returns (string memory);
 
@@ -66,9 +69,10 @@ interface IL2ToL2CrossDomainMessenger {
     /// @return Nonce of the next message to be sent, with added message version.
     function messageNonce() external view returns (uint256);
 
-    /// @notice Mapping of message nonces to message hashes. Note that a message will only be present in this
+    /// @notice Mapping of message hashes to boolean sent values. Note that a message will only be present in this
     ///         mapping if it has been sent from this chain to a destination chain.
-    function sentMessages(uint256) external view returns (bytes32);
+    /// @return Returns true if the message corresponding to the `_msgHash` was successfully sent.
+    function sentMessages(bytes32) external view returns (bool);
 
     /// @notice Retrieves the sender of the current cross domain message.
     /// @return sender_ Address of the sender of the current cross domain message.

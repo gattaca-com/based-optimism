@@ -94,7 +94,7 @@ func TestChallenge(t *testing.T) {
 	})
 
 	t.Run("DoNotLogErrValid", func(t *testing.T) {
-		logger, logs := testlog.CaptureLogger(t, log.LevelDebug)
+		logger, logs := testlog.CaptureLogger(t, log.LevelInfo)
 
 		_, _, oracle, challenger := setupChallengerTest(logger)
 		// All preimages are valid

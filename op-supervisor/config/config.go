@@ -13,7 +13,7 @@ import (
 
 var (
 	ErrMissingSyncSources   = errors.New("must specify sync source collection")
-	ErrMissingFullConfigSet = errors.New("must specify a full config set source")
+	ErrMissingDependencySet = errors.New("must specify a dependency set source")
 	ErrMissingDatadir       = errors.New("must specify datadir")
 )
 
@@ -25,7 +25,7 @@ type Config struct {
 	PprofConfig   oppprof.CLIConfig
 	RPC           oprpc.CLIConfig
 
-	FullConfigSetSource depset.FullConfigSetSource
+	DependencySetSource depset.DependencySetSource
 
 	// MockRun runs the service with a mock backend
 	MockRun bool
@@ -41,15 +41,6 @@ type Config struct {
 
 	Datadir             string
 	DatadirSyncEndpoint string
-
-	// RPCVerificationWarnings enables asynchronous RPC verification of DB checkAccess call in the CheckAccessList endpoint, indicating warnings as a metric
-	RPCVerificationWarnings bool
-
-	// FailsafeEnabled enables failsafe mode for the supervisor
-	FailsafeEnabled bool
-
-	// FailsafeOnInvalidation controls whether failsafe should activate when a block is invalidated
-	FailsafeOnInvalidation bool
 }
 
 func (c *Config) Check() error {
@@ -57,8 +48,8 @@ func (c *Config) Check() error {
 	result = errors.Join(result, c.MetricsConfig.Check())
 	result = errors.Join(result, c.PprofConfig.Check())
 	result = errors.Join(result, c.RPC.Check())
-	if c.FullConfigSetSource == nil {
-		result = errors.Join(result, ErrMissingFullConfigSet)
+	if c.DependencySetSource == nil {
+		result = errors.Join(result, ErrMissingDependencySet)
 	}
 	if c.Datadir == "" {
 		result = errors.Join(result, ErrMissingDatadir)
@@ -73,18 +64,16 @@ func (c *Config) Check() error {
 
 // NewConfig creates a new config using default values whenever possible.
 // Required options with no suitable default are passed as parameters.
-func NewConfig(l1RPC string, syncSrcs syncnode.SyncNodeCollection, fullCfgSet depset.FullConfigSetSource, datadir string) *Config {
+func NewConfig(l1RPC string, syncSrcs syncnode.SyncNodeCollection, depSet depset.DependencySetSource, datadir string) *Config {
 	return &Config{
-		LogConfig:              oplog.DefaultCLIConfig(),
-		MetricsConfig:          opmetrics.DefaultCLIConfig(),
-		PprofConfig:            oppprof.DefaultCLIConfig(),
-		RPC:                    oprpc.DefaultCLIConfig(),
-		FullConfigSetSource:    fullCfgSet,
-		MockRun:                false,
-		L1RPC:                  l1RPC,
-		SyncSources:            syncSrcs,
-		Datadir:                datadir,
-		FailsafeEnabled:        false,
-		FailsafeOnInvalidation: true,
+		LogConfig:           oplog.DefaultCLIConfig(),
+		MetricsConfig:       opmetrics.DefaultCLIConfig(),
+		PprofConfig:         oppprof.DefaultCLIConfig(),
+		RPC:                 oprpc.DefaultCLIConfig(),
+		DependencySetSource: depSet,
+		MockRun:             false,
+		L1RPC:               l1RPC,
+		SyncSources:         syncSrcs,
+		Datadir:             datadir,
 	}
 }

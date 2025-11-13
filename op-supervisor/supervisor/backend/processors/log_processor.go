@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/ethereum-optimism/optimism/op-service/eth"
+	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/backend/depset"
 	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/types"
 )
 
@@ -21,13 +22,15 @@ type logProcessor struct {
 	chain        eth.ChainID
 	logStore     LogStorage
 	eventDecoder EventDecoderFn
+	depSet       depset.ChainIndexFromID
 }
 
-func NewLogProcessor(chain eth.ChainID, logStore LogStorage) LogProcessor {
+func NewLogProcessor(chain eth.ChainID, logStore LogStorage, depSet depset.ChainIndexFromID) LogProcessor {
 	return &logProcessor{
 		chain:        chain,
 		logStore:     logStore,
 		eventDecoder: DecodeExecutingMessageLog,
+		depSet:       depSet,
 	}
 }
 
@@ -37,9 +40,9 @@ func (p *logProcessor) ProcessLogs(_ context.Context, block eth.BlockRef, rcpts 
 	for _, rcpt := range rcpts {
 		for _, l := range rcpt.Logs {
 			// log hash represents the hash of *this* log as a potentially initiating message
-			logHash := LogToLogHash(l)
+			logHash := logToLogHash(l)
 			// The log may be an executing message emitted by the CrossL2Inbox
-			execMsg, err := p.eventDecoder(l)
+			execMsg, err := p.eventDecoder(l, p.depSet)
 			if err != nil {
 				return fmt.Errorf("invalid log %d from block %s: %w", l.Index, block.ID(), err)
 			}
@@ -56,12 +59,12 @@ func (p *logProcessor) ProcessLogs(_ context.Context, block eth.BlockRef, rcpts 
 	return nil
 }
 
-// LogToLogHash transforms a log into a hash that represents the log.
+// logToLogHash transforms a log into a hash that represents the log.
 // it is the concatenation of the log's address and the hash of the log's payload,
 // which is then hashed again. This is the hash that is stored in the log storage.
 // The address is hashed into the payload hash to save space in the log storage,
 // and because they represent paired data.
-func LogToLogHash(l *ethTypes.Log) common.Hash {
+func logToLogHash(l *ethTypes.Log) common.Hash {
 	payloadHash := crypto.Keccak256Hash(types.LogToMessagePayload(l))
 	return types.PayloadHashToLogHash(payloadHash, l.Address)
 }

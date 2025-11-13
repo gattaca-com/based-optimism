@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
+	"slices"
 	"testing"
 	"time"
-
-	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/standard"
 
 	op_e2e "github.com/ethereum-optimism/optimism/op-e2e"
 
@@ -19,6 +19,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/maps"
 )
 
 func TestValidatorAddress(t *testing.T) {
@@ -32,21 +33,21 @@ func TestValidatorAddress(t *testing.T) {
 		{
 			name:        "Valid Sepolia v1.8.0",
 			chainID:     11155111,
-			version:     standard.ContractsV180Tag,
+			version:     VersionV180,
 			want:        common.HexToAddress("0x0a5bf8ebb4b177b2dcc6eba933db726a2e2e2b4d"),
 			expectError: false,
 		},
 		{
 			name:        "Valid Sepolia v2.0.0",
 			chainID:     11155111,
-			version:     standard.ContractsV200Tag,
+			version:     VersionV200,
 			want:        common.HexToAddress("0x37739a6b0a3F1E7429499a4eC4A0685439Daff5C"),
 			expectError: false,
 		},
 		{
 			name:        "Invalid Chain ID",
 			chainID:     999,
-			version:     standard.ContractsV180Tag,
+			version:     VersionV180,
 			want:        common.Address{},
 			expectError: true,
 		},
@@ -84,17 +85,20 @@ func TestAddressValidDeployment(t *testing.T) {
 	}
 }
 
+// Regex to match version strings, removing op-contracts/ prefix and -rc.* suffix
+var cleanVersionRegex = regexp.MustCompile(`^(?:op-contracts/)?(v\d+\.\d+\.\d+)(?:-rc\.\d+)?$`)
+
 func testStandardVersionNetwork(t *testing.T, network string) {
 	var rpcURL string
-	var stdVersDefs validation.Versions
+	var versions validation.Versions
 	var chainID uint64
 	if network == "mainnet" {
 		rpcURL = os.Getenv("MAINNET_RPC_URL")
-		stdVersDefs = validation.StandardVersionsMainnet
+		versions = validation.StandardVersionsMainnet
 		chainID = 1
 	} else if network == "sepolia" {
 		rpcURL = os.Getenv("SEPOLIA_RPC_URL")
-		stdVersDefs = validation.StandardVersionsSepolia
+		versions = validation.StandardVersionsSepolia
 		chainID = 11155111
 	} else {
 		t.Fatalf("Invalid network: %s", network)
@@ -102,23 +106,31 @@ func testStandardVersionNetwork(t *testing.T, network string) {
 
 	require.NotEmpty(t, rpcURL, "RPC URL is empty")
 
-	contractVersions := []string{
-		standard.ContractsV180Tag,
-		standard.ContractsV200Tag,
-		standard.ContractsV300Tag,
-		standard.ContractsV400Tag,
-	}
+	// Use maps.keys to ensure the versions are sorted in descending order.
+	sortedKeys := maps.Keys(versions)
+	slices.Sort(sortedKeys)
+	slices.Reverse(sortedKeys)
 
-	for _, semver := range contractVersions {
-		version := stdVersDefs[validation.Semver(semver)]
+	for _, semver := range sortedKeys {
+		// Versions are in descending order, to stop at all versions prior to v1.8.0 since
+		// they don't have validators.
+		if string(semver) == "op-contracts/v1.6.0" {
+			break
+		}
 
-		address, err := ValidatorAddress(chainID, semver)
+		version := versions[semver]
+
+		matches := cleanVersionRegex.FindStringSubmatch(string(semver))
+		require.Len(t, matches, 2, "Invalid version format: %s", semver)
+		cleanVersion := matches[1]
+
+		address, err := ValidatorAddress(chainID, cleanVersion)
 		require.NoError(t, err)
 
 		rpcClient, err := rpc.Dial(rpcURL)
 		require.NoError(t, err)
 
-		t.Run(semver, func(t *testing.T) {
+		t.Run(string(semver), func(t *testing.T) {
 			testStandardVersion(t, address, rpcClient, version)
 		})
 	}

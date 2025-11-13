@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"context"
 	"time"
 
 	"github.com/ethereum-optimism/optimism/op-service/eth"
@@ -24,10 +23,10 @@ func (ev BuildStartedEvent) String() string {
 	return "build-started"
 }
 
-func (e *EngineController) onBuildStarted(ctx context.Context, ev BuildStartedEvent) {
+func (eq *EngDeriver) onBuildStarted(ev BuildStartedEvent) {
 	// If a (pending) safe block, immediately seal the block
 	if ev.DerivedFrom != (eth.L1BlockRef{}) {
-		e.emitter.Emit(ctx, BuildSealEvent{
+		eq.emitter.Emit(BuildSealEvent{
 			Info:         ev.Info,
 			BuildStarted: ev.BuildStarted,
 			Concluding:   ev.Concluding,

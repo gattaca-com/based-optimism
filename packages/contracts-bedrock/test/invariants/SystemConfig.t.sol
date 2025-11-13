@@ -6,7 +6,6 @@ import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { IProxy } from "interfaces/universal/IProxy.sol";
 import { Constants } from "src/libraries/Constants.sol";
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
-import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 
 contract SystemConfig_GasLimitBoundaries_Invariant is Test {
     ISystemConfig public config;
@@ -46,8 +45,7 @@ contract SystemConfig_GasLimitBoundaries_Invariant is Test {
                         optimismPortal: address(0),
                         optimismMintableERC20Factory: address(0)
                     }),
-                    1234, // _l2ChainId
-                    ISuperchainConfig(address(0)) // _superchainConfig
+                    1234 // _l2ChainId
                 )
             )
         );

@@ -1,9 +1,10 @@
-package opcm
+package opcm_test
 
 import (
 	"math/big"
 	"testing"
 
+	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/opcm"
 	"github.com/stretchr/testify/require"
 )
 
@@ -15,11 +16,11 @@ func TestNewDeployPreimageOracleScript(t *testing.T) {
 		// Then we load the script
 		//
 		// This would raise an error if the Go types didn't match the ABI
-		deployPreimageOracle, err := NewDeployPreimageOracleScript(host1)
+		deployPreimageOracle, err := opcm.NewDeployPreimageOracleScript(host1)
 		require.NoError(t, err)
 
 		// Then we deploy
-		output, err := deployPreimageOracle.Run(DeployPreimageOracle2Input{
+		output, err := deployPreimageOracle.Run(opcm.DeployPreimageOracle2Input{
 			MinProposalSize: big.NewInt(1),
 			ChallengePeriod: big.NewInt(2),
 		})
@@ -33,7 +34,7 @@ func TestNewDeployPreimageOracleScript(t *testing.T) {
 		// We run it on a fresh host so that the deployer nonces are the same
 		// which in turn means we should get identical output
 		host2 := createTestHost(t)
-		deprecatedOutput, err := DeployPreimageOracle(host2, DeployPreimageOracleInput{
+		deprecatedOutput, err := opcm.DeployPreimageOracle(host2, opcm.DeployPreimageOracleInput{
 			MinProposalSize: big.NewInt(1),
 			ChallengePeriod: big.NewInt(2),
 		})

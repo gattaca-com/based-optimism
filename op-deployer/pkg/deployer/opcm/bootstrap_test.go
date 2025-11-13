@@ -1,4 +1,4 @@
-package opcm
+package opcm_test
 
 import (
 	"math/big"

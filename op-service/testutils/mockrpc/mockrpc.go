@@ -73,8 +73,6 @@ type MockRPC struct {
 
 	lis net.Listener
 	err error
-
-	srv *http.Server
 }
 
 type Option func(*MockRPC)
@@ -100,16 +98,6 @@ func WithExpectationsFile(t *testing.T, path string) Option {
 	}
 }
 
-func WithOkCall(method string, pm ParamsMatcher, result any) Option {
-	return func(rpc *MockRPC) {
-		rpc.calls = append(rpc.calls, rpcCall{
-			Method:        method,
-			ParamsMatcher: pm,
-			Result:        result,
-		})
-	}
-}
-
 func NewMockRPC(t *testing.T, lgr log.Logger, opts ...Option) *MockRPC {
 	m := &MockRPC{
 		lgr: lgr,
@@ -125,8 +113,6 @@ func NewMockRPC(t *testing.T, lgr log.Logger, opts ...Option) *MockRPC {
 	srv := &http.Server{
 		Handler: m,
 	}
-
-	m.srv = srv
 
 	errCh := make(chan error, 1)
 	go func() {
@@ -240,10 +226,6 @@ func (m *MockRPC) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-}
-
-func (m *MockRPC) Close() error {
-	return m.srv.Shutdown(context.Background())
 }
 
 func (m *MockRPC) Endpoint() string {

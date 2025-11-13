@@ -6,31 +6,26 @@ import (
 	"testing"
 	"time"
 
-	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/stretchr/testify/require"
-
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/ethereum/go-ethereum/log"
-
 	op_e2e "github.com/ethereum-optimism/optimism/op-e2e"
+
 	"github.com/ethereum-optimism/optimism/op-e2e/e2eutils/geth"
 	"github.com/ethereum-optimism/optimism/op-e2e/e2eutils/opnode"
 	"github.com/ethereum-optimism/optimism/op-e2e/e2eutils/wait"
 	"github.com/ethereum-optimism/optimism/op-e2e/system/e2esys"
 	"github.com/ethereum-optimism/optimism/op-e2e/system/helpers"
-	"github.com/ethereum-optimism/optimism/op-node/config"
 	"github.com/ethereum-optimism/optimism/op-node/metrics"
 	rollupNode "github.com/ethereum-optimism/optimism/op-node/node"
 	"github.com/ethereum-optimism/optimism/op-node/p2p"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/driver"
-	"github.com/ethereum-optimism/optimism/op-node/rollup/interop"
 	"github.com/ethereum-optimism/optimism/op-service/endpoint"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
-	opmetrics "github.com/ethereum-optimism/optimism/op-service/metrics"
 	"github.com/ethereum-optimism/optimism/op-service/oppprof"
-	oprpc "github.com/ethereum-optimism/optimism/op-service/rpc"
 	"github.com/ethereum-optimism/optimism/op-service/testlog"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/log"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSystemP2PAltSync(t *testing.T) {
@@ -44,22 +39,20 @@ func TestSystemP2PAltSync(t *testing.T) {
 	// remove default verifier node
 	delete(cfg.Nodes, "verifier")
 	// Add more verifier nodes
-	cfg.Nodes["alice"] = &config.Config{
+	cfg.Nodes["alice"] = &rollupNode.Config{
 		Driver: driver.Config{
 			VerifierConfDepth:  0,
 			SequencerConfDepth: 0,
 			SequencerEnabled:   false,
 		},
-		InteropConfig:       &interop.Config{},
 		L1EpochPollInterval: time.Second * 4,
 	}
-	cfg.Nodes["bob"] = &config.Config{
+	cfg.Nodes["bob"] = &rollupNode.Config{
 		Driver: driver.Config{
 			VerifierConfDepth:  0,
 			SequencerConfDepth: 0,
 			SequencerEnabled:   false,
 		},
-		InteropConfig:       &interop.Config{},
 		L1EpochPollInterval: time.Second * 4,
 	}
 	cfg.Loggers["alice"] = testlog.Logger(t, log.LevelInfo).New("role", "alice")
@@ -117,18 +110,17 @@ func TestSystemP2PAltSync(t *testing.T) {
 
 	// Configure the new rollup node that'll be syncing
 	var syncedPayloads []string
-	syncNodeCfg := &config.Config{
+	syncNodeCfg := &rollupNode.Config{
 		Driver:    driver.Config{VerifierConfDepth: 0},
 		Rollup:    *sys.RollupConfig,
 		P2PSigner: nil,
-		RPC: oprpc.CLIConfig{
+		RPC: rollupNode.RPCConfig{
 			ListenAddr:  "127.0.0.1",
 			ListenPort:  0,
 			EnableAdmin: true,
 		},
-		InteropConfig:       &interop.Config{},
 		P2P:                 &p2p.Prepared{HostP2P: h, EnableReqRespSync: true},
-		Metrics:             opmetrics.CLIConfig{Enabled: false}, // no metrics server
+		Metrics:             rollupNode.MetricsConfig{Enabled: false}, // no metrics server
 		Pprof:               oppprof.CLIConfig{},
 		L1EpochPollInterval: time.Second * 10,
 		Tracer: &opnode.FnTracer{

@@ -26,9 +26,9 @@ import (
 	"github.com/ethereum-optimism/optimism/op-node/rollup"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/derive"
 	engine2 "github.com/ethereum-optimism/optimism/op-node/rollup/engine"
+	"github.com/ethereum-optimism/optimism/op-node/rollup/event"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/sync"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
-	"github.com/ethereum-optimism/optimism/op-service/event"
 	"github.com/ethereum-optimism/optimism/op-service/sources"
 	"github.com/ethereum-optimism/optimism/op-service/testlog"
 	"github.com/ethereum-optimism/optimism/op-service/testutils"
@@ -644,9 +644,7 @@ func PerformELSyncAndCheckPayloads(t actionsHelpers.Testing, miner *actionsHelpe
 	// Insert it on the verifier
 	seqHead, err := seqEngCl.PayloadByLabel(t.Ctx(), eth.Unsafe)
 	require.NoError(t, err)
-	// Must check with block which is not genesis
-	startBlockNum := from + 1
-	seqStart, err := seqEngCl.PayloadByNumber(t.Ctx(), startBlockNum)
+	seqStart, err := seqEngCl.PayloadByNumber(t.Ctx(), from)
 	require.NoError(t, err)
 	verifier.ActL2InsertUnsafePayload(seqHead)(t)
 
@@ -659,10 +657,10 @@ func PerformELSyncAndCheckPayloads(t actionsHelpers.Testing, miner *actionsHelpe
 	)
 
 	// Expect snap sync to download & execute the entire chain
-	// Verify this by checking that the verifier has the correct value for block startBlockNum
+	// Verify this by checking that the verifier has the correct value for block 1
 	require.Eventually(t,
 		func() bool {
-			block, err := verifier.Eng.L2BlockRefByNumber(t.Ctx(), startBlockNum)
+			block, err := verifier.Eng.L2BlockRefByNumber(t.Ctx(), from)
 			if err != nil {
 				return false
 			}
@@ -823,7 +821,7 @@ func TestELSyncTransitionsToCLSyncAfterNodeRestart(gt *testing.T) {
 	PrepareELSyncedNode(t, miner, sequencer, seqEng, verifier, verEng, seqEngCl, batcher, dp)
 
 	// Create a new verifier which is essentially a new op-node with the sync mode of ELSync and default geth engine kind.
-	verifier = actionsHelpers.NewL2Verifier(t, captureLog, miner.L1Client(t, sd.RollupCfg), miner.BlobStore(), altda.Disabled, verifier.Eng, sd.RollupCfg, sd.L1Cfg.Config, sd.DependencySet, &sync.Config{SyncMode: sync.ELSync}, actionsHelpers.DefaultVerifierCfg().SafeHeadListener)
+	verifier = actionsHelpers.NewL2Verifier(t, captureLog, miner.L1Client(t, sd.RollupCfg), miner.BlobStore(), altda.Disabled, verifier.Eng, sd.RollupCfg, &sync.Config{SyncMode: sync.ELSync}, actionsHelpers.DefaultVerifierCfg().SafeHeadListener)
 
 	// Build another 10 L1 blocks on the sequencer
 	for i := 0; i < 10; i++ {
@@ -865,7 +863,7 @@ func TestForcedELSyncCLAfterNodeRestart(gt *testing.T) {
 	PrepareELSyncedNode(t, miner, sequencer, seqEng, verifier, verEng, seqEngCl, batcher, dp)
 
 	// Create a new verifier which is essentially a new op-node with the sync mode of ELSync and erigon engine kind.
-	verifier2 := actionsHelpers.NewL2Verifier(t, captureLog, miner.L1Client(t, sd.RollupCfg), miner.BlobStore(), altda.Disabled, verifier.Eng, sd.RollupCfg, sd.L1Cfg.Config, sd.DependencySet, &sync.Config{SyncMode: sync.ELSync, SupportsPostFinalizationELSync: true}, actionsHelpers.DefaultVerifierCfg().SafeHeadListener)
+	verifier2 := actionsHelpers.NewL2Verifier(t, captureLog, miner.L1Client(t, sd.RollupCfg), miner.BlobStore(), altda.Disabled, verifier.Eng, sd.RollupCfg, &sync.Config{SyncMode: sync.ELSync, SupportsPostFinalizationELSync: true}, actionsHelpers.DefaultVerifierCfg().SafeHeadListener)
 
 	// Build another 10 L1 blocks on the sequencer
 	for i := 0; i < 10; i++ {
@@ -1054,7 +1052,8 @@ func TestSpanBatchAtomicity_Consolidation(gt *testing.T) {
 			require.Equal(t, verifier.L2Safe().Number, uint64(0))
 		} else {
 			// Make sure we do the post-processing of what safety updates might happen
-			verifier.ActL2PipelineFull(t)
+			// after the pending-safe event, before the next pending-safe event.
+			verifier.ActL2EventsUntil(t, event.Is[engine2.PendingSafeUpdateEvent], 100, true)
 			// Once the span batch is fully processed, the safe head must advance to the end of span batch.
 			require.Equal(t, verifier.L2Safe().Number, targetHeadNumber)
 			require.Equal(t, verifier.L2Safe(), verifier.L2PendingSafe())

@@ -7,7 +7,6 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-service/testutils"
 	"github.com/ethereum-optimism/optimism/op-service/testutils/fuzzerutils"
-	"github.com/ethereum/go-ethereum/params"
 	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/require"
 )
@@ -30,7 +29,7 @@ func FuzzParseL1InfoDepositTxDataValid(f *testing.F) {
 		var rollupCfg rollup.Config
 
 		// Create our deposit tx from our info
-		depTx, err := L1InfoDeposit(&rollupCfg, params.MergedTestChainConfig, sysCfg, seqNr, &l1Info, 0)
+		depTx, err := L1InfoDeposit(&rollupCfg, sysCfg, seqNr, &l1Info, 0)
 		require.NoError(t, err, "error creating deposit tx from L1 info")
 
 		// Get our info from out deposit tx
@@ -75,7 +74,7 @@ func FuzzDecodeDepositTxDataToL1Info(f *testing.F) {
 			GasLimit:    uint64(0),
 		}
 
-		depTx, err := L1InfoDeposit(&rollupCfg, params.MergedTestChainConfig, sysCfg, res.SequenceNumber, &l1Info, 0)
+		depTx, err := L1InfoDeposit(&rollupCfg, sysCfg, res.SequenceNumber, &l1Info, 0)
 		require.NoError(t, err, "error creating deposit tx from L1 info")
 		require.Equal(t, depTx.Data, fuzzedData)
 	})

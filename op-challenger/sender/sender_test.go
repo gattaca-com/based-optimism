@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-service/testlog"
 	"github.com/ethereum-optimism/optimism/op-service/txmgr"
 	"github.com/ethereum/go-ethereum/common"
@@ -173,10 +172,6 @@ func (s *stubTxMgr) sentCount() int {
 	s.m.Lock()
 	defer s.m.Unlock()
 	return len(s.sending)
-}
-
-func (s *stubTxMgr) ChainID() eth.ChainID {
-	panic("unsupported")
 }
 
 func (s *stubTxMgr) From() common.Address {

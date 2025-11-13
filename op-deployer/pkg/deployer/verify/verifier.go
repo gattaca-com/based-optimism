@@ -35,9 +35,8 @@ func NewVerifier(apiKey string, l1ChainID uint64, artifactsFS foundry.StatDirFs,
 	if err != nil {
 		return nil, fmt.Errorf("unsupported L1 chain ID: %d", l1ChainID)
 	}
-	l.Info("found etherscan url", "url", etherscanUrl)
 
-	etherscan := NewEtherscanClient(apiKey, etherscanUrl, rate.NewLimiter(rate.Limit(1), 1))
+	etherscan := NewEtherscanClient(apiKey, etherscanUrl, rate.NewLimiter(rate.Limit(3), 2))
 
 	return &Verifier{
 		l1ChainID:   l1ChainID,
@@ -88,7 +87,7 @@ func VerifyCLI(cliCtx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to parse l1 contracts release locator: %w", err)
 	}
-	artifactsFS, err := artifacts.Download(ctx, locator, nil, deployer.DefaultCacheDir())
+	artifactsFS, err := artifacts.Download(ctx, locator, nil, deployer.GetDefaultCacheDir())
 	if err != nil {
 		return fmt.Errorf("failed to get artifacts: %w", err)
 	}

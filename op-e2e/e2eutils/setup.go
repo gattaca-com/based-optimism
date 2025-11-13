@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/ethereum-optimism/optimism/op-e2e/config/secrets"
-	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/backend/depset"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -87,7 +86,6 @@ type SetupData struct {
 	L1Cfg         *core.Genesis
 	L2Cfg         *core.Genesis
 	RollupCfg     *rollup.Config
-	DependencySet depset.DependencySet
 	ChainSpec     *rollup.ChainSpec
 	DeploymentsL1 *genesis.L1Deployments
 }
@@ -109,12 +107,6 @@ func Ether(v uint64) *big.Int {
 }
 
 func GetL2AllocsMode(dc *genesis.DeployConfig, t uint64) genesis.L2AllocsMode {
-	if fork := dc.JovianTime(t); fork != nil && *fork <= 0 {
-		return genesis.L2AllocsJovian
-	}
-	if fork := dc.InteropTime(t); fork != nil && *fork <= 0 {
-		return genesis.L2AllocsInterop
-	}
 	if fork := dc.IsthmusTime(t); fork != nil && *fork <= 0 {
 		return genesis.L2AllocsIsthmus
 	}

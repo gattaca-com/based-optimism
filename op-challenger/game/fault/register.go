@@ -67,13 +67,6 @@ func RegisterGameTypes(
 		}
 		registerTasks = append(registerTasks, NewCannonRegisterTask(faultTypes.CannonGameType, cfg, m, vm.NewOpProgramServerExecutor(logger), l2HeaderSource, rollupClient, syncValidator))
 	}
-	if cfg.TraceTypeEnabled(faultTypes.TraceTypeCannonKona) {
-		l2HeaderSource, rollupClient, syncValidator, err := clients.SingleChainClients()
-		if err != nil {
-			return nil, err
-		}
-		registerTasks = append(registerTasks, NewCannonKonaRegisterTask(faultTypes.CannonKonaGameType, cfg, m, vm.NewKonaExecutor(), l2HeaderSource, rollupClient, syncValidator))
-	}
 	if cfg.TraceTypeEnabled(faultTypes.TraceTypeSuperCannon) {
 		rootProvider, syncValidator, err := clients.SuperchainClients()
 		if err != nil {
@@ -109,13 +102,6 @@ func RegisterGameTypes(
 		}
 		registerTasks = append(registerTasks, NewAsteriscKonaRegisterTask(faultTypes.AsteriscKonaGameType, cfg, m, vm.NewKonaExecutor(), l2HeaderSource, rollupClient, syncValidator))
 	}
-	if cfg.TraceTypeEnabled(faultTypes.TraceTypeSuperAsteriscKona) {
-		rootProvider, syncValidator, err := clients.SuperchainClients()
-		if err != nil {
-			return nil, err
-		}
-		registerTasks = append(registerTasks, NewSuperAsteriscKonaRegisterTask(faultTypes.SuperAsteriscKonaGameType, cfg, m, vm.NewKonaSuperExecutor(), rootProvider, syncValidator))
-	}
 	if cfg.TraceTypeEnabled(faultTypes.TraceTypeFast) {
 		l2HeaderSource, rollupClient, syncValidator, err := clients.SingleChainClients()
 		if err != nil {
@@ -131,7 +117,7 @@ func RegisterGameTypes(
 		registerTasks = append(registerTasks, NewAlphabetRegisterTask(faultTypes.AlphabetGameType, l2HeaderSource, rollupClient, syncValidator))
 	}
 	for _, task := range registerTasks {
-		if err := task.Register(ctx, registry, oracles, systemClock, l1Clock, logger, m, txSender, gameFactory, caller, l1HeaderSource, selective, claimants, cfg.ResponseDelay, cfg.ResponseDelayAfter); err != nil {
+		if err := task.Register(ctx, registry, oracles, systemClock, l1Clock, logger, m, txSender, gameFactory, caller, l1HeaderSource, selective, claimants); err != nil {
 			return clients.Close, fmt.Errorf("failed to register %v game type: %w", task.gameType, err)
 		}
 	}

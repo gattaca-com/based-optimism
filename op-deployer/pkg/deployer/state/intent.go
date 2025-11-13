@@ -5,12 +5,11 @@ import (
 	"fmt"
 	"math/big"
 	"net/url"
+	"reflect"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/params"
 
-	"github.com/ethereum-optimism/optimism/op-chain-ops/addresses"
 	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/artifacts"
 	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/standard"
 	"github.com/ethereum-optimism/optimism/op-service/ioutil"
@@ -30,13 +29,12 @@ var emptyAddress common.Address
 var emptyHash common.Hash
 
 type SuperchainProofParams struct {
-	WithdrawalDelaySeconds          uint64      `json:"faultGameWithdrawalDelay" toml:"faultGameWithdrawalDelay"`
-	MinProposalSizeBytes            uint64      `json:"preimageOracleMinProposalSize" toml:"preimageOracleMinProposalSize"`
-	ChallengePeriodSeconds          uint64      `json:"preimageOracleChallengePeriod" toml:"preimageOracleChallengePeriod"`
-	ProofMaturityDelaySeconds       uint64      `json:"proofMaturityDelaySeconds" toml:"proofMaturityDelaySeconds"`
-	DisputeGameFinalityDelaySeconds uint64      `json:"disputeGameFinalityDelaySeconds" toml:"disputeGameFinalityDelaySeconds"`
-	MIPSVersion                     uint64      `json:"mipsVersion" toml:"mipsVersion"`
-	DevFeatureBitmap                common.Hash `json:"devFeatureBitmap" toml:"devFeatureBitmap"`
+	WithdrawalDelaySeconds          uint64 `json:"faultGameWithdrawalDelay" toml:"faultGameWithdrawalDelay"`
+	MinProposalSizeBytes            uint64 `json:"preimageOracleMinProposalSize" toml:"preimageOracleMinProposalSize"`
+	ChallengePeriodSeconds          uint64 `json:"preimageOracleChallengePeriod" toml:"preimageOracleChallengePeriod"`
+	ProofMaturityDelaySeconds       uint64 `json:"proofMaturityDelaySeconds" toml:"proofMaturityDelaySeconds"`
+	DisputeGameFinalityDelaySeconds uint64 `json:"disputeGameFinalityDelaySeconds" toml:"disputeGameFinalityDelaySeconds"`
+	MIPSVersion                     uint64 `json:"mipsVersion" toml:"mipsVersion"`
 }
 
 type L1DevGenesisBlockParams struct {
@@ -56,65 +54,73 @@ type L1DevGenesisParams struct {
 	// PragueTimeOffset configures Prague (aka Pectra) to be activated at the given time after L1 dev genesis time.
 	PragueTimeOffset *uint64 `json:"pragueTimeOffset" toml:"pragueTimeOffset"`
 
-	// OsakaTimeOffset configures Osaka (the EL changes in the Fusaka Ethereum fork) to be
-	// activated at the given time after L1 dev genesis time.
-	OsakaTimeOffset *uint64 `json:"osakaTimeOffset" toml:"osakaTimeOffset"`
-
-	// BPO1TimeOffset configures the BPO1 fork to be activated at the given time after L1 dev
-	// genesis time.
-	BPO1TimeOffset *uint64 `json:"bpo1TimeOffset" toml:"bpo1TimeOffset"`
-
-	BlobSchedule *params.BlobScheduleConfig `json:"blobSchedule"`
-
 	// Prefund is a map of addresses to balances (in wei), to prefund in the L1 dev genesis state.
 	// This is independent of the "Prefund" functionality that may fund a default 20 test accounts.
 	Prefund map[common.Address]*hexutil.U256 `json:"prefund" toml:"prefund"`
 }
 
 type Intent struct {
-	ConfigType            IntentType                 `json:"configType" toml:"configType"`
-	L1ChainID             uint64                     `json:"l1ChainID" toml:"l1ChainID"`
-	OPCMAddress           *common.Address            `json:"opcmAddress" toml:"opcmAddress"`
-	SuperchainConfigProxy *common.Address            `json:"superchainConfigProxy" toml:"superchainConfigProxy"`
-	SuperchainRoles       *addresses.SuperchainRoles `json:"superchainRoles" toml:"superchainRoles,omitempty"`
-	FundDevAccounts       bool                       `json:"fundDevAccounts" toml:"fundDevAccounts"`
-	L1ContractsLocator    *artifacts.Locator         `json:"l1ContractsLocator" toml:"l1ContractsLocator"`
-	L2ContractsLocator    *artifacts.Locator         `json:"l2ContractsLocator" toml:"l2ContractsLocator"`
-	Chains                []*ChainIntent             `json:"chains" toml:"chains"`
-	GlobalDeployOverrides map[string]any             `json:"globalDeployOverrides" toml:"globalDeployOverrides"`
+	ConfigType            IntentType         `json:"configType" toml:"configType"`
+	L1ChainID             uint64             `json:"l1ChainID" toml:"l1ChainID"`
+	SuperchainConfigProxy *common.Address    `json:"superchainConfigProxy" toml:"superchainConfigProxy"`
+	SuperchainRoles       *SuperchainRoles   `json:"superchainRoles" toml:"superchainRoles,omitempty"`
+	FundDevAccounts       bool               `json:"fundDevAccounts" toml:"fundDevAccounts"`
+	UseInterop            bool               `json:"useInterop" toml:"useInterop"`
+	L1ContractsLocator    *artifacts.Locator `json:"l1ContractsLocator" toml:"l1ContractsLocator"`
+	L2ContractsLocator    *artifacts.Locator `json:"l2ContractsLocator" toml:"l2ContractsLocator"`
+	Chains                []*ChainIntent     `json:"chains" toml:"chains"`
+	GlobalDeployOverrides map[string]any     `json:"globalDeployOverrides" toml:"globalDeployOverrides"`
 
 	// L1DevGenesisParams is optional. This may be used to customize the L1 genesis when
 	// the deployer output is directed to produce a L1 genesis state for development.
 	L1DevGenesisParams *L1DevGenesisParams `json:"l1DevGenesisParams"`
 }
 
+type SuperchainRoles struct {
+	ProxyAdminOwner       common.Address `json:"proxyAdminOwner" toml:"proxyAdminOwner"`
+	ProtocolVersionsOwner common.Address `json:"protocolVersionsOwner" toml:"protocolVersionsOwner"`
+	Guardian              common.Address `json:"guardian" toml:"guardian"`
+}
+
+var ErrSuperchainRoleZeroAddress = errors.New("SuperchainRole is set to zero address")
 var ErrL1ContractsLocatorUndefined = errors.New("L1ContractsLocator undefined")
 var ErrL2ContractsLocatorUndefined = errors.New("L2ContractsLocator undefined")
+
+func (s *SuperchainRoles) CheckNoZeroAddresses() error {
+	val := reflect.ValueOf(*s)
+	typ := reflect.TypeOf(*s)
+
+	// Iterate through all the fields
+	for i := 0; i < val.NumField(); i++ {
+		fieldValue := val.Field(i)
+		fieldName := typ.Field(i).Name
+
+		if fieldValue.Interface() == (common.Address{}) {
+			return fmt.Errorf("%w: %s", ErrSuperchainRoleZeroAddress, fieldName)
+		}
+	}
+	return nil
+}
 
 func (c *Intent) L1ChainIDBig() *big.Int {
 	return big.NewInt(int64(c.L1ChainID))
 }
 
 func (c *Intent) validateCustomConfig() error {
-	if c.L1ContractsLocator == nil {
+	if c.L1ContractsLocator == nil ||
+		(c.L1ContractsLocator.Tag == "" && c.L1ContractsLocator.URL == &url.URL{}) {
 		return ErrL1ContractsLocatorUndefined
 	}
-
-	if c.L2ContractsLocator == nil {
+	if c.L2ContractsLocator == nil ||
+		(c.L2ContractsLocator.Tag == "" && c.L2ContractsLocator.URL == &url.URL{}) {
 		return ErrL2ContractsLocatorUndefined
 	}
 
-	if c.OPCMAddress == nil {
-		if c.SuperchainRoles == nil {
-			return fmt.Errorf("%w: must set superchain roles if OPCM address is nil", ErrIncompatibleValue)
-		}
-		if err := addresses.CheckNoZeroAddresses(c.SuperchainRoles); err != nil {
-			return err
-		}
-	} else {
-		if c.SuperchainRoles != nil {
-			return fmt.Errorf("%w: must not set superchain roles if OPCM address is set", ErrIncompatibleValue)
-		}
+	if c.SuperchainRoles == nil {
+		return errors.New("SuperchainRoles is set to nil")
+	}
+	if err := c.SuperchainRoles.CheckNoZeroAddresses(); err != nil {
+		return err
 	}
 
 	if len(c.Chains) == 0 {
@@ -137,21 +143,20 @@ func (c *Intent) validateStandardValues() error {
 	if err := c.checkL1Prod(); err != nil {
 		return err
 	}
+	if err := c.checkL2Prod(); err != nil {
+		return err
+	}
 
 	if c.SuperchainConfigProxy != nil {
-		return ErrIncompatibleValue
+		return ErrNonStandardValue
 	}
 
-	if c.SuperchainRoles != nil {
-		return ErrIncompatibleValue
-	}
-
-	standardOPCM, err := standard.OPCMImplAddressFor(c.L1ChainID, standard.CurrentTag)
+	standardSuperchainRoles, err := GetStandardSuperchainRoles(c.L1ChainID)
 	if err != nil {
-		return fmt.Errorf("error getting OPCM address: %w", err)
+		return fmt.Errorf("error getting standard superchain roles: %w", err)
 	}
-	if c.OPCMAddress == nil || *c.OPCMAddress != standardOPCM {
-		return fmt.Errorf("%w: opcmAddress=%s", ErrNonStandardValue, standardOPCM)
+	if c.SuperchainRoles == nil || *c.SuperchainRoles != *standardSuperchainRoles {
+		return fmt.Errorf("SuperchainRoles does not match standard value")
 	}
 
 	for _, chain := range c.Chains {
@@ -161,9 +166,6 @@ func (c *Intent) validateStandardValues() error {
 		if chain.Eip1559DenominatorCanyon != standard.Eip1559DenominatorCanyon ||
 			chain.Eip1559Denominator != standard.Eip1559Denominator ||
 			chain.Eip1559Elasticity != standard.Eip1559Elasticity {
-			return fmt.Errorf("%w: chainId=%s", ErrNonStandardValue, chain.ID)
-		}
-		if chain.GasLimit != standard.GasLimit {
 			return fmt.Errorf("%w: chainId=%s", ErrNonStandardValue, chain.ID)
 		}
 		if len(chain.AdditionalDisputeGames) > 0 {
@@ -185,7 +187,7 @@ func (c *Intent) validateStandardValues() error {
 	return nil
 }
 
-func GetStandardSuperchainRoles(l1ChainId uint64) (*addresses.SuperchainRoles, error) {
+func GetStandardSuperchainRoles(l1ChainId uint64) (*SuperchainRoles, error) {
 	proxyAdminOwner, err := standard.L1ProxyAdminOwner(l1ChainId)
 	if err != nil {
 		return nil, fmt.Errorf("error getting L1ProxyAdminOwner: %w", err)
@@ -199,10 +201,10 @@ func GetStandardSuperchainRoles(l1ChainId uint64) (*addresses.SuperchainRoles, e
 		return nil, fmt.Errorf("error getting protocol versions owner: %w", err)
 	}
 
-	superchainRoles := &addresses.SuperchainRoles{
-		SuperchainProxyAdminOwner: proxyAdminOwner,
-		ProtocolVersionsOwner:     protocolVersionsOwner,
-		SuperchainGuardian:        guardian,
+	superchainRoles := &SuperchainRoles{
+		ProxyAdminOwner:       proxyAdminOwner,
+		ProtocolVersionsOwner: protocolVersionsOwner,
+		Guardian:              guardian,
 	}
 
 	return superchainRoles, nil
@@ -259,40 +261,32 @@ func (c *Intent) checkL1Prod() error {
 		return err
 	}
 
-	if _, ok := versions[validation.Semver(standard.CurrentTag)]; !ok {
-		return fmt.Errorf("tag '%s' not found in standard versions", standard.CurrentTag)
-	}
-
-	opcmAddr, err := standard.OPCMImplAddressFor(c.L1ChainID, standard.CurrentTag)
-	if err != nil {
-		return fmt.Errorf("error getting OPCM address: %w", err)
-	}
-	if c.OPCMAddress == nil || *c.OPCMAddress != opcmAddr {
-		return fmt.Errorf("%w: opcmAddress=%s", ErrNonStandardValue, opcmAddr)
+	if _, ok := versions[validation.Semver(c.L1ContractsLocator.Tag)]; !ok {
+		return fmt.Errorf("tag '%s' not found in standard versions", c.L1ContractsLocator.Tag)
 	}
 
 	return nil
 }
 
-func NewIntent(configType IntentType, l1ChainId uint64, l2ChainIds []common.Hash) (intent Intent, err error) {
+func (c *Intent) checkL2Prod() error {
+	_, err := standard.ArtifactsURLForTag(c.L2ContractsLocator.Tag)
+	return err
+}
+
+func NewIntent(configType IntentType, l1ChainId uint64, l2ChainIds []common.Hash) (Intent, error) {
 	switch configType {
 	case IntentTypeCustom:
-		intent, err = NewIntentCustom(l1ChainId, l2ChainIds)
+		return NewIntentCustom(l1ChainId, l2ChainIds)
 
 	case IntentTypeStandard:
-		intent, err = NewIntentStandard(l1ChainId, l2ChainIds)
+		return NewIntentStandard(l1ChainId, l2ChainIds)
 
 	case IntentTypeStandardOverrides:
-		intent, err = NewIntentStandardOverrides(l1ChainId, l2ChainIds)
+		return NewIntentStandardOverrides(l1ChainId, l2ChainIds)
 
 	default:
 		return Intent{}, fmt.Errorf("intent type not supported: %s (valid types: %s, %s, %s)", configType, IntentTypeStandard, IntentTypeCustom, IntentTypeStandardOverrides)
 	}
-	if err != nil {
-		return
-	}
-	intent.ConfigType = configType
-	return
 }
 
 // Sets all Intent fields to their zero value with the expectation that the
@@ -303,31 +297,30 @@ func NewIntentCustom(l1ChainId uint64, l2ChainIds []common.Hash) (Intent, error)
 		L1ChainID:          l1ChainId,
 		L1ContractsLocator: &artifacts.Locator{URL: &url.URL{}},
 		L2ContractsLocator: &artifacts.Locator{URL: &url.URL{}},
-		SuperchainRoles:    &addresses.SuperchainRoles{},
+		SuperchainRoles:    &SuperchainRoles{},
 	}
 
 	for _, l2ChainID := range l2ChainIds {
 		intent.Chains = append(intent.Chains, &ChainIntent{
-			ID:       l2ChainID,
-			GasLimit: standard.GasLimit,
+			ID: l2ChainID,
 		})
 	}
 	return intent, nil
 }
 
 func NewIntentStandard(l1ChainId uint64, l2ChainIds []common.Hash) (Intent, error) {
-	opcmAddr, err := standard.OPCMImplAddressFor(l1ChainId, standard.CurrentTag)
-	if err != nil {
-		return Intent{}, fmt.Errorf("error getting OPCM impl address: %w", err)
-	}
-
 	intent := Intent{
 		ConfigType:         IntentTypeStandard,
 		L1ChainID:          l1ChainId,
 		L1ContractsLocator: artifacts.DefaultL1ContractsLocator,
 		L2ContractsLocator: artifacts.DefaultL2ContractsLocator,
-		OPCMAddress:        &opcmAddr,
 	}
+
+	superchainRoles, err := GetStandardSuperchainRoles(l1ChainId)
+	if err != nil {
+		return Intent{}, fmt.Errorf("error getting standard superchain roles: %w", err)
+	}
+	intent.SuperchainRoles = superchainRoles
 
 	challenger, err := standard.ChallengerAddressFor(l1ChainId)
 	if err != nil {
@@ -339,7 +332,7 @@ func NewIntentStandard(l1ChainId uint64, l2ChainIds []common.Hash) (Intent, erro
 	}
 	l2ProxyAdminOwner, err := standard.L2ProxyAdminOwner(l1ChainId)
 	if err != nil {
-		return Intent{}, fmt.Errorf("error getting OpChainProxyAdminOwner: %w", err)
+		return Intent{}, fmt.Errorf("error getting L2ProxyAdminOwner: %w", err)
 	}
 
 	for _, l2ChainID := range l2ChainIds {
@@ -348,7 +341,6 @@ func NewIntentStandard(l1ChainId uint64, l2ChainIds []common.Hash) (Intent, erro
 			Eip1559DenominatorCanyon: standard.Eip1559DenominatorCanyon,
 			Eip1559Denominator:       standard.Eip1559Denominator,
 			Eip1559Elasticity:        standard.Eip1559Elasticity,
-			GasLimit:                 standard.GasLimit,
 			Roles: ChainRoles{
 				Challenger:        challenger,
 				L1ProxyAdminOwner: l1ProxyAdminOwner,

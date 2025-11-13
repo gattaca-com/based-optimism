@@ -32,18 +32,29 @@ op-program-client-mips:
         GITDATE={{GIT_DATE}} \
         VERSION={{OP_PROGRAM_VERSION}}
 
-# Generate the prestate proof containing the absolute pre-state hash.
-prestate TYPE CLIENT_SUFFIX PRESTATE_SUFFIX: cannon op-program-client-mips
+# Run the op-program-client elf binary directly through cannon's load-elf subcommand.
+client TYPE CLIENT_SUFFIX PRESTATE_SUFFIX: cannon op-program-client-mips
     #!/bin/bash
-    go run /app/op-program/builder/main.go build-prestate \
-        --program-elf /app/op-program/bin/op-program-client{{CLIENT_SUFFIX}}.elf \
-        --version {{TYPE}}\
-        --suffix {{PRESTATE_SUFFIX}}
+    /app/cannon/bin/cannon load-elf \
+        --type {{TYPE}} \
+        --path /app/op-program/bin/op-program-client{{CLIENT_SUFFIX}}.elf \
+        --out /app/op-program/bin/prestate{{PRESTATE_SUFFIX}}.bin.gz \
+        --meta "/app/op-program/bin/meta{{PRESTATE_SUFFIX}}.json"
 
-build-mt64: (prestate "multithreaded64-4" "64" "-mt64")
-build-mt64Next: (prestate "multithreaded64-5" "64" "-mt64Next")
-build-interop: (prestate "multithreaded64-4" "-interop" "-interop")
-build-interopNext: (prestate "multithreaded64-5" "-interop" "-interopNext")
+# Generate the prestate proof containing the absolute pre-state hash.
+prestate TYPE CLIENT_SUFFIX PRESTATE_SUFFIX: (client TYPE CLIENT_SUFFIX PRESTATE_SUFFIX)
+    #!/bin/bash
+    /app/cannon/bin/cannon run \
+        --proof-at '=0' \
+        --stop-at '=1' \
+        --input /app/op-program/bin/prestate{{PRESTATE_SUFFIX}}.bin.gz \
+        --meta "" \
+        --proof-fmt '/app/op-program/bin/%d{{PRESTATE_SUFFIX}}.json' \
+        --output ""
+    mv /app/op-program/bin/0{{PRESTATE_SUFFIX}}.json /app/op-program/bin/prestate-proof{{PRESTATE_SUFFIX}}.json
 
-build-current: build-mt64 build-interop
-build-next: build-mt64Next build-interopNext
+build-default: (prestate "singlethreaded-2" "" "")
+build-mt64: (prestate "multithreaded64-3" "64" "-mt64")
+build-interop: (prestate "multithreaded64-3" "-interop" "-interop")
+
+build-all: build-default build-mt64 build-interop

@@ -1,3 +1,6 @@
+//go:build cannon64
+// +build cannon64
+
 package memory
 
 import (
@@ -17,7 +20,7 @@ import (
 
 func TestMemory64BinaryTreeMerkleProof(t *testing.T) {
 	t.Run("nearly empty tree", func(t *testing.T) {
-		m := NewBinaryTreeMemory(testDefaultCodeRegionSize, testDefaultHeapSize)
+		m := NewBinaryTreeMemory()
 		m.SetWord(0x10000, 0xAABBCCDD_EEFF1122)
 		proof := m.MerkleProof(0x10000)
 		require.Equal(t, uint64(0xAABBCCDD_EEFF1122), binary.BigEndian.Uint64(proof[:8]))
@@ -26,7 +29,7 @@ func TestMemory64BinaryTreeMerkleProof(t *testing.T) {
 		}
 	})
 	t.Run("fuller tree", func(t *testing.T) {
-		m := NewBinaryTreeMemory(testDefaultCodeRegionSize, testDefaultHeapSize)
+		m := NewBinaryTreeMemory()
 		m.SetWord(0x10000, 0xaabbccdd)
 		m.SetWord(0x80008, 42)
 		m.SetWord(0x13370000, 123)
@@ -50,38 +53,38 @@ func TestMemory64BinaryTreeMerkleProof(t *testing.T) {
 
 func TestMemory64BinaryTreeMerkleRoot(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
-		m := NewBinaryTreeMemory(testDefaultCodeRegionSize, testDefaultHeapSize)
+		m := NewBinaryTreeMemory()
 		root := m.MerkleRoot()
 		require.Equal(t, zeroHashes[64-5], root, "fully zeroed memory should have expected zero hash")
 	})
 	t.Run("empty page", func(t *testing.T) {
-		m := NewBinaryTreeMemory(testDefaultCodeRegionSize, testDefaultHeapSize)
+		m := NewBinaryTreeMemory()
 		m.SetWord(0xF000, 0)
 		root := m.MerkleRoot()
 		require.Equal(t, zeroHashes[64-5], root, "fully zeroed memory should have expected zero hash")
 	})
 	t.Run("single page", func(t *testing.T) {
-		m := NewBinaryTreeMemory(testDefaultCodeRegionSize, testDefaultHeapSize)
+		m := NewBinaryTreeMemory()
 		m.SetWord(0xF000, 1)
 		root := m.MerkleRoot()
 		require.NotEqual(t, zeroHashes[64-5], root, "non-zero memory")
 	})
 	t.Run("repeat zero", func(t *testing.T) {
-		m := NewBinaryTreeMemory(testDefaultCodeRegionSize, testDefaultHeapSize)
+		m := NewBinaryTreeMemory()
 		m.SetWord(0xF000, 0)
 		m.SetWord(0xF008, 0)
 		root := m.MerkleRoot()
 		require.Equal(t, zeroHashes[64-5], root, "zero still")
 	})
 	t.Run("two empty pages", func(t *testing.T) {
-		m := NewBinaryTreeMemory(testDefaultCodeRegionSize, testDefaultHeapSize)
+		m := NewBinaryTreeMemory()
 		m.SetWord(PageSize*3, 0)
 		m.SetWord(PageSize*10, 0)
 		root := m.MerkleRoot()
 		require.Equal(t, zeroHashes[64-5], root, "zero still")
 	})
 	t.Run("random few pages", func(t *testing.T) {
-		m := NewBinaryTreeMemory(testDefaultCodeRegionSize, testDefaultHeapSize)
+		m := NewBinaryTreeMemory()
 		m.SetWord(PageSize*3, 1)
 		m.SetWord(PageSize*5, 42)
 		m.SetWord(PageSize*6, 123)
@@ -103,7 +106,7 @@ func TestMemory64BinaryTreeMerkleRoot(t *testing.T) {
 		require.Equal(t, r1, r2, "expecting manual page combination to match subtree merkle func")
 	})
 	t.Run("invalidate page", func(t *testing.T) {
-		m := NewBinaryTreeMemory(testDefaultCodeRegionSize, testDefaultHeapSize)
+		m := NewBinaryTreeMemory()
 		m.SetWord(0xF000, 0)
 		require.Equal(t, zeroHashes[64-5], m.MerkleRoot(), "zero at first")
 		m.SetWord(0xF008, 1)
@@ -115,7 +118,7 @@ func TestMemory64BinaryTreeMerkleRoot(t *testing.T) {
 
 func TestMemory64BinaryTreeReadWrite(t *testing.T) {
 	t.Run("large random", func(t *testing.T) {
-		m := NewBinaryTreeMemory(testDefaultCodeRegionSize, testDefaultHeapSize)
+		m := NewBinaryTreeMemory()
 		data := make([]byte, 20_000)
 		_, err := rand.Read(data[:])
 		require.NoError(t, err)
@@ -128,7 +131,7 @@ func TestMemory64BinaryTreeReadWrite(t *testing.T) {
 	})
 
 	t.Run("repeat range", func(t *testing.T) {
-		m := NewBinaryTreeMemory(testDefaultCodeRegionSize, testDefaultHeapSize)
+		m := NewBinaryTreeMemory()
 		data := []byte(strings.Repeat("under the big bright yellow sun ", 40))
 		require.NoError(t, m.SetMemoryRange(0x1337, bytes.NewReader(data)))
 		res, err := io.ReadAll(m.ReadMemoryRange(0x1337-10, Word(len(data)+20)))
@@ -139,7 +142,7 @@ func TestMemory64BinaryTreeReadWrite(t *testing.T) {
 	})
 
 	t.Run("empty range", func(t *testing.T) {
-		m := NewBinaryTreeMemory(testDefaultCodeRegionSize, testDefaultHeapSize)
+		m := NewBinaryTreeMemory()
 		addr := Word(0xAABBCC00)
 		r := bytes.NewReader(nil)
 		pre := m.MerkleRoot()
@@ -165,7 +168,7 @@ func TestMemory64BinaryTreeReadWrite(t *testing.T) {
 	})
 
 	t.Run("range page overlap", func(t *testing.T) {
-		m := NewBinaryTreeMemory(testDefaultCodeRegionSize, testDefaultHeapSize)
+		m := NewBinaryTreeMemory()
 		data := bytes.Repeat([]byte{0xAA}, PageAddrSize)
 		require.NoError(t, m.SetMemoryRange(0, bytes.NewReader(data)))
 		for i := 0; i < PageAddrSize/arch.WordSizeBytes; i++ {
@@ -183,7 +186,7 @@ func TestMemory64BinaryTreeReadWrite(t *testing.T) {
 	})
 
 	t.Run("read-write", func(t *testing.T) {
-		m := NewBinaryTreeMemory(testDefaultCodeRegionSize, testDefaultHeapSize)
+		m := NewBinaryTreeMemory()
 		m.SetWord(16, 0xAABBCCDD_EEFF1122)
 		require.Equal(t, Word(0xAABBCCDD_EEFF1122), m.GetWord(16))
 		m.SetWord(16, 0xAABB1CDD_EEFF1122)
@@ -193,7 +196,7 @@ func TestMemory64BinaryTreeReadWrite(t *testing.T) {
 	})
 
 	t.Run("unaligned read", func(t *testing.T) {
-		m := NewBinaryTreeMemory(testDefaultCodeRegionSize, testDefaultHeapSize)
+		m := NewBinaryTreeMemory()
 		m.SetWord(16, Word(0xAABBCCDD_EEFF1122))
 		m.SetWord(24, 0x11223344_55667788)
 		for i := Word(17); i < 24; i++ {
@@ -207,7 +210,7 @@ func TestMemory64BinaryTreeReadWrite(t *testing.T) {
 	})
 
 	t.Run("unaligned write", func(t *testing.T) {
-		m := NewBinaryTreeMemory(testDefaultCodeRegionSize, testDefaultHeapSize)
+		m := NewBinaryTreeMemory()
 		m.SetWord(16, 0xAABBCCDD_EEFF1122)
 		require.Panics(t, func() {
 			m.SetWord(17, 0x11223344)
@@ -235,17 +238,17 @@ func TestMemory64BinaryTreeReadWrite(t *testing.T) {
 }
 
 func TestMemory64BinaryTreeJSON(t *testing.T) {
-	m := NewBinaryTreeMemory(testDefaultCodeRegionSize, testDefaultHeapSize)
+	m := NewBinaryTreeMemory()
 	m.SetWord(8, 0xAABBCCDD_EEFF1122)
 	dat, err := json.Marshal(m)
 	require.NoError(t, err)
-	res := NewBinaryTreeMemory(testDefaultCodeRegionSize, testDefaultHeapSize)
+	res := NewBinaryTreeMemory()
 	require.NoError(t, json.Unmarshal(dat, &res))
 	require.Equal(t, Word(0xAABBCCDD_EEFF1122), res.GetWord(8))
 }
 
 func TestMemory64BinaryTreeCopy(t *testing.T) {
-	m := NewBinaryTreeMemory(testDefaultCodeRegionSize, testDefaultHeapSize)
+	m := NewBinaryTreeMemory()
 	m.SetWord(0xAABBCCDD_8000, 0x000000_AABB)
 	mcpy := m.Copy()
 	require.Equal(t, Word(0xAABB), mcpy.GetWord(0xAABBCCDD_8000))

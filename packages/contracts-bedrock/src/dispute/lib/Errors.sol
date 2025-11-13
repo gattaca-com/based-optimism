@@ -139,6 +139,3 @@ error ReservedGameType();
 
 /// @notice Thrown when an unauthorized address attempts to interact with the game.
 error BadAuth();
-
-/// @notice Thrown when trying to close a game while the system is paused.
-error GamePaused();

@@ -7,14 +7,14 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-type mockBootstrapOracle struct {
+type mockBoostrapOracle struct {
 	l1Head             common.Hash
 	l2OutputRoot       common.Hash
 	l2Claim            common.Hash
 	l2ClaimBlockNumber uint64
 }
 
-func (o *mockBootstrapOracle) Get(key preimage.Key) []byte {
+func (o *mockBoostrapOracle) Get(key preimage.Key) []byte {
 	switch key.PreimageKey() {
 	case L1HeadLocalIndex.PreimageKey():
 		return o.l1Head[:]

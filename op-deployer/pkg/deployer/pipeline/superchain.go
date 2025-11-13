@@ -3,7 +3,6 @@ package pipeline
 import (
 	"fmt"
 
-	"github.com/ethereum-optimism/optimism/op-chain-ops/addresses"
 	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/opcm"
 	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/state"
 
@@ -20,11 +19,12 @@ func DeploySuperchain(env *Env, intent *state.Intent, st *state.State) error {
 
 	lgr.Info("deploying superchain")
 
-	dso, err := env.Scripts.DeploySuperchain.Run(
+	dso, err := opcm.DeploySuperchain(
+		env.L1ScriptHost,
 		opcm.DeploySuperchainInput{
-			SuperchainProxyAdminOwner:  intent.SuperchainRoles.SuperchainProxyAdminOwner,
+			SuperchainProxyAdminOwner:  intent.SuperchainRoles.ProxyAdminOwner,
 			ProtocolVersionsOwner:      intent.SuperchainRoles.ProtocolVersionsOwner,
-			Guardian:                   intent.SuperchainRoles.SuperchainGuardian,
+			Guardian:                   intent.SuperchainRoles.Guardian,
 			Paused:                     false,
 			RequiredProtocolVersion:    rollup.OPStackSupport,
 			RecommendedProtocolVersion: rollup.OPStackSupport,
@@ -34,14 +34,13 @@ func DeploySuperchain(env *Env, intent *state.Intent, st *state.State) error {
 		return fmt.Errorf("failed to deploy superchain: %w", err)
 	}
 
-	st.SuperchainDeployment = &addresses.SuperchainContracts{
-		SuperchainProxyAdminImpl: dso.SuperchainProxyAdmin,
-		SuperchainConfigProxy:    dso.SuperchainConfigProxy,
-		SuperchainConfigImpl:     dso.SuperchainConfigImpl,
-		ProtocolVersionsProxy:    dso.ProtocolVersionsProxy,
-		ProtocolVersionsImpl:     dso.ProtocolVersionsImpl,
+	st.SuperchainDeployment = &state.SuperchainDeployment{
+		ProxyAdminAddress:            dso.SuperchainProxyAdmin,
+		SuperchainConfigProxyAddress: dso.SuperchainConfigProxy,
+		SuperchainConfigImplAddress:  dso.SuperchainConfigImpl,
+		ProtocolVersionsProxyAddress: dso.ProtocolVersionsProxy,
+		ProtocolVersionsImplAddress:  dso.ProtocolVersionsImpl,
 	}
-	st.SuperchainRoles = intent.SuperchainRoles
 
 	return nil
 }

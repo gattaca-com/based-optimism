@@ -88,8 +88,6 @@ func NewGamePlayer(
 	l1HeaderSource L1HeaderSource,
 	selective bool,
 	claimants []common.Address,
-	responseDelay time.Duration,
-	responseDelayAfter uint64,
 ) (*GamePlayer, error) {
 	logger = logger.New("game", addr)
 
@@ -152,7 +150,7 @@ func NewGamePlayer(
 		return nil, fmt.Errorf("failed to create the responder: %w", err)
 	}
 
-	agent := NewAgent(m, systemClock, l1Clock, loader, gameDepth, maxClockDuration, accessor, responder, logger, selective, claimants, responseDelay, responseDelayAfter)
+	agent := NewAgent(m, systemClock, l1Clock, loader, gameDepth, maxClockDuration, accessor, responder, logger, selective, claimants)
 	return &GamePlayer{
 		act:                agent.Act,
 		loader:             loader,

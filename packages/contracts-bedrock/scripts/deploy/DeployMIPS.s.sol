@@ -10,8 +10,7 @@ import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 
 // Interfaces
 import { IPreimageOracle } from "interfaces/cannon/IPreimageOracle.sol";
-import { IMIPS64 } from "interfaces/cannon/IMIPS64.sol";
-import { StandardConstants } from "scripts/deploy/StandardConstants.sol";
+import { IMIPS } from "interfaces/cannon/IMIPS.sol";
 
 /// @title DeployMIPSInput
 contract DeployMIPSInput is BaseDeployIO {
@@ -23,7 +22,7 @@ contract DeployMIPSInput is BaseDeployIO {
 
     function set(bytes4 _sel, uint256 _value) public {
         if (_sel == this.mipsVersion.selector) {
-            require(_value == StandardConstants.MIPS_VERSION, "DeployMIPS: unsupported mips version");
+            require(_value == 1 || _value == 2, "DeployMIPS: unknown mips version");
             _mipsVersion = _value;
         } else {
             revert("DeployMIPS: unknown selector");
@@ -41,7 +40,7 @@ contract DeployMIPSInput is BaseDeployIO {
 
     function mipsVersion() public view returns (uint256) {
         require(_mipsVersion != 0, "DeployMIPS: mipsVersion not set");
-        require(_mipsVersion == StandardConstants.MIPS_VERSION, "DeployMIPS: unsupported mips version");
+        require(_mipsVersion == 1 || _mipsVersion == 2, "DeployMIPS: unknown mips version");
         return _mipsVersion;
     }
 
@@ -53,18 +52,18 @@ contract DeployMIPSInput is BaseDeployIO {
 
 /// @title DeployMIPSOutput
 contract DeployMIPSOutput is BaseDeployIO {
-    IMIPS64 internal _mipsSingleton;
+    IMIPS internal _mipsSingleton;
 
     function set(bytes4 _sel, address _value) public {
         if (_sel == this.mipsSingleton.selector) {
             require(_value != address(0), "DeployMIPS: mipsSingleton cannot be zero address");
-            _mipsSingleton = IMIPS64(_value);
+            _mipsSingleton = IMIPS(_value);
         } else {
             revert("DeployMIPS: unknown selector");
         }
     }
 
-    function mipsSingleton() public view returns (IMIPS64) {
+    function mipsSingleton() public view returns (IMIPS) {
         DeployUtils.assertValidContractAddress(address(_mipsSingleton));
         return _mipsSingleton;
     }
@@ -78,13 +77,13 @@ contract DeployMIPS is Script {
     }
 
     function deployMipsSingleton(DeployMIPSInput _mi, DeployMIPSOutput _mo) internal {
+        IMIPS singleton;
         uint256 mipsVersion = _mi.mipsVersion();
         IPreimageOracle preimageOracle = IPreimageOracle(_mi.preimageOracle());
-
-        IMIPS64 singleton = IMIPS64(
+        singleton = IMIPS(
             DeployUtils.createDeterministic({
-                _name: "MIPS64",
-                _args: DeployUtils.encodeConstructor(abi.encodeCall(IMIPS64.__constructor__, (preimageOracle, mipsVersion))),
+                _name: mipsVersion == 1 ? "MIPS" : "MIPS64",
+                _args: DeployUtils.encodeConstructor(abi.encodeCall(IMIPS.__constructor__, (preimageOracle))),
                 _salt: DeployUtils.DEFAULT_SALT
             })
         );
@@ -99,7 +98,7 @@ contract DeployMIPS is Script {
     }
 
     function assertValidMipsSingleton(DeployMIPSInput _mi, DeployMIPSOutput _mo) internal view {
-        IMIPS64 mips = _mo.mipsSingleton();
+        IMIPS mips = _mo.mipsSingleton();
         require(address(mips.oracle()) == address(_mi.preimageOracle()), "MIPS-10");
     }
 }

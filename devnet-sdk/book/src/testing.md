@@ -85,8 +85,8 @@ func wrapETHScenario(chainIdx uint64, walletGetter validators.WalletGetter) syst
         user := walletGetter(ctx)
         
         // Access contract registry
-        wethAddr := constants.WETH
-        weth, err := chain.ContractsRegistry().WETH(wethAddr)
+        wethAddr := constants.SuperchainWETH
+        weth, err := chain.ContractsRegistry().SuperchainWETH(wethAddr)
         require.NoError(t, err)
         
         // Test logic using pure interfaces

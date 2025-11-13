@@ -5,7 +5,6 @@ import (
 	"io"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/ethereum-optimism/optimism/op-service/eth"
@@ -17,7 +16,7 @@ import (
 // Builder provides access to block-building work.
 // Different implementations are available, e.g. for local or remote block-building.
 type Builder interface {
-	NewJob(ctx context.Context, opts seqtypes.BuildOpts) (BuildJob, error)
+	NewJob(ctx context.Context, opts *seqtypes.BuildOpts) (BuildJob, error)
 	String() string
 	ID() seqtypes.BuilderID
 	io.Closer
@@ -38,11 +37,9 @@ type SignedBlock interface {
 type BuildJob interface {
 	ID() seqtypes.BuildJobID
 	Cancel(ctx context.Context) error
-	Open(ctx context.Context) error
 	Seal(ctx context.Context) (Block, error)
 	String() string
 	Close() // cleans up and unregisters the job
-	IncludeTx(ctx context.Context, tx hexutil.Bytes) error
 }
 
 // Jobs tracks block-building jobs by ID, so the jobs can be inspected and updated.
@@ -66,7 +63,6 @@ type Signer interface {
 	ID() seqtypes.SignerID
 	io.Closer
 	Sign(ctx context.Context, block Block) (SignedBlock, error)
-	ChainID() eth.ChainID
 }
 
 // Committer commits to a (signed) block to become canonical.
@@ -103,10 +99,7 @@ type Sequencer interface {
 	// Close the sequencer. After closing successfully the sequencer is no longer usable.
 	Close() error
 
-	// New starts a next sequencing slot
-	New(ctx context.Context, opts seqtypes.BuildOpts) error
-
-	// Open opens the current sequencing slot
+	// Open starts a next sequencing slot
 	Open(ctx context.Context) error
 
 	// BuildJob identifies the current block-building work.

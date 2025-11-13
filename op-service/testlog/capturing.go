@@ -6,8 +6,6 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/log"
-
-	"github.com/ethereum-optimism/optimism/op-service/logmods"
 )
 
 // CapturedAttributes forms a chain of inherited attributes, to traverse on captured log records.
@@ -61,23 +59,17 @@ type CapturingHandler struct {
 	attrs *CapturedAttributes
 }
 
-var _ logmods.Handler = (*CapturingHandler)(nil)
-
-func WrapCaptureLogger(h slog.Handler) slog.Handler {
-	return &CapturingHandler{handler: h, Logs: new([]*CapturedRecord)}
-}
-
 func CaptureLogger(t Testing, level slog.Level) (_ log.Logger, ch *CapturingHandler) {
-	logger := LoggerWithHandlerMod(t, level, WrapCaptureLogger)
-	out, ok := logmods.FindHandler[*CapturingHandler](logger.Handler())
-	if !ok {
-		panic("failed to get attached log-capturing handler")
-	}
-	return logger, out
+	return LoggerWithHandlerMod(t, level, func(h slog.Handler) slog.Handler {
+		ch = &CapturingHandler{handler: h, Logs: new([]*CapturedRecord)}
+		return ch
+	}), ch
 }
 
-func (c *CapturingHandler) Unwrap() slog.Handler {
-	return c.handler
+func (c *CapturingHandler) Enabled(context.Context, slog.Level) bool {
+	// We want to capture all logs, even if the underlying handler only logs
+	// above a certain level.
+	return true
 }
 
 func (c *CapturingHandler) Handle(ctx context.Context, r slog.Record) error {
@@ -85,7 +77,10 @@ func (c *CapturingHandler) Handle(ctx context.Context, r slog.Record) error {
 		Parent: c.attrs,
 		Record: &r,
 	})
-	return c.handler.Handle(ctx, r)
+	if c.handler != nil && c.handler.Enabled(ctx, r.Level) {
+		return c.handler.Handle(ctx, r)
+	}
+	return nil
 }
 
 func (c *CapturingHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
@@ -104,10 +99,6 @@ func (c *CapturingHandler) WithGroup(name string) slog.Handler {
 		handler: c.handler.WithGroup(name),
 		Logs:    c.Logs,
 	}
-}
-
-func (c *CapturingHandler) Enabled(ctx context.Context, level slog.Level) bool {
-	return c.handler.Enabled(ctx, level)
 }
 
 func (c *CapturingHandler) Clear() {
@@ -224,12 +215,3 @@ func (h *CapturedRecord) AttrValue(name string) (v any) {
 }
 
 var _ slog.Handler = (*CapturingHandler)(nil)
-
-type Capturer interface {
-	slog.Handler
-	Clear()
-	FindLog(filters ...LogFilter) *CapturedRecord
-	FindLogs(filters ...LogFilter) []*CapturedRecord
-}
-
-var _ Capturer = (*CapturingHandler)(nil)

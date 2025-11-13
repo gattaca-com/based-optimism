@@ -36,7 +36,7 @@ type matchArgs struct {
 	parentHash common.Hash
 }
 
-func jovianArgs() matchArgs {
+func holoceneArgs() matchArgs {
 	var (
 		validParentHash       = common.HexToHash("0x123")
 		validTimestamp        = eth.Uint64Quantity(50)
@@ -46,29 +46,24 @@ func jovianArgs() matchArgs {
 		validFeeRecipient     = predeploys.SequencerFeeVaultAddr
 		validTx               = testutils.RandomLegacyTxNotProtected(rand.New(rand.NewSource(42)))
 		validTxData, _        = validTx.MarshalBinary()
-		minBaseFee            = uint64(1e9)
 
-		validJovianExtraData = eth.BytesMax32(eip1559.EncodeMinBaseFeeExtraData(
-			*defaultOpConfig.EIP1559DenominatorCanyon, defaultOpConfig.EIP1559Elasticity, minBaseFee))
-		validJovianEIP1559Params = new(eth.Bytes8)
+		validHoloceneExtraData = eth.BytesMax32(eip1559.EncodeHoloceneExtraData(
+			*defaultOpConfig.EIP1559DenominatorCanyon, defaultOpConfig.EIP1559Elasticity))
+		validHoloceneEIP1559Params = new(eth.Bytes8)
 	)
-	// Populate the EIP1559 params with the encoded values
-	copy((*validJovianEIP1559Params)[:], eip1559.EncodeHolocene1559Params(
-		*defaultOpConfig.EIP1559DenominatorCanyon, defaultOpConfig.EIP1559Elasticity))
 
 	return matchArgs{
 		envelope: &eth.ExecutionPayloadEnvelope{
 			ParentBeaconBlockRoot: &validParentBeaconRoot,
 			ExecutionPayload: &eth.ExecutionPayload{
-				ParentHash:      validParentHash,
-				Timestamp:       validTimestamp,
-				PrevRandao:      validPrevRandao,
-				GasLimit:        validGasLimit,
-				Transactions:    []eth.Data{validTxData},
-				Withdrawals:     &types.Withdrawals{},
-				FeeRecipient:    validFeeRecipient,
-				ExtraData:       validJovianExtraData,
-				WithdrawalsRoot: &types.EmptyWithdrawalsHash,
+				ParentHash:   validParentHash,
+				Timestamp:    validTimestamp,
+				PrevRandao:   validPrevRandao,
+				GasLimit:     validGasLimit,
+				Transactions: []eth.Data{validTxData},
+				Withdrawals:  &types.Withdrawals{},
+				FeeRecipient: validFeeRecipient,
+				ExtraData:    validHoloceneExtraData,
 			},
 		},
 		attrs: &eth.PayloadAttributes{
@@ -79,39 +74,10 @@ func jovianArgs() matchArgs {
 			Transactions:          []eth.Data{validTxData},
 			Withdrawals:           &types.Withdrawals{},
 			SuggestedFeeRecipient: validFeeRecipient,
-			EIP1559Params:         validJovianEIP1559Params,
-			MinBaseFee:            &minBaseFee,
+			EIP1559Params:         validHoloceneEIP1559Params,
 		},
 		parentHash: validParentHash,
 	}
-}
-
-func jovianArgsMinBaseFeeMissingFromAttributes() matchArgs {
-	args := jovianArgs()
-	args.attrs.MinBaseFee = nil
-	return args
-}
-
-func jovianArgsMinBaseFeeMissingFromBlock() matchArgs {
-	args := jovianArgs()
-	args.envelope.ExecutionPayload.ExtraData = eth.BytesMax32(eip1559.EncodeHoloceneExtraData(
-		*defaultOpConfig.EIP1559DenominatorCanyon, defaultOpConfig.EIP1559Elasticity)) // Note use of HoloceneExtraData instead of JovianExtraData
-	return args
-}
-
-func jovianArgsInconsistentMinBaseFee() matchArgs {
-	args := jovianArgs()
-	args.attrs.MinBaseFee = ptr(uint64(2e9))
-	return args
-}
-
-func holoceneArgs() matchArgs {
-	args := jovianArgs()
-	args.envelope.ExecutionPayload.ExtraData = eth.BytesMax32(eip1559.EncodeHoloceneExtraData(
-		*defaultOpConfig.EIP1559DenominatorCanyon, defaultOpConfig.EIP1559Elasticity))
-	args.attrs.EIP1559Params = new(eth.Bytes8)
-	args.attrs.MinBaseFee = nil
-	return args
 }
 
 func ecotoneArgs() matchArgs {
@@ -218,11 +184,12 @@ func createMismatchedEIP1559Params() matchArgs {
 }
 
 func TestAttributesMatch(t *testing.T) {
-	cfg := func(fork rollup.ForkName) *rollup.Config {
-		cfg := &rollup.Config{ChainOpConfig: defaultOpConfig}
-		cfg.ActivateAtGenesis(fork)
-		return cfg
-	}
+	// default valid timestamp is 50
+	pastTime := uint64(0)
+	futureTime := uint64(100)
+
+	rollupCfgPreCanyon := &rollup.Config{CanyonTime: &futureTime, ChainOpConfig: defaultOpConfig}
+	rollupCfgPreIsthmus := &rollup.Config{CanyonTime: &pastTime, IsthmusTime: &futureTime, ChainOpConfig: defaultOpConfig}
 
 	tests := []struct {
 		args      matchArgs
@@ -232,128 +199,105 @@ func TestAttributesMatch(t *testing.T) {
 	}{
 		{
 			args:      bedrockArgs(),
-			rollupCfg: cfg(rollup.Bedrock),
+			rollupCfg: rollupCfgPreCanyon,
 			desc:      "validBedrockArgs",
 		},
 		{
 			args:      bedrockArgs(),
-			rollupCfg: cfg(rollup.Canyon),
+			rollupCfg: rollupCfgPreIsthmus,
 			err:       ErrCanyonMustHaveWithdrawals.Error() + ": block",
 			desc:      "bedrockArgsPostCanyon",
 		},
 		{
 			args:      canyonArgs(),
-			rollupCfg: cfg(rollup.Canyon),
+			rollupCfg: rollupCfgPreIsthmus,
 			desc:      "validCanyonArgs",
 		},
 		{
 			args:      ecotoneArgs(),
-			rollupCfg: cfg(rollup.Ecotone),
+			rollupCfg: rollupCfgPreIsthmus,
 			desc:      "validEcotoneArgs",
 		},
 		{
 			args:      holoceneArgs(),
-			rollupCfg: cfg(rollup.Holocene),
+			rollupCfg: rollupCfgPreIsthmus,
 			desc:      "validholoceneArgs",
 		},
 		{
-			args:      jovianArgs(),
-			rollupCfg: cfg(rollup.Jovian),
-			desc:      "validJovianArgs",
-		},
-		{
 			args:      mismatchedParentHashArgs(),
-			rollupCfg: cfg(rollup.Holocene),
+			rollupCfg: rollupCfgPreIsthmus,
 			err:       "parent hash field does not match",
 			desc:      "mismatchedParentHashArgs",
 		},
 		{
 			args:      createMismatchedTimestamp(),
-			rollupCfg: cfg(rollup.Holocene),
+			rollupCfg: rollupCfgPreIsthmus,
 			err:       "timestamp field does not match",
 			desc:      "createMismatchedTimestamp",
 		},
 		{
 			args:      createMismatchedPrevRandao(),
-			rollupCfg: cfg(rollup.Holocene),
+			rollupCfg: rollupCfgPreIsthmus,
 			err:       "random field does not match",
 			desc:      "createMismatchedPrevRandao",
 		},
 		{
 			args:      createMismatchedTransactions(),
-			rollupCfg: cfg(rollup.Holocene),
+			rollupCfg: rollupCfgPreIsthmus,
 			err:       "transaction count does not match",
 			desc:      "createMismatchedTransactions",
 		},
 		{
 			args:      ecotoneNoParentBeaconBlockRoot(),
-			rollupCfg: cfg(rollup.Holocene),
+			rollupCfg: rollupCfgPreIsthmus,
 			err:       "expected non-nil parent beacon block root",
 			desc:      "ecotoneNoParentBeaconBlockRoot",
 		},
 		{
 			args:      ecotoneUnexpectedParentBeaconBlockRoot(),
-			rollupCfg: cfg(rollup.Holocene),
+			rollupCfg: rollupCfgPreIsthmus,
 			err:       "expected nil parent beacon block root but got non-nil",
 			desc:      "ecotoneUnexpectedParentBeaconBlockRoot",
 		},
 		{
 			args:      ecotoneMismatchParentBeaconBlockRoot(),
-			rollupCfg: cfg(rollup.Ecotone),
+			rollupCfg: rollupCfgPreIsthmus,
 			err:       "parent beacon block root does not match",
 			desc:      "ecotoneMismatchParentBeaconBlockRoot",
 		},
 		{
 			args:      ecotoneMismatchParentBeaconBlockRootPtr(),
-			rollupCfg: cfg(rollup.Ecotone),
+			rollupCfg: rollupCfgPreIsthmus,
 			desc:      "ecotoneMismatchParentBeaconBlockRootPtr",
 		},
 		{
 			args:      ecotoneNilParentBeaconBlockRoots(),
-			rollupCfg: cfg(rollup.Ecotone),
+			rollupCfg: rollupCfgPreIsthmus,
 			desc:      "ecotoneNilParentBeaconBlockRoots",
 		},
 		{
 			args:      createMismatchedGasLimit(),
-			rollupCfg: cfg(rollup.Holocene),
+			rollupCfg: rollupCfgPreIsthmus,
 			err:       "gas limit does not match",
 			desc:      "createMismatchedGasLimit",
 		},
 		{
 			args:      createNilGasLimit(),
-			rollupCfg: cfg(rollup.Holocene),
+			rollupCfg: rollupCfgPreIsthmus,
 			err:       "expected gaslimit in attributes to not be nil",
 			desc:      "createNilGasLimit",
 		},
 		{
 			args:      createMismatchedFeeRecipient(),
-			rollupCfg: cfg(rollup.Holocene),
+			rollupCfg: rollupCfgPreIsthmus,
 			err:       "fee recipient data does not match",
 			desc:      "createMismatchedFeeRecipient",
 		},
 		{
 			args:      createMismatchedEIP1559Params(),
-			rollupCfg: cfg(rollup.Holocene),
+			rollupCfg: rollupCfgPreIsthmus,
 			err:       "eip1559 parameters do not match",
 			desc:      "createMismatchedEIP1559Params",
-		},
-		{
-			args:      jovianArgsMinBaseFeeMissingFromAttributes(),
-			rollupCfg: cfg(rollup.Jovian),
-			err:       "minBaseFee does not match",
-			desc:      "missingMinBaseFee",
-		},
-		{
-			args:      jovianArgsMinBaseFeeMissingFromBlock(),
-			rollupCfg: cfg(rollup.Jovian),
-			err:       "invalid block extraData: MinBaseFee extraData should be 17 bytes, got 9",
-			desc:      "missingMinBaseFee",
-		},
-		{
-			args:      jovianArgsInconsistentMinBaseFee(),
-			rollupCfg: cfg(rollup.Jovian),
-			err:       "minBaseFee does not match",
-			desc:      "inconsistentMinBaseFee",
 		},
 	}
 
@@ -586,7 +530,7 @@ func TestCheckEIP1559ParamsMatch(t *testing.T) {
 			desc:           "err-invalid-extra",
 			attrParams:     &params,
 			blockExtraData: append(eth.BytesMax32{42}, params[:]...),
-			err:            "invalid block extraData: holocene extraData version byte should be 0, got 42",
+			err:            "invalid block extraData: holocene extraData should have 0 version byte, got 42",
 		},
 		{
 			desc:           "err-no-match",
@@ -601,15 +545,7 @@ func TestCheckEIP1559ParamsMatch(t *testing.T) {
 		},
 	} {
 		t.Run(test.desc, func(t *testing.T) {
-			pastTime := uint64(0)
-			futureTime := uint64(3)
-			cfg := &rollup.Config{
-				CanyonTime:    &pastTime,
-				HoloceneTime:  &pastTime,
-				IsthmusTime:   &pastTime,
-				JovianTime:    &futureTime,
-				ChainOpConfig: defaultOpConfig}
-			err := checkExtraDataParamsMatch(cfg, uint64(2), test.attrParams, nil, test.blockExtraData)
+			err := checkEIP1559ParamsMatch(defaultOpConfig, test.attrParams, test.blockExtraData)
 			if test.err == "" {
 				require.NoError(t, err)
 			} else {

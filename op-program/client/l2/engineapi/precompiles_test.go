@@ -398,10 +398,6 @@ func (s *stubPrecompile) Run(_ []byte) ([]byte, error) {
 	return stubResult, nil
 }
 
-func (s *stubPrecompile) Name() string {
-	return "STUB"
-}
-
 type stubPrecompileOracle struct {
 	result            []byte
 	failureResponse   bool

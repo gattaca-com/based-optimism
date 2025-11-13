@@ -41,7 +41,6 @@ interface IFaultDisputeGame is IDisputeGame {
 
     error AlreadyInitialized();
     error AnchorRootNotFound();
-    error BadExtraData();
     error BlockNumberMatches();
     error BondTransferFailed();
     error CannotDefendRootClaim();
@@ -79,7 +78,7 @@ interface IFaultDisputeGame is IDisputeGame {
     error GameNotFinalized();
     error GameNotResolved();
     error ReservedGameType();
-    error GamePaused();
+
     event Move(uint256 indexed parentIndex, Claim indexed claim, address indexed claimant);
     event GameClosed(BondDistributionMode bondDistributionMode);
 

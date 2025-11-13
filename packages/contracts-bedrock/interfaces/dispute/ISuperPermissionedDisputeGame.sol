@@ -41,7 +41,6 @@ interface ISuperPermissionedDisputeGame is IDisputeGame {
 
     error AlreadyInitialized();
     error AnchorRootNotFound();
-    error BadExtraData();
     error BondTransferFailed();
     error CannotDefendRootClaim();
     error ClaimAboveSplit();
@@ -72,7 +71,6 @@ interface ISuperPermissionedDisputeGame is IDisputeGame {
     error GameNotResolved();
     error ReservedGameType();
     error BadAuth();
-    error GamePaused();
 
     event Move(uint256 indexed parentIndex, Claim indexed claim, address indexed claimant);
     event GameClosed(BondDistributionMode bondDistributionMode);

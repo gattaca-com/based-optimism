@@ -5,6 +5,15 @@ import (
 	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/types"
 )
 
+type ChainProcessEvent struct {
+	ChainID eth.ChainID
+	Target  uint64
+}
+
+func (ev ChainProcessEvent) String() string {
+	return "chain-process"
+}
+
 type UpdateCrossUnsafeRequestEvent struct {
 	ChainID eth.ChainID
 }
@@ -110,30 +119,13 @@ func (ev LocalDerivedOriginUpdateEvent) String() string {
 	return "local-derived-origin-update"
 }
 
-type ResetPreInteropRequestEvent struct {
+type AnchorEvent struct {
 	ChainID eth.ChainID
+	Anchor  types.DerivedBlockRefPair
 }
 
-func (ev ResetPreInteropRequestEvent) String() string {
-	return "reset-pre-interop-request"
-}
-
-type UnsafeActivationBlockEvent struct {
-	Unsafe  eth.BlockRef
-	ChainID eth.ChainID
-}
-
-func (ev UnsafeActivationBlockEvent) String() string {
-	return "unsafe-activation-block-received"
-}
-
-type SafeActivationBlockEvent struct {
-	Safe    types.DerivedBlockRefPair
-	ChainID eth.ChainID
-}
-
-func (ev SafeActivationBlockEvent) String() string {
-	return "safe-activation-block-received"
+func (ev AnchorEvent) String() string {
+	return "anchor"
 }
 
 type InvalidateLocalSafeEvent struct {
@@ -162,6 +154,14 @@ func (ev ReplaceBlockEvent) String() string {
 	return "replace-block-event"
 }
 
+type ChainRewoundEvent struct {
+	ChainID eth.ChainID
+}
+
+func (ev ChainRewoundEvent) String() string {
+	return "chain-rewound"
+}
+
 type UpdateLocalSafeFailedEvent struct {
 	ChainID eth.ChainID
 	Err     error
@@ -170,12 +170,4 @@ type UpdateLocalSafeFailedEvent struct {
 
 func (ev UpdateLocalSafeFailedEvent) String() string {
 	return "update-local-safe-failed"
-}
-
-type ChainIndexingContinueEvent struct {
-	ChainID eth.ChainID
-}
-
-func (ev ChainIndexingContinueEvent) String() string {
-	return "chain-indexing-continue"
 }

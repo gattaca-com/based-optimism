@@ -1,10 +1,7 @@
 package geth
 
 import (
-	"context"
 	"encoding/binary"
-	"errors"
-	"fmt"
 	"math/big"
 	"math/rand"
 	"time"
@@ -15,10 +12,10 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/eth"
+	"github.com/ethereum/go-ethereum/eth/catalyst"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/ethereum-optimism/optimism/op-service/clock"
 	opeth "github.com/ethereum-optimism/optimism/op-service/eth"
@@ -31,9 +28,9 @@ type Beacon interface {
 
 // fakePoS is a testing-only utility to attach to Geth,
 // to build a fake proof-of-stake L1 chain with fixed block time and basic lagging safe/finalized blocks.
-type FakePoS struct {
+type fakePoS struct {
 	clock     clock.Clock
-	eth       Backend
+	eth       *eth.Ethereum
 	log       log.Logger
 	blockTime uint64
 
@@ -42,94 +39,44 @@ type FakePoS struct {
 	finalizedDistance uint64
 	safeDistance      uint64
 
-	engineAPI EngineAPI
+	engineAPI *catalyst.ConsensusAPI
 	sub       ethereum.Subscription
 
 	beacon Beacon
-
-	config *params.ChainConfig
 }
 
-type Backend interface {
-	// HeaderByNumber is assumed to behave the same as go-ethereum/ethclient.Client.HeaderByNumber.
-	HeaderByNumber(context.Context, *big.Int) (*types.Header, error)
-}
-
-type EngineAPI interface {
-	ForkchoiceUpdatedV3(engine.ForkchoiceStateV1, *engine.PayloadAttributes) (engine.ForkChoiceResponse, error)
-	ForkchoiceUpdatedV2(engine.ForkchoiceStateV1, *engine.PayloadAttributes) (engine.ForkChoiceResponse, error)
-
-	GetPayloadV5(engine.PayloadID) (*engine.ExecutionPayloadEnvelope, error)
-	GetPayloadV4(engine.PayloadID) (*engine.ExecutionPayloadEnvelope, error)
-	GetPayloadV3(engine.PayloadID) (*engine.ExecutionPayloadEnvelope, error)
-	GetPayloadV2(engine.PayloadID) (*engine.ExecutionPayloadEnvelope, error)
-
-	NewPayloadV4(engine.ExecutableData, []common.Hash, *common.Hash, []hexutil.Bytes) (engine.PayloadStatusV1, error)
-	NewPayloadV3(engine.ExecutableData, []common.Hash, *common.Hash) (engine.PayloadStatusV1, error)
-	NewPayloadV2(engine.ExecutableData) (engine.PayloadStatusV1, error)
-}
-
-func NewFakePoS(backend Backend, engineAPI EngineAPI, c clock.Clock, logger log.Logger, blockTime uint64, finalizedDistance uint64, beacon Beacon, config *params.ChainConfig) *FakePoS {
-	return &FakePoS{
-		clock:             c,
-		eth:               backend,
-		log:               logger,
-		blockTime:         blockTime,
-		finalizedDistance: finalizedDistance,
-		safeDistance:      10,
-		engineAPI:         engineAPI,
-		beacon:            beacon,
-		config:            config,
-	}
-}
-
-func (f *FakePoS) FakeBeaconBlockRoot(time uint64) common.Hash {
+func (f *fakePoS) FakeBeaconBlockRoot(time uint64) common.Hash {
 	var dat [8]byte
 	binary.LittleEndian.PutUint64(dat[:], time)
 	return crypto.Keccak256Hash(dat[:])
 }
 
-func (f *FakePoS) Start() error {
+func (f *fakePoS) Start() error {
 	if advancing, ok := f.clock.(*clock.AdvancingClock); ok {
 		advancing.Start()
 	}
 	withdrawalsRNG := rand.New(rand.NewSource(450368975843)) // avoid generating the same address as any test
-	genesisHeader, err := f.eth.HeaderByNumber(context.Background(), new(big.Int))
-	if err != nil {
-		return fmt.Errorf("get genesis header: %w", err)
-	}
 	f.sub = event.NewSubscription(func(quit <-chan struct{}) error {
 		// poll every half a second: enough to catch up with any block time when ticks are missed
 		t := f.clock.NewTicker(time.Second / 2)
 		for {
 			select {
 			case now := <-t.Ch():
-				head, err := f.eth.HeaderByNumber(context.Background(), nil)
-				if err != nil {
-					f.log.Warn("Failed to obtain latest header", "err", err)
-					continue
+				chain := f.eth.BlockChain()
+				head := chain.CurrentBlock()
+				finalized := chain.CurrentFinalBlock()
+				if finalized == nil { // fallback to genesis if nothing is finalized
+					finalized = chain.Genesis().Header()
 				}
-				finalized, err := f.eth.HeaderByNumber(context.Background(), big.NewInt(int64(rpc.FinalizedBlockNumber)))
-				if err != nil {
-					finalized = genesisHeader // fallback to genesis if nothing is finalized
-				}
-				safe, err := f.eth.HeaderByNumber(context.Background(), big.NewInt(int64(rpc.SafeBlockNumber)))
-				if err != nil { // fallback to finalized if nothing is safe
+				safe := chain.CurrentSafeBlock()
+				if safe == nil { // fallback to finalized if nothing is safe
 					safe = finalized
 				}
 				if head.Number.Uint64() > f.finalizedDistance { // progress finalized block, if we can
-					finalized, err = f.eth.HeaderByNumber(context.Background(), new(big.Int).SetUint64(head.Number.Uint64()-f.finalizedDistance))
-					if err != nil {
-						f.log.Warn("Failed to finalized header", "err", err)
-						continue
-					}
+					finalized = f.eth.BlockChain().GetHeaderByNumber(head.Number.Uint64() - f.finalizedDistance)
 				}
 				if head.Number.Uint64() > f.safeDistance { // progress safe block, if we can
-					safe, err = f.eth.HeaderByNumber(context.Background(), new(big.Int).SetUint64(head.Number.Uint64()-f.safeDistance))
-					if err != nil {
-						f.log.Warn("Failed to safe header", "err", err)
-						continue
-					}
+					safe = f.eth.BlockChain().GetHeaderByNumber(head.Number.Uint64() - f.safeDistance)
 				}
 				// start building the block as soon as we are past the current head time
 				if head.Time >= uint64(now.Unix()) {
@@ -158,10 +105,8 @@ func (f *FakePoS) Start() error {
 					Withdrawals:           withdrawals,
 				}
 				parentBeaconBlockRoot := f.FakeBeaconBlockRoot(head.Time) // parent beacon block root
-				nextHeight := new(big.Int).SetUint64(head.Number.Uint64() + 1)
-				isCancun := f.config.IsCancun(nextHeight, newBlockTime)
-				isPrague := f.config.IsPrague(nextHeight, newBlockTime)
-				isOsaka := f.config.IsOsaka(nextHeight, newBlockTime)
+				isCancun := f.eth.BlockChain().Config().IsCancun(new(big.Int).SetUint64(head.Number.Uint64()+1), newBlockTime)
+				isPrague := f.eth.BlockChain().Config().IsPrague(new(big.Int).SetUint64(head.Number.Uint64()+1), newBlockTime)
 				if isCancun {
 					attrs.BeaconRoot = &parentBeaconBlockRoot
 				}
@@ -170,6 +115,7 @@ func (f *FakePoS) Start() error {
 					SafeBlockHash:      safe.Hash(),
 					FinalizedBlockHash: finalized.Hash(),
 				}
+				var err error
 				var res engine.ForkChoiceResponse
 				if isCancun {
 					res, err = f.engineAPI.ForkchoiceUpdatedV3(fcState, attrs)
@@ -195,9 +141,7 @@ func (f *FakePoS) Start() error {
 					return nil
 				}
 				var envelope *engine.ExecutionPayloadEnvelope
-				if isOsaka {
-					envelope, err = f.engineAPI.GetPayloadV5(*res.PayloadID)
-				} else if isPrague {
+				if isPrague {
 					envelope, err = f.engineAPI.GetPayloadV4(*res.PayloadID)
 				} else if isCancun {
 					envelope, err = f.engineAPI.GetPayloadV3(*res.PayloadID)
@@ -237,7 +181,7 @@ func (f *FakePoS) Start() error {
 				}
 
 				if envelope.BlobsBundle != nil {
-					slot := (envelope.ExecutionPayload.Timestamp - genesisHeader.Time) / f.blockTime
+					slot := (envelope.ExecutionPayload.Timestamp - f.eth.BlockChain().Genesis().Time()) / f.blockTime
 					if f.beacon == nil {
 						f.log.Error("no blobs storage available")
 						continue
@@ -267,10 +211,7 @@ func (f *FakePoS) Start() error {
 	return nil
 }
 
-func (f *FakePoS) Stop() error {
-	if f.sub == nil || f.clock == nil {
-		return errors.New("fakePoS not started, but stop was called")
-	}
+func (f *fakePoS) Stop() error {
 	f.sub.Unsubscribe()
 	if advancing, ok := f.clock.(*clock.AdvancingClock); ok {
 		advancing.Stop()

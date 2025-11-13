@@ -61,7 +61,6 @@ type ChannelOut interface {
 	FullErr() error
 	Close() error
 	OutputFrame(*bytes.Buffer, uint64) (uint16, error)
-	DiscardCompressor()
 }
 
 type SingularChannelOut struct {
@@ -77,10 +76,6 @@ type SingularChannelOut struct {
 	closed bool
 
 	chainSpec *rollup.ChainSpec
-}
-
-func (co *SingularChannelOut) DiscardCompressor() {
-	co.compress = nil
 }
 
 func (co *SingularChannelOut) ID() ChannelID {

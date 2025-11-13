@@ -1,21 +1,30 @@
 package opcm
 
 import (
-	"github.com/ethereum-optimism/optimism/op-chain-ops/script"
 	"github.com/ethereum/go-ethereum/common"
+
+	"github.com/ethereum-optimism/optimism/op-chain-ops/script"
 )
 
 type DeployAsteriscInput struct {
 	PreimageOracle common.Address
 }
 
+func (input *DeployAsteriscInput) InputSet() bool {
+	return true
+}
+
 type DeployAsteriscOutput struct {
 	AsteriscSingleton common.Address
 }
 
-type DeployAsteriscScript script.DeployScriptWithOutput[DeployAsteriscInput, DeployAsteriscOutput]
+func (output *DeployAsteriscOutput) CheckOutput(input common.Address) error {
+	return nil
+}
 
-// NewDeployAsteriscScript loads and validates the DeployAsterisc script contract
-func NewDeployAsteriscScript(host *script.Host) (DeployAsteriscScript, error) {
-	return script.NewDeployScriptWithOutputFromFile[DeployAsteriscInput, DeployAsteriscOutput](host, "DeployAsterisc.s.sol", "DeployAsterisc")
+func DeployAsterisc(
+	host *script.Host,
+	input DeployAsteriscInput,
+) (DeployAsteriscOutput, error) {
+	return RunScriptSingle[DeployAsteriscInput, DeployAsteriscOutput](host, input, "DeployAsterisc.s.sol", "DeployAsterisc")
 }

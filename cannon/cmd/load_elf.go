@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum-optimism/optimism/cannon/mipsevm"
 	"github.com/ethereum-optimism/optimism/cannon/mipsevm/multithreaded"
 	"github.com/ethereum-optimism/optimism/cannon/mipsevm/program"
+	"github.com/ethereum-optimism/optimism/cannon/mipsevm/singlethreaded"
 	"github.com/ethereum-optimism/optimism/cannon/mipsevm/versions"
 	openum "github.com/ethereum-optimism/optimism/op-service/enum"
 	"github.com/ethereum-optimism/optimism/op-service/ioutil"
@@ -59,11 +60,23 @@ func LoadELF(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	if versions.IsSupportedMultiThreaded64(ver) {
+	switch ver {
+	case versions.GetCurrentSingleThreaded():
+		createInitialState = func(f *elf.File) (mipsevm.FPVMState, error) {
+			return program.LoadELF(f, singlethreaded.CreateInitialState)
+		}
+		patcher = func(state mipsevm.FPVMState) error {
+			err := program.PatchGoGC(elfProgram, state)
+			if err != nil {
+				return err
+			}
+			return program.PatchStack(state)
+		}
+	case versions.GetCurrentMultiThreaded(), versions.GetCurrentMultiThreaded64():
 		createInitialState = func(f *elf.File) (mipsevm.FPVMState, error) {
 			return program.LoadELF(f, multithreaded.CreateInitialState)
 		}
-	} else {
+	default:
 		return fmt.Errorf("unsupported state version: %d (%s)", ver, ver.String())
 	}
 
@@ -84,7 +97,7 @@ func LoadELF(ctx *cli.Context) error {
 	}
 
 	// Ensure the state is written with appropriate version information
-	versionedState, err := versions.NewFromState(ver, state)
+	versionedState, err := versions.NewFromState(state)
 	if err != nil {
 		return fmt.Errorf("failed to create versioned state: %w", err)
 	}

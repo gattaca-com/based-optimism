@@ -19,7 +19,7 @@ var faultDisputeGame []byte
 //go:embed abi/PreimageOracle.json
 var preimageOracle []byte
 
-//go:embed abi/MIPS64.json
+//go:embed abi/MIPS.json
 var mips []byte
 
 //go:embed abi/DelayedWETH.json

@@ -6,9 +6,7 @@ import { Test } from "forge-std/Test.sol";
 import { CallRecorder, Reverter } from "test/mocks/Callers.sol";
 import { Transactor } from "src/periphery/Transactor.sol";
 
-/// @title Transactor_TestInit
-/// @notice Reusable test initialization for `Transactor` tests.
-contract Transactor_TestInit is Test {
+contract Transactor_Initializer is Test {
     address alice = address(128);
     address bob = address(256);
 
@@ -34,18 +32,12 @@ contract Transactor_TestInit is Test {
     }
 }
 
-/// @title Transactor_Constructor_Test
-/// @notice Tests the constructor of the `Transactor` contract.
-contract Transactor_Constructor_Test is Transactor_TestInit {
+contract TransactorTest is Transactor_Initializer {
     /// @notice Tests if the owner was set correctly during deploy
     function test_constructor_succeeds() external view {
         assertEq(address(alice), transactor.owner());
     }
-}
 
-/// @title Transactor_Call_Test
-/// @notice Tests the `CALL` function of the `Transactor` contract.
-contract Transactor_Call_Test is Transactor_TestInit {
     /// @notice Tests CALL, should do a call to target
     function test_call_succeeds() external {
         // Initialize call data
@@ -65,11 +57,7 @@ contract Transactor_Call_Test is Transactor_TestInit {
         vm.expectRevert("UNAUTHORIZED");
         transactor.CALL(address(callRecorded), data, 200_000 wei);
     }
-}
 
-/// @title Transactor_DelegateCall_Test
-/// @notice Tests the `DELEGATECALL` function of the `Transactor` contract.
-contract Transactor_DelegateCall_Test is Transactor_TestInit {
     /// @notice Deletate call succeeds.
     function test_delegateCall_succeeds() external {
         // Initialize call data

@@ -21,8 +21,8 @@ import (
 func validBatcherConfig() batcher.CLIConfig {
 	return batcher.CLIConfig{
 		L1EthRpc:               "fake",
-		L2EthRpc:               []string{"fake"},
-		RollupRpc:              []string{"fake"},
+		L2EthRpc:               "fake",
+		RollupRpc:              "fake",
 		MaxChannelDuration:     0,
 		SubSafetyMargin:        0,
 		PollInterval:           time.Second,
@@ -38,17 +38,10 @@ func validBatcherConfig() batcher.CLIConfig {
 		MetricsConfig:          metrics.DefaultCLIConfig(),
 		PprofConfig:            oppprof.DefaultCLIConfig(),
 		// The compressor config is not checked in config.Check()
-		RPC:             rpc.DefaultCLIConfig(),
-		CompressionAlgo: derive.Zlib,
-		ThrottleConfig: batcher.ThrottleConfig{
-			ControllerType:      flags.DefaultThrottleControllerType,
-			LowerThreshold:      flags.DefaultThrottleLowerThreshold,
-			UpperThreshold:      flags.DefaultThrottleUpperThreshold,
-			TxSizeLowerLimit:    flags.DefaultThrottleTxSizeLowerLimit,
-			TxSizeUpperLimit:    flags.DefaultThrottleTxSizeUpperLimit,
-			BlockSizeLowerLimit: flags.DefaultThrottleBlockSizeLowerLimit,
-			BlockSizeUpperLimit: flags.DefaultThrottleBlockSizeUpperLimit,
-		},
+		RPC:               rpc.DefaultCLIConfig(),
+		CompressionAlgo:   derive.Zlib,
+		ThrottleThreshold: 0, // no DA throttling
+		ThrottleTxSize:    0,
 	}
 }
 
@@ -73,12 +66,12 @@ func TestBatcherConfig(t *testing.T) {
 		},
 		{
 			name:      "empty L2",
-			override:  func(c *batcher.CLIConfig) { c.L2EthRpc = []string{} },
+			override:  func(c *batcher.CLIConfig) { c.L2EthRpc = "" },
 			errString: "empty L2 RPC URL",
 		},
 		{
 			name:      "empty rollup",
-			override:  func(c *batcher.CLIConfig) { c.RollupRpc = []string{} },
+			override:  func(c *batcher.CLIConfig) { c.RollupRpc = "" },
 			errString: "empty rollup RPC URL",
 		},
 		{
@@ -126,24 +119,6 @@ func TestBatcherConfig(t *testing.T) {
 				c.Compressor = compressor.RatioKind
 			},
 			errString: "invalid ApproxComprRatio 4.2 for ratio compressor",
-		},
-		{
-			name: "throttle_max_threshold=throttle_threshold",
-			override: func(c *batcher.CLIConfig) {
-				c.ThrottleConfig.LowerThreshold = 5
-				c.ThrottleConfig.UpperThreshold = 5
-
-			},
-			errString: "throttle.upper-threshold must be greater than throttle.lower-threshold",
-		},
-		{
-			name: "throttle_max_threshold=throttle_threshold",
-			override: func(c *batcher.CLIConfig) {
-				c.ThrottleConfig.LowerThreshold = 5
-				c.ThrottleConfig.UpperThreshold = 4
-
-			},
-			errString: "throttle.upper-threshold must be greater than throttle.lower-threshold",
 		},
 	}
 

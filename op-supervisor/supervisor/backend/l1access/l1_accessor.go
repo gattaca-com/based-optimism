@@ -10,14 +10,12 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/log"
 
+	"github.com/ethereum-optimism/optimism/op-node/rollup/event"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
-	"github.com/ethereum-optimism/optimism/op-service/event"
 	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/backend/superevents"
 )
 
 const reqTimeout = time.Second * 10
-
-var errNoL1Source = errors.New("no L1 source configured")
 
 type L1Source interface {
 	L1BlockRefByNumber(ctx context.Context, number uint64) (eth.L1BlockRef, error)
@@ -67,7 +65,7 @@ func (p *L1Accessor) AttachEmitter(em event.Emitter) {
 	p.emitter = em
 }
 
-func (p *L1Accessor) OnEvent(ctx context.Context, ev event.Event) bool {
+func (p *L1Accessor) OnEvent(ev event.Event) bool {
 	return false
 }
 
@@ -80,10 +78,14 @@ func (p *L1Accessor) AttachClient(client L1Source, subscribe bool) {
 	defer p.clientMu.Unlock()
 
 	// if we have a finality subscription, unsubscribe from it
-	p.UnsubscribeFinalityHandler()
+	if p.finalitySub != nil {
+		p.finalitySub.Unsubscribe()
+	}
 
 	// if we have a latest subscription, unsubscribe from it
-	p.UnsubscribeLatestHandler()
+	if p.latestSub != nil {
+		p.latestSub.Unsubscribe()
+	}
 
 	p.client = client
 
@@ -103,12 +105,6 @@ func (p *L1Accessor) SubscribeFinalityHandler() {
 		reqTimeout)
 }
 
-func (p *L1Accessor) UnsubscribeFinalityHandler() {
-	if p.finalitySub != nil {
-		p.finalitySub.Unsubscribe()
-	}
-}
-
 func (p *L1Accessor) SubscribeLatestHandler() {
 	p.latestSub = eth.PollBlockChanges(
 		p.log,
@@ -119,12 +115,6 @@ func (p *L1Accessor) SubscribeLatestHandler() {
 		reqTimeout)
 }
 
-func (p *L1Accessor) UnsubscribeLatestHandler() {
-	if p.latestSub != nil {
-		p.latestSub.Unsubscribe()
-	}
-}
-
 func (p *L1Accessor) SetConfDepth(depth uint64) {
 	p.confDepth = depth
 }
@@ -133,7 +123,7 @@ func (p *L1Accessor) PullFinalized() error {
 	p.clientMu.RLock()
 	defer p.clientMu.RUnlock()
 	if p.client == nil {
-		return errNoL1Source
+		return errors.New("no L1 source configured")
 	}
 
 	ctx, cancel := context.WithTimeout(p.sysCtx, reqTimeout)
@@ -151,7 +141,7 @@ func (p *L1Accessor) PullLatest() error {
 	defer p.clientMu.RUnlock()
 
 	if p.client == nil {
-		return errNoL1Source
+		return errors.New("no L1 source configured")
 	}
 
 	ctx, cancel := context.WithTimeout(p.sysCtx, reqTimeout)
@@ -165,7 +155,7 @@ func (p *L1Accessor) PullLatest() error {
 }
 
 func (p *L1Accessor) onFinalized(ctx context.Context, ref eth.L1BlockRef) {
-	p.emitter.Emit(ctx, superevents.FinalizedL1RequestEvent{FinalizedL1: ref})
+	p.emitter.Emit(superevents.FinalizedL1RequestEvent{FinalizedL1: ref})
 }
 
 func (p *L1Accessor) onLatest(ctx context.Context, ref eth.L1BlockRef) {
@@ -181,7 +171,7 @@ func (p *L1Accessor) onLatest(ctx context.Context, ref eth.L1BlockRef) {
 
 	// If the incoming block is not the child of the current tip, signal a potential reorg
 	if ref.ParentHash != p.tip.Hash {
-		p.emitter.Emit(ctx, superevents.RewindL1Event{
+		p.emitter.Emit(superevents.RewindL1Event{
 			IncomingBlock: ref.ID(),
 		})
 		p.log.Info("Reorg detected", "ref", ref)
@@ -196,7 +186,7 @@ func (p *L1Accessor) L1BlockRefByNumber(ctx context.Context, number uint64) (eth
 	p.clientMu.RLock()
 	defer p.clientMu.RUnlock()
 	if p.client == nil {
-		return eth.L1BlockRef{}, errNoL1Source
+		return eth.L1BlockRef{}, errors.New("no L1 source available")
 	}
 	// block access to requests more recent than the confirmation depth
 	if number > p.tip.Number-p.confDepth {

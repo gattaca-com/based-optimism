@@ -10,6 +10,8 @@ import (
 )
 
 // SequencerControl defines the interface for controlling the sequencer.
+//
+//go:generate mockery --name SequencerControl --output mocks/ --with-expecter=true
 type SequencerControl interface {
 	StartSequencer(ctx context.Context, hash common.Hash) error
 	StopSequencer(ctx context.Context) (common.Hash, error)

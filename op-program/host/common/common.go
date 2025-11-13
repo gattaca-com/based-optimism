@@ -11,9 +11,11 @@ import (
 
 	preimage "github.com/ethereum-optimism/optimism/op-preimage"
 	cl "github.com/ethereum-optimism/optimism/op-program/client"
+	"github.com/ethereum-optimism/optimism/op-program/client/l2"
 	"github.com/ethereum-optimism/optimism/op-program/host/config"
 	"github.com/ethereum-optimism/optimism/op-program/host/kvstore"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethdb/memorydb"
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -23,7 +25,10 @@ type Prefetcher interface {
 }
 type PrefetcherCreator func(ctx context.Context, logger log.Logger, kv kvstore.KV, cfg *config.Config) (Prefetcher, error)
 type programCfg struct {
-	prefetcher PrefetcherCreator
+	prefetcher     PrefetcherCreator
+	skipValidation bool
+	db             l2.KeyValueStore
+	storeBlockData bool
 }
 
 type ProgramOpt func(c *programCfg)
@@ -35,23 +40,78 @@ func WithPrefetcher(creator PrefetcherCreator) ProgramOpt {
 	}
 }
 
+// WithSkipValidation controls whether the program will skip validation of the derived block.
+func WithSkipValidation(skip bool) ProgramOpt {
+	return func(c *programCfg) {
+		c.skipValidation = skip
+	}
+}
+
+// WithDB sets the backing state database used by the program.
+// If not set, the program will use an in-memory database.
+func WithDB(db l2.KeyValueStore) ProgramOpt {
+	return func(c *programCfg) {
+		c.db = db
+	}
+}
+
+// WithStoreBlockData controls whether block data, including intermediate trie nodes from transactions and receipts
+// of the derived block should be stored in the database.
+func WithStoreBlockData(store bool) ProgramOpt {
+	return func(c *programCfg) {
+		c.storeBlockData = store
+	}
+}
+
 // FaultProofProgram is the programmatic entry-point for the fault proof program
 func FaultProofProgram(ctx context.Context, logger log.Logger, cfg *config.Config, opts ...ProgramOpt) error {
-	programConfig := &programCfg{}
+	programConfig := &programCfg{
+		db: memorydb.New(),
+	}
 	for _, opt := range opts {
 		opt(programConfig)
 	}
 	if programConfig.prefetcher == nil {
 		panic("prefetcher creator is not set")
 	}
-	preimageServer, err := StartPreimageServer(ctx, logger, cfg, programConfig.prefetcher)
+	var (
+		serverErr chan error
+		pClientRW preimage.FileChannel
+		hClientRW preimage.FileChannel
+	)
+	defer func() {
+		if pClientRW != nil {
+			_ = pClientRW.Close()
+		}
+		if hClientRW != nil {
+			_ = hClientRW.Close()
+		}
+		if serverErr != nil {
+			err := <-serverErr
+			if err != nil {
+				logger.Error("preimage server failed", "err", err)
+			}
+			logger.Debug("Preimage server stopped")
+		}
+	}()
+	// Setup client I/O for preimage oracle interaction
+	pClientRW, pHostRW, err := preimage.CreateBidirectionalChannel()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create preimage pipe: %w", err)
 	}
-	defer preimageServer.Close()
 
-	hClientRW := preimageServer.HintClientRW()
-	pClientRW := preimageServer.PreimageClientRW()
+	// Setup client I/O for hint comms
+	hClientRW, hHostRW, err := preimage.CreateBidirectionalChannel()
+	if err != nil {
+		return fmt.Errorf("failed to create hints pipe: %w", err)
+	}
+
+	// Use a channel to receive the server result so we can wait for it to complete before returning
+	serverErr = make(chan error)
+	go func() {
+		defer close(serverErr)
+		serverErr <- PreimageServer(ctx, logger, cfg, pHostRW, hHostRW, programConfig.prefetcher)
+	}()
 
 	var cmd *exec.Cmd
 	if cfg.ExecCmd != "" {
@@ -74,80 +134,22 @@ func FaultProofProgram(ctx context.Context, logger log.Logger, cfg *config.Confi
 		logger.Debug("Client program completed successfully")
 		return nil
 	} else {
-		clientCfg := cl.Config{
-			InteropEnabled: cfg.InteropEnabled,
+		var clientCfg cl.Config
+		if programConfig.skipValidation {
+			clientCfg.SkipValidation = true
 		}
+		clientCfg.InteropEnabled = cfg.InteropEnabled
+		clientCfg.DB = programConfig.db
+		clientCfg.StoreBlockData = programConfig.storeBlockData
 		return cl.RunProgram(logger, pClientRW, hClientRW, clientCfg)
 	}
 }
 
-type PreimageServer struct {
-	logger    log.Logger
-	serverErr chan error
-
-	pClientRW preimage.FileChannel
-	hClientRW preimage.FileChannel
-}
-
-func StartPreimageServer(ctx context.Context, logger log.Logger, cfg *config.Config, prefetcher PrefetcherCreator) (*PreimageServer, error) {
-	server := &PreimageServer{
-		logger: logger,
-	}
-	// Setup client I/O for preimage oracle interaction
-	pClientRW, pHostRW, err := preimage.CreateBidirectionalChannel()
-	if err != nil {
-		server.Close()
-		return nil, fmt.Errorf("failed to create preimage pipe: %w", err)
-	}
-	server.pClientRW = pClientRW
-
-	// Setup client I/O for hint comms
-	hClientRW, hHostRW, err := preimage.CreateBidirectionalChannel()
-	if err != nil {
-		server.Close()
-		return nil, fmt.Errorf("failed to create hints pipe: %w", err)
-	}
-	server.hClientRW = hClientRW
-
-	// Use a channel to receive the server result so we can wait for it to complete before returning
-	server.serverErr = make(chan error)
-	go func() {
-		defer close(server.serverErr)
-		server.serverErr <- RunPreimageServer(ctx, logger, cfg, pHostRW, hHostRW, prefetcher)
-	}()
-
-	return server, nil
-}
-
-func (p *PreimageServer) PreimageClientRW() preimage.FileChannel {
-	return p.pClientRW
-}
-
-func (p *PreimageServer) HintClientRW() preimage.FileChannel {
-	return p.hClientRW
-}
-
-func (p *PreimageServer) Close() {
-	if p.pClientRW != nil {
-		_ = p.pClientRW.Close()
-	}
-	if p.hClientRW != nil {
-		_ = p.hClientRW.Close()
-	}
-	if p.serverErr != nil {
-		err := <-p.serverErr
-		if err != nil {
-			p.logger.Error("preimage server failed", "err", err)
-		}
-		p.logger.Debug("Preimage server stopped")
-	}
-}
-
-// RunPreimageServer reads hints and preimage requests from the provided channels and processes those requests.
+// PreimageServer reads hints and preimage requests from the provided channels and processes those requests.
 // This method will block until both the hinter and preimage handlers complete.
 // If either returns an error both handlers are stopped.
 // The supplied preimageChannel and hintChannel will be closed before this function returns.
-func RunPreimageServer(ctx context.Context, logger log.Logger, cfg *config.Config, preimageChannel preimage.FileChannel, hintChannel preimage.FileChannel, prefetcherCreator PrefetcherCreator) error {
+func PreimageServer(ctx context.Context, logger log.Logger, cfg *config.Config, preimageChannel preimage.FileChannel, hintChannel preimage.FileChannel, prefetcherCreator PrefetcherCreator) error {
 	var serverDone chan error
 	var hinterDone chan error
 	logger.Info("Starting preimage server")

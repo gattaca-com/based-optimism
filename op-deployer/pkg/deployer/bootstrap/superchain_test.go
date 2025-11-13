@@ -19,18 +19,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var networks = []string{"mainnet", "sepolia"}
+
+var versions = []string{"v1.6.0", "v1.8.0-rc.4"}
+
 func TestSuperchain(t *testing.T) {
 	for _, network := range networks {
-		t.Run(network, func(t *testing.T) {
-			envVar := strings.ToUpper(network) + "_RPC_URL"
-			rpcURL := os.Getenv(envVar)
-			require.NotEmpty(t, rpcURL, "must specify RPC url via %s env var", envVar)
-			testSuperchain(t, rpcURL)
-		})
+		for _, version := range versions {
+			t.Run(network+"-"+version, func(t *testing.T) {
+				envVar := strings.ToUpper(network) + "_RPC_URL"
+				rpcURL := os.Getenv(envVar)
+				require.NotEmpty(t, rpcURL, "must specify RPC url via %s env var", envVar)
+				testSuperchain(t, rpcURL, version)
+			})
+		}
 	}
 }
 
-func testSuperchain(t *testing.T, forkRPCURL string) {
+func testSuperchain(t *testing.T, forkRPCURL string, version string) {
 	t.Parallel()
 
 	if forkRPCURL == "" {
@@ -54,7 +60,7 @@ func testSuperchain(t *testing.T, forkRPCURL string) {
 	out, err := Superchain(ctx, SuperchainConfig{
 		L1RPCUrl:         l1RPC,
 		PrivateKey:       "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
-		ArtifactsLocator: artifacts.EmbeddedLocator,
+		ArtifactsLocator: artifacts.MustNewLocatorFromTag("op-contracts/" + version),
 		Logger:           lgr,
 
 		SuperchainProxyAdminOwner:  common.Address{'S'},

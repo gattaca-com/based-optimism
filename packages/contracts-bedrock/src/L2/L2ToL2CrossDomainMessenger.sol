@@ -64,8 +64,8 @@ contract L2ToL2CrossDomainMessenger is ISemver, TransientReentrancyAware {
     uint16 public constant messageVersion = uint16(0);
 
     /// @notice Semantic version.
-    /// @custom:semver 1.3.0
-    string public constant version = "1.3.0";
+    /// @custom:semver 1.1.0
+    string public constant version = "1.1.0";
 
     /// @notice Mapping of message hashes to boolean receipt values. Note that a message will only be present in this
     ///         mapping if it has successfully been relayed on this chain, and can therefore not be relayed again.
@@ -76,9 +76,9 @@ contract L2ToL2CrossDomainMessenger is ISemver, TransientReentrancyAware {
     ///         message.
     uint240 internal msgNonce;
 
-    /// @notice Mapping of message nonces to message hashes. Note that a message will only be present in this
+    /// @notice Mapping of message hashes to boolean sent values. Note that a message will only be present in this
     ///         mapping if it has been sent from this chain to a destination chain.
-    mapping(uint256 => bytes32) public sentMessages;
+    mapping(bytes32 => bool) public sentMessages;
 
     /// @notice Emitted whenever a message is sent to a destination
     /// @param destination  Chain ID of the destination chain.
@@ -94,10 +94,7 @@ contract L2ToL2CrossDomainMessenger is ISemver, TransientReentrancyAware {
     /// @param source       Chain ID of the source chain.
     /// @param messageNonce Nonce associated with the messsage sent
     /// @param messageHash  Hash of the message that was relayed.
-    /// @param returnDataHash Hash of the return data from the message that was relayed.
-    event RelayedMessage(
-        uint256 indexed source, uint256 indexed messageNonce, bytes32 indexed messageHash, bytes32 returnDataHash
-    );
+    event RelayedMessage(uint256 indexed source, uint256 indexed messageNonce, bytes32 indexed messageHash);
 
     /// @notice Retrieves the sender of the current cross domain message. If not entered, reverts.
     /// @return sender_ Address of the sender of the current cross domain message.
@@ -154,7 +151,7 @@ contract L2ToL2CrossDomainMessenger is ISemver, TransientReentrancyAware {
             _message: _message
         });
 
-        sentMessages[nonce] = messageHash_;
+        sentMessages[messageHash_] = true;
         msgNonce++;
 
         emit SentMessage(_destination, _target, nonce, msg.sender, _message);
@@ -189,7 +186,7 @@ contract L2ToL2CrossDomainMessenger is ISemver, TransientReentrancyAware {
             _message: _message
         });
 
-        if (sentMessages[_nonce] != messageHash_) revert InvalidMessage();
+        if (!sentMessages[messageHash_]) revert InvalidMessage();
 
         emit SentMessage(_destination, _target, _nonce, _sender, _message);
     }
@@ -250,7 +247,7 @@ contract L2ToL2CrossDomainMessenger is ISemver, TransientReentrancyAware {
             }
         }
 
-        emit RelayedMessage(source, nonce, messageHash, keccak256(returnData_));
+        emit RelayedMessage(source, nonce, messageHash);
 
         _storeMessageMetadata(0, address(0));
     }

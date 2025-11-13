@@ -24,11 +24,6 @@ func SetStartBlockLiveStrategy(ctx context.Context, intent *state.Intent, env *E
 		return fmt.Errorf("failed to get chain state: %w", err)
 	}
 
-	if thisChainState.StartBlock != nil {
-		lgr.Info("start block already set")
-		return nil
-	}
-
 	l1Client := env.L1Client.Client()
 
 	var headerBlockRef *state.L1BlockRefJSON

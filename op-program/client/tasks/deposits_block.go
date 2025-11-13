@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/ethereum-optimism/optimism/op-node/rollup"
-	"github.com/ethereum-optimism/optimism/op-node/rollup/interop/indexing"
+	"github.com/ethereum-optimism/optimism/op-node/rollup/interop/managed"
 	preimage "github.com/ethereum-optimism/optimism/op-preimage"
 	"github.com/ethereum-optimism/optimism/op-program/client/l1"
 	"github.com/ethereum-optimism/optimism/op-program/client/l2"
@@ -128,7 +128,7 @@ func blockToDepositsOnlyAttributes(cfg *rollup.Config, block *types.Block, outpu
 			deposits = append(deposits, txdata)
 		}
 	}
-	invalidatedBlockTx := indexing.InvalidatedBlockSourceDepositTx(output.Marshal())
+	invalidatedBlockTx := managed.InvalidatedBlockSourceDepositTx(output.Marshal())
 	invalidatedBlockTxData, err := invalidatedBlockTx.MarshalBinary()
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal deposited tx: %w", err)
@@ -145,12 +145,10 @@ func blockToDepositsOnlyAttributes(cfg *rollup.Config, block *types.Block, outpu
 		NoTxPool:              true,
 		GasLimit:              &gasLimit,
 	}
-
 	if cfg.IsHolocene(block.Time()) {
-		d, e, m := eip1559.DecodeOptimismExtraData(cfg, block.Time(), block.Extra())
+		d, e := eip1559.DecodeHoloceneExtraData(block.Extra())
 		eip1559Params := eth.Bytes8(eip1559.EncodeHolocene1559Params(d, e))
 		attrs.EIP1559Params = &eip1559Params
-		attrs.MinBaseFee = m
 	}
 	return attrs, nil
 }

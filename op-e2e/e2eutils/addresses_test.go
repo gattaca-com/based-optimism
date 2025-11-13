@@ -14,7 +14,7 @@ func TestCollectAddresses(t *testing.T) {
 		SequencerWindowSize: 120,
 		ChannelTimeout:      120,
 		L1BlockTime:         15,
-		AllocType:           config.DefaultAllocType,
+		AllocType:           config.AllocTypeStandard,
 	}
 	dp := MakeDeployParams(t, tp)
 	alloc := &AllocParams{PrefundTestUsers: true}

@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/broadcaster"
-	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/standard"
 	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/testutil"
 	"github.com/ethereum-optimism/optimism/op-deployer/pkg/env"
 	"github.com/ethereum-optimism/optimism/op-service/testlog"
@@ -27,7 +26,7 @@ func TestDeployMIPS(t *testing.T) {
 	require.NoError(t, err)
 
 	input := DeployMIPSInput{
-		MipsVersion:    uint64(standard.MIPSVersion),
+		MipsVersion:    1,
 		PreimageOracle: common.Address{0xab},
 	}
 

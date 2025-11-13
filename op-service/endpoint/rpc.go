@@ -7,7 +7,6 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
-// MustRPC forces the RPC URL string to be non-empty when decoding or encoding.
 type MustRPC struct {
 	Value RPC
 }
@@ -35,8 +34,6 @@ func (u MustRPC) MarshalText() ([]byte, error) {
 	return []byte(out), nil
 }
 
-// OptionalRPC is the opposite of MustRPC:
-// it allows the RPC URL to be empty during decoding/encoding.
 type OptionalRPC struct {
 	Value RPC
 }

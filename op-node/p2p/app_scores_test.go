@@ -71,7 +71,7 @@ func setupPeerApplicationScorerTest(t *testing.T, params *ApplicationScoreParams
 			updates: make(chan stubScoreBookUpdate, 10),
 		},
 	}
-	appScorer := NewPeerApplicationScorer(data.ctx, data.logger, data.clock, params, data.scorebook, func() []peer.ID {
+	appScorer := newPeerApplicationScorer(data.ctx, data.logger, data.clock, params, data.scorebook, func() []peer.ID {
 		return data.peers
 	})
 	return data, appScorer
@@ -155,8 +155,8 @@ func TestDecayScoresAfterDecayInterval(t *testing.T) {
 		DecayToZero:          0.1,
 	}
 
-	appScorer.Start()
-	defer appScorer.Stop()
+	appScorer.start()
+	defer appScorer.stop()
 
 	data.clock.WaitForNewPendingTaskWithTimeout(30 * time.Second)
 

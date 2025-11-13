@@ -18,6 +18,7 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/sources"
 	"github.com/ethereum-optimism/optimism/op-service/testlog"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/stretchr/testify/require"
@@ -44,11 +45,30 @@ func NewL2FaultProofEnv[c any](t helpers.Testing, testCfg *TestCfg[c], tp *e2eut
 	log, logs := testlog.CaptureLogger(t, log.LevelDebug)
 
 	dp := NewDeployParams(t, tp, func(dp *e2eutils.DeployParams) {
+		genesisBlock := hexutil.Uint64(0)
+
+		// Enable cancun always
+		dp.DeployConfig.L1CancunTimeOffset = &genesisBlock
+
 		// Enable L2 feature.
-		if testCfg.Hardfork == nil {
-			t.Fatalf("HF not set")
+		switch testCfg.Hardfork {
+		case Regolith:
+			dp.DeployConfig.ActivateForkAtGenesis(rollup.Regolith)
+		case Canyon:
+			dp.DeployConfig.ActivateForkAtGenesis(rollup.Canyon)
+		case Delta:
+			dp.DeployConfig.ActivateForkAtGenesis(rollup.Delta)
+		case Ecotone:
+			dp.DeployConfig.ActivateForkAtGenesis(rollup.Ecotone)
+		case Fjord:
+			dp.DeployConfig.ActivateForkAtGenesis(rollup.Fjord)
+		case Granite:
+			dp.DeployConfig.ActivateForkAtGenesis(rollup.Granite)
+		case Holocene:
+			dp.DeployConfig.ActivateForkAtGenesis(rollup.Holocene)
+		case Isthmus:
+			dp.DeployConfig.ActivateForkAtGenesis(rollup.Isthmus)
 		}
-		dp.DeployConfig.ActivateForkAtGenesis(rollup.ForkName(testCfg.Hardfork.Name))
 
 		for _, override := range deployConfigOverrides {
 			override(dp.DeployConfig)
@@ -72,7 +92,7 @@ func NewL2FaultProofEnv[c any](t helpers.Testing, testCfg *TestCfg[c], tp *e2eut
 	l2EngineCl, err := sources.NewEngineClient(engine.RPCClient(), log, nil, sources.EngineClientDefaultConfig(sd.RollupCfg))
 	require.NoError(t, err)
 
-	sequencer := helpers.NewL2Sequencer(t, log.New("role", "sequencer"), l1Cl, miner.BlobStore(), altda.Disabled, l2EngineCl, sd.RollupCfg, sd.L1Cfg.Config, sd.DependencySet, 0)
+	sequencer := helpers.NewL2Sequencer(t, log.New("role", "sequencer"), l1Cl, miner.BlobStore(), altda.Disabled, l2EngineCl, sd.RollupCfg, 0)
 	miner.ActL1SetFeeRecipient(common.Address{0xCA, 0xFE, 0xBA, 0xBE})
 	sequencer.ActL2PipelineFull(t)
 	engCl := engine.EngineClient(t, sd.RollupCfg)
@@ -88,7 +108,7 @@ func NewL2FaultProofEnv[c any](t helpers.Testing, testCfg *TestCfg[c], tp *e2eut
 		EthCl:          l1EthCl,
 		Signer:         types.LatestSigner(sd.L1Cfg.Config),
 		AddressCorpora: addresses,
-		Bindings:       helpers.NewL1Bindings(t, l1EthCl, e2ecfg.DefaultAllocType),
+		Bindings:       helpers.NewL1Bindings(t, l1EthCl, e2ecfg.AllocTypeStandard),
 	}
 	l2UserEnv := &helpers.BasicUserEnv[*helpers.L2Bindings]{
 		EthCl:          l2EthCl,
@@ -96,10 +116,10 @@ func NewL2FaultProofEnv[c any](t helpers.Testing, testCfg *TestCfg[c], tp *e2eut
 		AddressCorpora: addresses,
 		Bindings:       helpers.NewL2Bindings(t, l2EthCl, engine.GethClient()),
 	}
-	alice := helpers.NewCrossLayerUser(log, dp.Secrets.Alice, rand.New(rand.NewSource(0xa57b)), e2ecfg.DefaultAllocType)
+	alice := helpers.NewCrossLayerUser(log, dp.Secrets.Alice, rand.New(rand.NewSource(0xa57b)), e2ecfg.AllocTypeStandard)
 	alice.L1.SetUserEnv(l1UserEnv)
 	alice.L2.SetUserEnv(l2UserEnv)
-	bob := helpers.NewCrossLayerUser(log, dp.Secrets.Bob, rand.New(rand.NewSource(0xbeef)), e2ecfg.DefaultAllocType)
+	bob := helpers.NewCrossLayerUser(log, dp.Secrets.Bob, rand.New(rand.NewSource(0xbeef)), e2ecfg.AllocTypeStandard)
 	bob.L1.SetUserEnv(l1UserEnv)
 	bob.L2.SetUserEnv(l2UserEnv)
 
@@ -210,15 +230,13 @@ func NewOpProgramCfg(
 	fi *FixtureInputs,
 ) *config.Config {
 	var rollupConfigs []*rollup.Config
-	var l2chainConfigs []*params.ChainConfig
-	var l1chainConfig *params.ChainConfig
+	var chainConfigs []*params.ChainConfig
 	for _, source := range fi.L2Sources {
 		rollupConfigs = append(rollupConfigs, source.Node.RollupCfg)
-		l2chainConfigs = append(l2chainConfigs, source.ChainConfig)
-		l1chainConfig = source.Node.L1ChainConfig
+		chainConfigs = append(chainConfigs, source.ChainConfig)
 	}
 
-	dfault := config.NewConfig(rollupConfigs, l2chainConfigs, l1chainConfig, fi.L1Head, fi.L2Head, fi.L2OutputRoot, fi.L2Claim, fi.L2BlockNumber)
+	dfault := config.NewConfig(rollupConfigs, chainConfigs, fi.L1Head, fi.L2Head, fi.L2OutputRoot, fi.L2Claim, fi.L2BlockNumber)
 	dfault.L2ChainID = boot.CustomChainIDIndicator
 	if fi.InteropEnabled {
 		dfault.AgreedPrestate = fi.AgreedPrestate

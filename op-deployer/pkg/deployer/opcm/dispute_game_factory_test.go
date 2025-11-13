@@ -47,10 +47,9 @@ func TestSetDisputeGameImpl(t *testing.T) {
 	factoryAddr := common.HexToAddress("0x05F9613aDB30026FFd634f38e5C4dFd30a197Fa1")
 
 	input := SetDisputeGameImplInput{
-		Factory:             factoryAddr,
-		Impl:                common.Address{'I'},
-		GameType:            999,
-		AnchorStateRegistry: common.Address{}, // Do not set as respected game type as we aren't authorized
+		Factory:  factoryAddr,
+		Impl:     common.Address{'I'},
+		GameType: 999,
 	}
 	require.NoError(t, SetDisputeGameImpl(host, input))
 }

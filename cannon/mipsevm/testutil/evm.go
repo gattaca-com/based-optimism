@@ -6,14 +6,12 @@ import (
 	"fmt"
 	"math/big"
 	"os"
-	"testing"
 
 	"github.com/ethereum-optimism/optimism/cannon/mipsevm/arch"
 	"github.com/ethereum-optimism/optimism/op-chain-ops/srcmap"
 	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/eth/tracers/logger"
 	"github.com/ethereum/go-ethereum/triedb"
-	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ethereum-optimism/optimism/op-chain-ops/foundry"
@@ -44,10 +42,9 @@ type Addresses struct {
 type ContractMetadata struct {
 	Artifacts *Artifacts
 	Addresses *Addresses
-	Version   uint8 // versions.StateVersion can't be used as it causes dependency cycles
 }
 
-func TestContractsSetup(t require.TestingT, version MipsVersion, stateVersion uint8) *ContractMetadata {
+func TestContractsSetup(t require.TestingT, version MipsVersion) *ContractMetadata {
 	artifacts, err := loadArtifacts(version)
 	require.NoError(t, err)
 
@@ -58,16 +55,26 @@ func TestContractsSetup(t require.TestingT, version MipsVersion, stateVersion ui
 		FeeRecipient: common.Address{0xaa},
 	}
 
-	return &ContractMetadata{Artifacts: artifacts, Addresses: addrs, Version: stateVersion}
+	return &ContractMetadata{Artifacts: artifacts, Addresses: addrs}
 }
 
 // loadArtifacts loads the Cannon contracts, from the contracts package.
 func loadArtifacts(version MipsVersion) (*Artifacts, error) {
 	artifactFS := foundry.OpenArtifactsDir("../../../packages/contracts-bedrock/forge-artifacts")
-	if arch.IsMips32 || version != MipsMultithreaded {
-		return nil, fmt.Errorf("unknown MipsVersion supplied: %v", version)
+	var mips *foundry.Artifact
+	var err error
+	switch version {
+	case MipsSingleThreaded:
+		mips, err = artifactFS.ReadArtifact("MIPS.sol", "MIPS")
+	case MipsMultithreaded:
+		if arch.IsMips32 {
+			mips, err = artifactFS.ReadArtifact("MIPS2.sol", "MIPS2")
+		} else {
+			mips, err = artifactFS.ReadArtifact("MIPS64.sol", "MIPS64")
+		}
+	default:
+		return nil, fmt.Errorf("Unknown MipsVersion supplied: %v", version)
 	}
-	mips, err := artifactFS.ReadArtifact("MIPS64.sol", "MIPS64")
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +90,7 @@ func loadArtifacts(version MipsVersion) (*Artifacts, error) {
 	}, nil
 }
 
-func NewEVMEnv(t testing.TB, contracts *ContractMetadata) (*vm.EVM, *state.StateDB) {
+func NewEVMEnv(contracts *ContractMetadata) (*vm.EVM, *state.StateDB) {
 	// Temporary hack until Cancun is activated on mainnet
 	cpy := *params.MainnetChainConfig
 	chainCfg := &cpy // don't modify the global chain config
@@ -100,7 +107,7 @@ func NewEVMEnv(t testing.TB, contracts *ContractMetadata) (*vm.EVM, *state.State
 	statedb := state.NewDatabase(triedb.NewDatabase(db, nil), nil)
 	state, err := state.New(types.EmptyRootHash, statedb)
 	if err != nil {
-		t.Fatalf("failed to create memory state db: %v", err)
+		panic(fmt.Errorf("failed to create memory state db: %w", err))
 	}
 	blockContext := core.NewEVMBlockContext(header, bc, nil, chainCfg, state)
 	vmCfg := vm.Config{}
@@ -109,23 +116,13 @@ func NewEVMEnv(t testing.TB, contracts *ContractMetadata) (*vm.EVM, *state.State
 	// pre-deploy the contracts
 	env.StateDB.SetCode(contracts.Addresses.Oracle, contracts.Artifacts.Oracle.DeployedBytecode.Object)
 
-	var ctorArgs []byte
-	if contracts.Version == 0 { // Old MIPS.sol doesn't specify the state version in the constructor
-		var mipsCtorArgs [32]byte
-		copy(mipsCtorArgs[12:], contracts.Addresses.Oracle[:])
-		ctorArgs = mipsCtorArgs[:]
-	} else {
-		var mipsCtorArgs [64]byte
-		copy(mipsCtorArgs[12:], contracts.Addresses.Oracle[:])
-		vers := uint256.NewInt(uint64(contracts.Version)).Bytes32()
-		copy(mipsCtorArgs[32:], vers[:])
-		ctorArgs = mipsCtorArgs[:]
-	}
-	mipsDeploy := append(bytes.Clone(contracts.Artifacts.MIPS.Bytecode.Object), ctorArgs...)
+	var mipsCtorArgs [32]byte
+	copy(mipsCtorArgs[12:], contracts.Addresses.Oracle[:])
+	mipsDeploy := append(bytes.Clone(contracts.Artifacts.MIPS.Bytecode.Object), mipsCtorArgs[:]...)
 	startingGas := uint64(30_000_000)
-	retVal, deployedMipsAddr, leftOverGas, err := env.Create(contracts.Addresses.Sender, mipsDeploy, startingGas, common.U2560)
+	_, deployedMipsAddr, leftOverGas, err := env.Create(contracts.Addresses.Sender, mipsDeploy, startingGas, common.U2560)
 	if err != nil {
-		t.Fatalf("failed to deploy MIPS contract. error: '%v'. return value: 0x%x. took %d gas.", err, retVal, startingGas-leftOverGas)
+		panic(fmt.Errorf("failed to deploy MIPS contract: %w. took %d gas", err, startingGas-leftOverGas))
 	}
 	contracts.Addresses.MIPS = deployedMipsAddr
 
@@ -177,10 +174,20 @@ func MarkdownTracer() *tracing.Hooks {
 
 func SourceMapTracer(t require.TestingT, version MipsVersion, mips *foundry.Artifact, oracle *foundry.Artifact, addrs *Addresses) *tracing.Hooks {
 	srcFS := foundry.NewSourceMapFS(os.DirFS("../../../packages/contracts-bedrock"))
-	if arch.IsMips32 || version != MipsMultithreaded {
+	var mipsSrcMap *srcmap.SourceMap
+	var err error
+	switch version {
+	case MipsSingleThreaded:
+		mipsSrcMap, err = srcFS.SourceMap(mips, "MIPS")
+	case MipsMultithreaded:
+		if arch.IsMips32 {
+			mipsSrcMap, err = srcFS.SourceMap(mips, "MIPS2")
+		} else {
+			mipsSrcMap, err = srcFS.SourceMap(mips, "MIPS64")
+		}
+	default:
 		require.Fail(t, "invalid mips version")
 	}
-	mipsSrcMap, err := srcFS.SourceMap(mips, "MIPS64")
 	require.NoError(t, err)
 	oracleSrcMap, err := srcFS.SourceMap(oracle, "PreimageOracle")
 	require.NoError(t, err)

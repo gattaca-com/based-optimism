@@ -1,7 +1,6 @@
 package multithreaded
 
 import (
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	lru "github.com/hashicorp/golang-lru/v2/simplelru"
 
 	"github.com/ethereum-optimism/optimism/cannon/mipsevm"
@@ -15,7 +14,6 @@ type StatsTracker interface {
 	trackReservationInvalidation()
 	trackForcedPreemption()
 	trackThreadActivated(tid Word, step uint64)
-	trackInstructionCacheMiss(pc Word)
 	populateDebugInfo(debugInfo *mipsevm.DebugInfo)
 }
 
@@ -33,7 +31,6 @@ func (s *noopStatsTracker) trackReservationInvalidation()                  {}
 func (s *noopStatsTracker) trackForcedPreemption()                         {}
 func (s *noopStatsTracker) trackThreadActivated(tid Word, step uint64)     {}
 func (s *noopStatsTracker) populateDebugInfo(debugInfo *mipsevm.DebugInfo) {}
-func (s *noopStatsTracker) trackInstructionCacheMiss(pc Word)              {}
 
 var _ StatsTracker = (*noopStatsTracker)(nil)
 
@@ -51,8 +48,6 @@ type statsTrackerImpl struct {
 	reservationInvalidationCount uint64
 	forcedPreemptionCount        uint64
 	idleStepCountThread0         uint64
-	icacheMissCount              uint64
-	highestICacheMissPC          Word
 }
 
 func (s *statsTrackerImpl) populateDebugInfo(debugInfo *mipsevm.DebugInfo) {
@@ -62,8 +57,6 @@ func (s *statsTrackerImpl) populateDebugInfo(debugInfo *mipsevm.DebugInfo) {
 	debugInfo.ReservationInvalidationCount = s.reservationInvalidationCount
 	debugInfo.ForcedPreemptionCount = s.forcedPreemptionCount
 	debugInfo.IdleStepCountThread0 = s.idleStepCountThread0
-	debugInfo.InstructionCacheMissCount = s.icacheMissCount
-	debugInfo.HighestICacheMissPC = hexutil.Uint64(s.highestICacheMissPC)
 }
 
 func (s *statsTrackerImpl) trackLL(threadId Word, step uint64) {
@@ -110,13 +103,6 @@ func (s *statsTrackerImpl) trackThreadActivated(tid Word, step uint64) {
 		s.idleStepCountThread0 += idleSteps
 	}
 	s.activeThreadId = tid
-}
-
-func (s *statsTrackerImpl) trackInstructionCacheMiss(pc Word) {
-	s.icacheMissCount += 1
-	if pc > s.highestICacheMissPC {
-		s.highestICacheMissPC = pc
-	}
 }
 
 func NewStatsTracker() StatsTracker {

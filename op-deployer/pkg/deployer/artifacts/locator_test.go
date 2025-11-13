@@ -15,6 +15,26 @@ func TestLocator_Marshaling(t *testing.T) {
 		err  bool
 	}{
 		{
+			name: "valid tag",
+			in:   "tag://op-contracts/v1.6.0",
+			out: &Locator{
+				Tag: "op-contracts/v1.6.0",
+			},
+			err: false,
+		},
+		{
+			name: "well-formed but nonexistent tag",
+			in:   "tag://op-contracts/v1.5.0",
+			out:  nil,
+			err:  true,
+		},
+		{
+			name: "mal-formed tag",
+			in:   "tag://honk",
+			out:  nil,
+			err:  true,
+		},
+		{
 			name: "valid HTTPS URL",
 			in:   "https://example.com",
 			out: &Locator{
@@ -56,14 +76,6 @@ func TestLocator_Marshaling(t *testing.T) {
 			out:  nil,
 			err:  true,
 		},
-		{
-			name: "embedded",
-			in:   "embedded",
-			out: &Locator{
-				URL: embeddedURL,
-			},
-			err: false,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -96,6 +108,21 @@ func TestLocator_Equal(t *testing.T) {
 		equal bool
 	}{
 		{
+			MustNewLocatorFromTag("op-contracts/v1.6.0"),
+			MustNewLocatorFromTag("op-contracts/v1.8.0-rc.4"),
+			false,
+		},
+		{
+			MustNewLocatorFromTag("op-contracts/v1.6.0"),
+			MustNewLocatorFromTag("op-contracts/v1.6.0"),
+			true,
+		},
+		{
+			MustNewLocatorFromURL("http://www.example.com"),
+			MustNewLocatorFromTag("op-contracts/v1.6.0"),
+			false,
+		},
+		{
 			MustNewLocatorFromURL("https://www.example.com"),
 			MustNewLocatorFromURL("http://www.example.com"),
 			false,
@@ -104,6 +131,11 @@ func TestLocator_Equal(t *testing.T) {
 			MustNewLocatorFromURL("http://www.example.com"),
 			MustNewLocatorFromURL("http://www.example.com"),
 			true,
+		},
+		{
+			MustNewLocatorFromTag("op-contracts/v1.6.0"),
+			MustNewFileLocator("/foo/bar"),
+			false,
 		},
 		{
 			MustNewFileLocator("/foo/bar"),
