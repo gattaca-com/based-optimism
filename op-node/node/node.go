@@ -16,7 +16,6 @@ import (
 	"github.com/hashicorp/go-multierror"
 
 	"github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	gethevent "github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
@@ -118,28 +117,16 @@ type OpNode struct {
 	eventSys   event.System
 	eventDrain driver.Drain
 
-<<<<<<< HEAD
-	l1Source          *sources.L1Client       // L1 Client to fetch data from
-	registrySource    *sources.RegistryClient // Registry Client to fetch gateway address
-	l2Driver          *driver.Driver          // L2 Engine to Sync
-	l2Source          *sources.EngineClient   // L2 Execution Engine RPC bindings
-	server            *oprpc.Server           // RPC server hosting the rollup-node API
-	p2pNode           *p2p.NodeP2P            // P2P node functionality
-	p2pMu             gosync.Mutex            // protects p2pNode
-	p2pSigner         p2p.Signer              // p2p gossip application messages will be signed with this signer
-	p2pGatewayAddress common.Address          // Gateway address for P2P
-	runCfg            *runcfg.RuntimeConfig   // runtime configurables
-	preconfChannels   engine.PreconfChannels
-=======
-	l1Source  L1Source              // L1 Client to fetch data from
-	l2Driver  *driver.Driver        // L2 Engine to Sync
-	l2Source  *sources.EngineClient // L2 Execution Engine RPC bindings
-	server    *oprpc.Server         // RPC server hosting the rollup-node API
-	p2pNode   *p2p.NodeP2P          // P2P node functionality
-	p2pMu     gosync.Mutex          // protects p2pNode
-	p2pSigner p2p.Signer            // p2p gossip application messages will be signed with this signer
-	runCfg    *runcfg.RuntimeConfig // runtime configurables
->>>>>>> 94706ec5072b13030600d1b45ae10b673b660c0d
+	l1Source        L1Source // L1 Client to fetch data from
+	registrySource  *sources.RegistryClient
+	l2Driver        *driver.Driver        // L2 Engine to Sync
+	l2Source        *sources.EngineClient // L2 Execution Engine RPC bindings
+	server          *oprpc.Server         // RPC server hosting the rollup-node API
+	p2pNode         *p2p.NodeP2P          // P2P node functionality
+	p2pMu           gosync.Mutex          // protects p2pNode
+	p2pSigner       p2p.Signer            // p2p gossip application messages will be signed with this signer
+	runCfg          *runcfg.RuntimeConfig // runtime configurables
+	preconfChannels engine.PreconfChannels
 
 	safeDB closableSafeDB
 
@@ -229,13 +216,9 @@ func (n *OpNode) init(ctx context.Context, cfg *config.Config, overrides Initial
 	if err != nil {
 		return fmt.Errorf("failed to init event system: %w", err)
 	}
-<<<<<<< HEAD
 	if err := n.initRegistry(ctx, cfg); err != nil {
 		return fmt.Errorf("failed to init Registry: %w", err)
 	}
-	if err := n.initL1Source(ctx, cfg); err != nil {
-		return fmt.Errorf("failed to init L1 Source: %w", err)
-=======
 
 	if overrides.Beacon == nil {
 		beacon, err := initL1BeaconAPI(ctx, cfg, n)
@@ -245,7 +228,6 @@ func (n *OpNode) init(ctx context.Context, cfg *config.Config, overrides Initial
 		n.beacon = beacon
 	} else {
 		n.beacon = overrides.Beacon
->>>>>>> 94706ec5072b13030600d1b45ae10b673b660c0d
 	}
 
 	if overrides.L1Source == nil {
@@ -441,7 +423,7 @@ func (n *OpNode) initRegistry(ctx context.Context, cfg *config.Config) error {
 // note: this function relies on side effects to set node.runCfg
 func initRuntimeConfig(ctx context.Context, cfg *config.Config, node *OpNode) error {
 	// attempt to load runtime config, repeat N times
-	runCfg := runcfg.NewRuntimeConfig(node.log, node.l1Source, &cfg.Rollup)
+	runCfg := runcfg.NewRuntimeConfig(node.log, node.l1Source, &cfg.Rollup, node.registrySource)
 	// Set node.runCfg early so handleProtocolVersionsUpdate can access it during initialization
 	node.runCfg = runCfg
 
@@ -612,7 +594,7 @@ func initL2(ctx context.Context, cfg *config.Config, node *OpNode) (*sources.Eng
 		return nil, nil, nil, nil, err
 	}
 
-	n.preconfChannels = engine.StartPreconf(n.resourcesCtx, n.l2Source, *n.metrics, n.log)
+	node.preconfChannels = engine.StartPreconf(node.resourcesCtx, node.l2Source, *node.metrics, node.log)
 	indexingMode := false
 	sys, err := cfg.InteropConfig.Setup(ctx, node.log, &node.cfg.Rollup, node.l1Source, l2Source, node.metrics)
 	if err != nil {
@@ -717,18 +699,14 @@ func registerAPIs(cfg *config.Config, node *OpNode, handler *oprpc.Handler) erro
 		node.log.Info("Admin RPC enabled")
 	}
 	if cfg.RPC.EnableBased {
-		server.AddAPI(rpc.API{
+		if err := handler.AddAPI(rpc.API{
 			Namespace: "based",
 			Service:   NewBasedAPI(node.p2pNode, node.registrySource, node.log),
-		})
+		}); err != nil {
+			return fmt.Errorf("failed to add Based API: %w", err)
+		}
 		node.log.Info("Based RPC enabled")
 	}
-	node.log.Info("Starting JSON-RPC server")
-	if err := server.Start(); err != nil {
-		return fmt.Errorf("unable to start RPC server: %w", err)
-	}
-	node.log.Info("Started JSON-RPC server", "addr", server.Endpoint())
-	node.server = server
 	return nil
 }
 
