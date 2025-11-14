@@ -274,12 +274,15 @@ func (n *basedAPI) Env(ctx context.Context, signedEnv eth.SignedEnv) (string, er
 
 	// expectedSigner, err := n.registrySource.GatewayForBlock(ctx, signedEnv.Env.Number)
 
-	current, err := n.registrySource.EthClient.CurrentGateway(ctx)
-	expectedSigner := current.GatewayAddress
+	if n.registrySource == nil || n.registrySource.EthClient == nil {
+		return "ERROR", fmt.Errorf("registry source not initialized")
+	}
 
+	current, err := n.registrySource.EthClient.CurrentGateway(ctx)
 	if err != nil {
 		return "ERROR", fmt.Errorf("failed to get expected signer: %w", err)
 	}
+	expectedSigner := current.GatewayAddress
 
 	if validation := verifySignature(n.log, signedEnv.Signature[:], root[:], expectedSigner); validation != pubsub.ValidationAccept {
 		return "ERROR", fmt.Errorf("signature validation failed")
