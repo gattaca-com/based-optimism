@@ -246,6 +246,7 @@ type NewFrag struct {
 	BlockNumber uint64   `ssz-size:"8"`
 	Seq         uint64   `ssz-size:"8"`
 	IsLast      bool     `ssz-size:"1"`
+	BlobGasUsed uint64   `ssz-size:"8"`
 	Txs         [][]byte `ssz-max:"1048576,1073741824"`
 }
 
@@ -254,6 +255,7 @@ func (f *NewFrag) UnmarshalJSON(data []byte) error {
 		BlockNumber uint64          `json:"blockNumber"`
 		Seq         uint64          `json:"seq"`
 		IsLast      bool            `json:"isLast"`
+		BlobGasUsed uint64          `json:"blobGasUsed"`
 		Txs         []hexutil.Bytes `json:"txs"`
 	}
 
@@ -265,6 +267,7 @@ func (f *NewFrag) UnmarshalJSON(data []byte) error {
 	f.BlockNumber = frag.BlockNumber
 	f.Seq = frag.Seq
 	f.IsLast = frag.IsLast
+	f.BlobGasUsed = frag.BlobGasUsed
 	f.Txs = make([][]byte, len(frag.Txs))
 	for i, tx := range frag.Txs {
 		f.Txs[i] = tx
@@ -283,11 +286,13 @@ func (f *NewFrag) MarshalJSON() ([]byte, error) {
 		BlockNumber uint64          `json:"blockNumber"`
 		Seq         uint64          `json:"seq"`
 		IsLast      bool            `json:"isLast"`
+		BlobGasUsed uint64          `json:"blobGasUsed"`
 		Txs         []hexutil.Bytes `json:"txs"`
 	}{
 		BlockNumber: f.BlockNumber,
 		Seq:         f.Seq,
 		IsLast:      f.IsLast,
+		BlobGasUsed: f.BlobGasUsed,
 		Txs:         txs,
 	})
 }
@@ -308,6 +313,7 @@ type Seal struct {
 	ReceiptsRoot     Bytes32 `json:"receiptsRoot" ssz-size:"32"`
 	StateRoot        Bytes32 `json:"stateRoot" ssz-size:"32"`
 	BlockHash        Bytes32 `json:"blockHash" ssz-size:"32"`
+	BlobGasUsed      uint64  `json:"blobGasUsed" ssz-size:"8"`
 }
 
 type SignedEnv struct {

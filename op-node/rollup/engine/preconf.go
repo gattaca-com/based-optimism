@@ -49,7 +49,7 @@ func NewPreconfChannels() PreconfChannels {
 		EnvCh:     make(chan *eth.SignedEnv),
 		NewFragCh: make(chan *eth.SignedNewFrag),
 		SealCh:    make(chan *eth.SignedSeal),
-		l2BlockCh: make(chan *eth.L2BlockRef),
+		l2BlockCh: make(chan *eth.L2BlockRef, 10),
 	}
 }
 

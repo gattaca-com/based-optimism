@@ -522,8 +522,8 @@ func (envelope *ExecutionPayloadEnvelope) MarshalSSZ(w io.Writer) (n int, err er
 	return hashSize + payloadSize, nil
 }
 
-// block number, squence number, is_last, txs offset, version.
-const NewFragFixedSize = 8 + 8 + 1 + 4 + 8
+// block number, squence number, is_last, txs offset, version + blob gas used.
+const NewFragFixedSize = 8 + 8 + 1 + 4 + 8 + 8
 
 // UnmarshalSSZ decodes the NewFrag as SSZ type
 func (newFrag *NewFrag) UnmarshalSSZ(scope uint32, r io.Reader) error {
@@ -574,7 +574,7 @@ func (signedNewFrag *SignedNewFrag) MarshalSSZ(w io.Writer) error {
 	return nil
 }
 
-func (s *Seal) SizeSSZ(siz *ssz.Sizer) uint32 { return 32*4 + 8*4 }
+func (s *Seal) SizeSSZ(siz *ssz.Sizer) uint32 { return 32*4 + 8*4 + 8 }
 
 func (s *Seal) DefineSSZ(codec *ssz.Codec) {
 	ssz.DefineUint64(codec, &s.TotalFrags)
@@ -586,11 +586,12 @@ func (s *Seal) DefineSSZ(codec *ssz.Codec) {
 	ssz.DefineStaticBytes(codec, &s.ReceiptsRoot)
 	ssz.DefineStaticBytes(codec, &s.StateRoot)
 	ssz.DefineStaticBytes(codec, &s.BlockHash)
+	ssz.DefineUint64(codec, &s.BlobGasUsed)
 }
 
 func (f *NewFrag) SizeSSZ(siz *ssz.Sizer, fixed bool) uint32 {
-	// fixed size, 2 uint64 + 1 bool + 1 offset
-	size := uint32(8*2 + 1 + 4)
+	// Fixed size: BlockNumber(8) + Seq(8) + IsLast(1) + TxsOffset(4) + BlobGasUsed(8)
+	size := uint32(8*2 + 1 + 4 + 8)
 	if fixed {
 		return size
 	}
@@ -608,9 +609,10 @@ func (f *NewFrag) DefineSSZ(codec *ssz.Codec) {
 	ssz.DefineUint64(codec, &f.BlockNumber)
 	ssz.DefineUint64(codec, &f.Seq)
 	ssz.DefineBool(codec, &f.IsLast)
-	ssz.DefineSliceOfDynamicBytesOffset(codec, &f.Txs, MaxTxAmount, MaxTxsSize)
+	ssz.DefineUint64(codec, &f.BlobGasUsed)
 
 	// Variable size section
+	ssz.DefineSliceOfDynamicBytesOffset(codec, &f.Txs, MaxTxAmount, MaxTxsSize)
 	ssz.DefineSliceOfDynamicBytesContent(codec, &f.Txs, MaxTxAmount, MaxTxsSize)
 }
 
