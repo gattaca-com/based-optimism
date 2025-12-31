@@ -314,20 +314,19 @@ func unusableMethod(err error) bool {
 }
 
 // RegistryResponse is the response from the registry api.
-// It is a tuple of (block_number, url, gateway_address, jwt_secret) of a gateway that was the leader at the given block number.
+// It is a tuple of (block_number, url, gateway_address) of a gateway that was the leader at the given block number.
 type RegistryResponse struct {
 	BlockNumber    uint64
 	Url            string
 	GatewayAddress common.Address
-	JwtSecret      common.Hash
 }
 
 func RegistryResponseFromTuple(tuple []any) (*RegistryResponse, error) {
 	if tuple == nil {
 		return nil, fmt.Errorf("tuple is nil")
 	}
-	if len(tuple) != 4 {
-		return nil, fmt.Errorf("expected 4 elements in tuple, got %d", len(tuple))
+	if len(tuple) != 3 {
+		return nil, fmt.Errorf("expected 3 elements in tuple, got %d", len(tuple))
 	}
 
 	blockNum, ok := tuple[0].(float64)
@@ -345,15 +344,9 @@ func RegistryResponseFromTuple(tuple []any) (*RegistryResponse, error) {
 		return nil, fmt.Errorf("invalid gateway address type: expected string, got %T", tuple[2])
 	}
 
-	jwtSecret, ok := tuple[3].(string)
-	if !ok {
-		return nil, fmt.Errorf("invalid jwt secret type: expected string, got %T", tuple[3])
-	}
-
 	return &RegistryResponse{
 		BlockNumber:    uint64(blockNum),
 		Url:            url,
 		GatewayAddress: common.HexToAddress(gatewayAddress),
-		JwtSecret:      common.HexToHash(jwtSecret),
 	}, nil
 }
